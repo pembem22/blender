@@ -71,11 +71,7 @@ ccl_device_inline void path_state_init(KernelGlobals *kg,
   float wavelength_offset = fmod(path_state_rng_1D(kg, state, PRNG_WAVELENGTH),
                                  1.0f / CHANNELS_PER_RAY);
 
-  FOR_EACH_CHANNEL(i)
-  {
-    state->wavelengths[i] = float_lerp(
-        MIN_WAVELENGTH, MAX_WAVELENGTH, wavelength_offset + (1.0f * i / CHANNELS_PER_RAY));
-  }
+  state->wavelengths = float_lerp(MIN_WAVELENGTH, MAX_WAVELENGTH, wavelength_offset);
 }
 
 ccl_device_inline void path_state_next(KernelGlobals *kg,

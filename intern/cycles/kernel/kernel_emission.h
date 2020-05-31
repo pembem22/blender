@@ -144,7 +144,7 @@ ccl_device_noinline_cpu bool direct_emission(KernelGlobals *kg,
   shader_bsdf_eval(kg, sd, ls->D, eval, ls->pdf, ls->shader & SHADER_USE_MIS);
 #endif
 
-  bsdf_eval_mul(eval, light_eval / ls->pdf);
+  bsdf_eval_mul_spectral(eval, light_eval / ls->pdf);
 
 #ifdef __PASSES__
   /* use visibility flag to skip lights */

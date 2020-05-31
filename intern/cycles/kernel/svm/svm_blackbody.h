@@ -51,17 +51,18 @@ ccl_device_inline float blackbody_intensity(float temperature, float wavelength)
   return intensity;
 }
 
-ccl_device_inline SpectralColor blackbody_intensity(float temperature, SpectralColor wavelengths)
-{
-  SpectralColor wavelengths_i = 1.0f / wavelengths;
-  SpectralColor wavelengths_i2 = wavelengths_i * wavelengths_i;
-  SpectralColor wavelengths_i5 = wavelengths_i2 * wavelengths_i2 * wavelengths_i;
+// ccl_device_inline SpectralColor blackbody_intensity(float temperature, SpectralColor
+// wavelengths)
+// {
+//   SpectralColor wavelengths_i = 1.0f / wavelengths;
+//   SpectralColor wavelengths_i2 = wavelengths_i * wavelengths_i;
+//   SpectralColor wavelengths_i5 = wavelengths_i2 * wavelengths_i2 * wavelengths_i;
 
-  SpectralColor intensity = (2 * h * c * c * wavelengths_i5) /
-                            expm1(h * c / (kb * wavelengths * temperature));
+//   SpectralColor intensity = (2 * h * c * c * wavelengths_i5) /
+//                             expm1(h * c / (kb * wavelengths * temperature));
 
-  return intensity;
-}
+//   return intensity;
+// }
 
 ccl_device_inline float blackbody_intensity_peak(float temperature)
 {

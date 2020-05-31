@@ -28,18 +28,15 @@ ccl_device void svm_node_spectrum_curves(
 
   SpectralColor out;
 
-  FOR_EACH_CHANNEL(i)
-  {
-    float wavelength = state->wavelengths[i];
-    float t = (wavelength - MIN_WAVELENGTH) / (MAX_WAVELENGTH - MIN_WAVELENGTH);
+  float wavelength = state->wavelengths;
+  float t = (wavelength - MIN_WAVELENGTH) / (MAX_WAVELENGTH - MIN_WAVELENGTH);
 
-    int position = int(t * (table_size - 1));
-    float progress = (t * (table_size - 1)) - position;
+  int position = int(t * (table_size - 1));
+  float progress = (t * (table_size - 1)) - position;
 
-    out[i] = mix(fetch_node_float(kg, table_offset + position).x,
-                 fetch_node_float(kg, table_offset + min(table_size - 1, position + 1)).x,
-                 progress);
-  }
+  out = mix(fetch_node_float(kg, table_offset + position).x,
+            fetch_node_float(kg, table_offset + min(table_size - 1, position + 1)).x,
+            progress);
 
   stack_store_spectral(stack, out_offset, out);
 

@@ -128,7 +128,7 @@ ccl_device_inline void bsdf_eval_mul(BsdfEval *eval, float value)
   bsdf_eval_mis(eval, value);
 }
 
-ccl_device_inline void bsdf_eval_mul(BsdfEval *eval, SpectralColor value)
+ccl_device_inline void bsdf_eval_mul_spectral(BsdfEval *eval, SpectralColor value)
 {
 #ifdef __SHADOW_TRICKS__
   eval->sum_no_mis *= value;
@@ -725,14 +725,7 @@ ccl_device_inline void path_radiance_split_denoising(KernelGlobals *kg,
 ccl_device_inline void path_radiance_accum_sample(PathRadiance *L, PathRadiance *L_sample)
 {
 #ifdef __SPLIT_KERNEL__
-#  define safe_spectral_color_add(f, v) \
-    do { \
-      ccl_global float *p = (ccl_global float *)(&(f)); \
-      FOR_EACH_CHANNEL(i) \
-      { \
-        atomic_add_and_fetch_float(p + i, (v)[i]); \
-      } \
-    } while (0)
+#  define safe_spectral_color_add(f, v) atomic_add_and_fetch_float(&(f), (v))
 #  define safe_float_add(f, v) atomic_add_and_fetch_float(&(f), (v))
 #else
 #  define safe_spectral_color_add(f, v) (f) += (v)
