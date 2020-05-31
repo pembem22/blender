@@ -23,7 +23,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-#define SPECTRAL_COLOR_DATA_TYPE float8
+#define SPECTRAL_COLOR_DATA_TYPE float
 #define CHANNELS_PER_RAY 1
 
 typedef SPECTRAL_COLOR_DATA_TYPE SpectralColor;
@@ -36,6 +36,21 @@ typedef SPECTRAL_COLOR_DATA_TYPE SpectralColor;
 
 #define MIN_WAVELENGTH 380.0f
 #define MAX_WAVELENGTH 730.0f
+
+ccl_device_inline float make_float(const float f)
+{
+  return f;
+}
+
+ccl_device_inline float load_float(const float *v)
+{
+  return v[0];
+}
+
+ccl_device_inline void store_float(const float &a, float *v)
+{
+  v[0] = a;
+}
 
 CCL_NAMESPACE_END
 

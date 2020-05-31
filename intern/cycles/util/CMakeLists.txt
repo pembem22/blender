@@ -77,6 +77,7 @@ set(SRC_HEADERS
   util_math_cdf.h
   util_math_fast.h
   util_math_intersect.h
+  util_math_float.h
   util_math_float2.h
   util_math_float3.h
   util_math_float4.h

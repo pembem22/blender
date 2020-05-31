@@ -443,6 +443,7 @@ CCL_NAMESPACE_END
 #include "util/util_math_int3.h"
 #include "util/util_math_int4.h"
 
+#include "util/util_math_float.h"
 #include "util/util_math_float2.h"
 #include "util/util_math_float3.h"
 #include "util/util_math_float4.h"
