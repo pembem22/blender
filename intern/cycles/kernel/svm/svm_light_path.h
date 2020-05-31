@@ -58,6 +58,9 @@ ccl_device void svm_node_light_path(ShaderData *sd,
     case NODE_LP_ray_length:
       info = sd->ray_length;
       break;
+    case NODE_LP_ray_wavelength:
+      info = state->wavelengths;
+      break;
     case NODE_LP_ray_depth:
       info = (float)state->bounce;
       break;

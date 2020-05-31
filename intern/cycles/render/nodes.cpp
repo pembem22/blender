@@ -3931,6 +3931,7 @@ NODE_DEFINE(LightPathNode)
   SOCKET_OUT_FLOAT(is_transmission_ray, "Is Transmission Ray");
   SOCKET_OUT_FLOAT(is_volume_scatter_ray, "Is Volume Scatter Ray");
   SOCKET_OUT_FLOAT(ray_length, "Ray Length");
+  SOCKET_OUT_FLOAT(ray_wavelength, "Ray Wavelength");
   SOCKET_OUT_FLOAT(ray_depth, "Ray Depth");
   SOCKET_OUT_FLOAT(diffuse_depth, "Diffuse Depth");
   SOCKET_OUT_FLOAT(glossy_depth, "Glossy Depth");
@@ -3991,6 +3992,11 @@ void LightPathNode::compile(SVMCompiler &compiler)
   out = output("Ray Length");
   if (!out->links.empty()) {
     compiler.add_node(NODE_LIGHT_PATH, NODE_LP_ray_length, compiler.stack_assign(out));
+  }
+
+  out = output("Ray Wavelength");
+  if (!out->links.empty()) {
+    compiler.add_node(NODE_LIGHT_PATH, NODE_LP_ray_wavelength, compiler.stack_assign(out));
   }
 
   out = output("Ray Depth");

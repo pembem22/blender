@@ -30,6 +30,7 @@ static bNodeSocketTemplate sh_node_light_path_out[] = {
     {SOCK_FLOAT, N_("Is Reflection Ray"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
     {SOCK_FLOAT, N_("Is Transmission Ray"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
     {SOCK_FLOAT, N_("Ray Length"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
+    {SOCK_FLOAT, N_("Ray Wavelength"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
     {SOCK_FLOAT, N_("Ray Depth"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
     {SOCK_FLOAT, N_("Diffuse Depth"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
     {SOCK_FLOAT, N_("Glossy Depth"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f},
