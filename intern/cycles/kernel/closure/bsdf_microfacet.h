@@ -378,7 +378,7 @@ ccl_device int bsdf_microfacet_ggx_refraction_setup(MicrofacetBsdf *bsdf)
 
   bsdf->type = CLOSURE_BSDF_MICROFACET_GGX_REFRACTION_ID;
 
-  return SD_BSDF | SD_BSDF_HAS_EVAL;
+  return SD_BSDF | SD_BSDF_HAS_EVAL | SD_HAS_WAVELENGTH_DEPENDENCY;
 }
 
 ccl_device void bsdf_microfacet_ggx_blur(ShaderClosure *sc, float roughness)
@@ -815,7 +815,8 @@ ccl_device int bsdf_microfacet_beckmann_refraction_setup(MicrofacetBsdf *bsdf)
   bsdf->alpha_y = bsdf->alpha_x;
 
   bsdf->type = CLOSURE_BSDF_MICROFACET_BECKMANN_REFRACTION_ID;
-  return SD_BSDF | SD_BSDF_HAS_EVAL;
+  /* temp flag */
+  return SD_BSDF | SD_BSDF_HAS_EVAL | SD_HAS_WAVELENGTH_DEPENDENCY;
 }
 
 ccl_device void bsdf_microfacet_beckmann_blur(ShaderClosure *sc, float roughness)

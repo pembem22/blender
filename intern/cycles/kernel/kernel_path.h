@@ -509,13 +509,14 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 /**
  * Stores the scene-linear RGB luminance of the sample in PathRadiance *L
  **/
-ccl_device_forceinline void kernel_path_integrate(KernelGlobals *kg,
-                                                  PathState *state,
-                                                  SpectralColor throughput,
-                                                  Ray *ray,
-                                                  PathRadiance *L,
-                                                  ccl_global float *buffer,
-                                                  ShaderData *emission_sd)
+ccl_device_noinline void kernel_path_integrate(KernelGlobals *kg,
+                                               PathState *state,
+                                               SpectralColor throughput,
+                                               Ray *ray,
+                                               PathRadiance *L,
+                                               ccl_global float *buffer,
+                                               ShaderData *emission_sd,
+                                               bool branched = false)
 {
   PROFILING_INIT(kg, PROFILING_PATH_INTEGRATE);
 
@@ -534,6 +535,8 @@ ccl_device_forceinline void kernel_path_integrate(KernelGlobals *kg,
     for (;;) {
       /* Find intersection with objects in scene. */
       Intersection isect;
+      Ray old_ray = *ray;
+      PathState old_state = *state;
       bool hit = kernel_path_scene_intersect(kg, state, ray, &isect, L);
 
       /* Find intersection with lamps and compute emission for MIS. */
@@ -572,6 +575,33 @@ ccl_device_forceinline void kernel_path_integrate(KernelGlobals *kg,
         /* Evaluate shader. */
         shader_eval_surface(kg, &sd, state, buffer, state->flag);
         shader_prepare_closures(&sd, state);
+
+        /* TODO: fix ray flag, remove `branched` parameter. */
+        if ((sd.flag & SD_HAS_WAVELENGTH_DEPENDENCY) &&
+            !(state->flag & PATH_RAY_WAVELENGTH_BRANCHED) && !branched) {
+          FOR_EACH_CHANNEL(i)
+          {
+            PathState new_state = old_state;
+            new_state.flag |= PATH_RAY_WAVELENGTH_BRANCHED;
+            new_state.wavelengths = make_spectral_color(state->wavelengths[i]);
+
+            Ray new_ray = old_ray;
+
+            PathRadiance new_L;
+            path_radiance_init(kg, &new_L);
+
+            kernel_path_integrate(
+                kg, &new_state, throughput, &new_ray, &new_L, buffer, emission_sd, true);
+
+            L->emission[i] += new_L.emission[i];
+            L->color_glossy[i] += new_L.color_glossy[i];
+            L->direct_glossy[i] += new_L.direct_glossy[i];
+            L->indirect_glossy[i] += new_L.indirect_glossy[i];
+            L->path_total[i] += new_L.path_total[i];
+          }
+
+          break;
+        }
 
         /* Apply shadow catcher, holdout, emission. */
         if (!kernel_path_shader_apply(kg, &sd, state, ray, throughput, emission_sd, L, buffer)) {

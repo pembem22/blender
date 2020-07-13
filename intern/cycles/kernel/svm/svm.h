@@ -262,7 +262,7 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg,
         break;
       }
       case NODE_CLOSURE_BSDF:
-        svm_node_closure_bsdf(kg, sd, stack, node, type, path_flag, &offset);
+        svm_node_closure_bsdf(kg, state, sd, stack, node, type, path_flag, &offset);
         break;
       case NODE_CLOSURE_EMISSION:
         svm_node_closure_emission(sd, stack, node);

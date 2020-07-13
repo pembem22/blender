@@ -289,8 +289,8 @@ enum PathRayFlag {
                                  PATH_RAY_SHADOW_TRANSPARENT_NON_CATCHER),
   PATH_RAY_SHADOW = (PATH_RAY_SHADOW_OPAQUE | PATH_RAY_SHADOW_TRANSPARENT),
 
-  /* Unused, free to reuse. */
-  PATH_RAY_UNUSED = (1 << 11),
+  /* Ray is using only one wavelength. */
+  PATH_RAY_WAVELENGTH_BRANCHED = (1 << 11),
 
   /* Ray visibility for volume scattering. */
   PATH_RAY_VOLUME_SCATTER = (1 << 12),
@@ -895,15 +895,15 @@ enum ShaderDataFlag {
   SD_HAS_BUMP = (1 << 25),
   /* Has true displacement. */
   SD_HAS_DISPLACEMENT = (1 << 26),
-  /* Has constant emission (value stored in __shaders) */
-  SD_HAS_CONSTANT_EMISSION = (1 << 27),
+  /*  */
+  SD_HAS_WAVELENGTH_DEPENDENCY = (1 << 27),
   /* Needs to access attributes for volume rendering */
   SD_NEED_VOLUME_ATTRIBUTES = (1 << 28),
 
   SD_SHADER_FLAGS = (SD_USE_MIS | SD_HAS_TRANSPARENT_SHADOW | SD_HAS_VOLUME | SD_HAS_ONLY_VOLUME |
                      SD_HETEROGENEOUS_VOLUME | SD_HAS_BSSRDF_BUMP | SD_VOLUME_EQUIANGULAR |
                      SD_VOLUME_MIS | SD_VOLUME_CUBIC | SD_HAS_BUMP | SD_HAS_DISPLACEMENT |
-                     SD_HAS_CONSTANT_EMISSION | SD_NEED_VOLUME_ATTRIBUTES)
+                     SD_HAS_WAVELENGTH_DEPENDENCY | SD_NEED_VOLUME_ATTRIBUTES)
 };
 
 /* Object flags. */

@@ -40,7 +40,9 @@ CCL_NAMESPACE_BEGIN
 ccl_device int bsdf_refraction_setup(MicrofacetBsdf *bsdf)
 {
   bsdf->type = CLOSURE_BSDF_REFRACTION_ID;
-  return SD_BSDF;
+
+  /* TODO: temp flag */
+  return SD_BSDF | SD_HAS_WAVELENGTH_DEPENDENCY;
 }
 
 ccl_device SpectralColor bsdf_refraction_eval_reflect(const ShaderClosure *sc,

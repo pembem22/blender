@@ -979,17 +979,17 @@ ccl_device SpectralColor shader_bssrdf_sum(ShaderData *sd, float3 *N_, float *te
 
 ccl_device bool shader_constant_emission_eval(KernelGlobals *kg, int shader, SpectralColor *eval)
 {
-  int shader_index = shader & SHADER_MASK;
-  int shader_flag = kernel_tex_fetch(__shaders, shader_index).flags;
+  //   int shader_index = shader & SHADER_MASK;
+  //   int shader_flag = kernel_tex_fetch(__shaders, shader_index).flags;
 
   /* TODO: Fixme! */
-  if (shader_flag & SD_HAS_CONSTANT_EMISSION) {
-    FOR_EACH_CHANNEL(i)
-    {
-      (*eval)[i] = kernel_tex_fetch(__shaders, shader_index).constant_emission[i];
-    }
-    return true;
-  }
+  //   if (shader_flag & SD_HAS_CONSTANT_EMISSION) {
+  //     FOR_EACH_CHANNEL(i)
+  //     {
+  //       (*eval)[i] = kernel_tex_fetch(__shaders, shader_index).constant_emission[i];
+  //     }
+  //     return true;
+  //   }
 
   return false;
 }

@@ -58,6 +58,7 @@ ccl_device void svm_node_glass_setup(
 }
 
 ccl_device void svm_node_closure_bsdf(KernelGlobals *kg,
+                                      PathState *state,
                                       ShaderData *sd,
                                       float *stack,
                                       uint4 node,
@@ -136,6 +137,9 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg,
       float anisotropic_rotation = stack_load_float(stack, anisotropic_rotation_offset);
       float transmission_roughness = stack_load_float(stack, transmission_roughness_offset);
       float eta = fmaxf(stack_load_float(stack, eta_offset), 1e-5f);
+      eta += lerp(-0.2f,
+                  0.2f,
+                  (state->wavelengths[0] - MIN_WAVELENGTH) / (MAX_WAVELENGTH - MIN_WAVELENGTH));
 
       ClosureType distribution = (ClosureType)data_node2.y;
       ClosureType subsurface_method = (ClosureType)data_node2.z;
@@ -575,6 +579,9 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg,
         bsdf->extra = NULL;
 
         float eta = fmaxf(param2, 1e-5f);
+        eta += lerp(-0.2f,
+                    0.2f,
+                    (state->wavelengths[0] - MIN_WAVELENGTH) / (MAX_WAVELENGTH - MIN_WAVELENGTH));
         eta = (sd->flag & SD_BACKFACING) ? 1.0f / eta : eta;
 
         /* setup bsdf */
@@ -613,6 +620,9 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg,
 
       /* index of refraction */
       float eta = fmaxf(param2, 1e-5f);
+      eta += lerp(-0.2f,
+                  0.2f,
+                  (state->wavelengths[0] - MIN_WAVELENGTH) / (MAX_WAVELENGTH - MIN_WAVELENGTH));
       eta = (sd->flag & SD_BACKFACING) ? 1.0f / eta : eta;
 
       /* fresnel */
