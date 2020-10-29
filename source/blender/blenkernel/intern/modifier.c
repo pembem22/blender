@@ -130,6 +130,11 @@ void BKE_modifier_type_panel_id(ModifierType type, char *r_idname)
   strcat(r_idname, mti->name);
 }
 
+void BKE_modifier_panel_expand(ModifierData *md)
+{
+  md->ui_expand_flag |= (1 << 0);
+}
+
 /***/
 
 ModifierData *BKE_modifier_new(int type)
@@ -389,7 +394,7 @@ bool BKE_modifier_is_non_geometrical(ModifierData *md)
   return (mti->type == eModifierTypeType_NonGeometrical);
 }
 
-void BKE_modifier_set_error(ModifierData *md, const char *_format, ...)
+void BKE_modifier_set_error(const Object *ob, ModifierData *md, const char *_format, ...)
 {
   char buffer[512];
   va_list ap;
@@ -406,7 +411,16 @@ void BKE_modifier_set_error(ModifierData *md, const char *_format, ...)
 
   md->error = BLI_strdup(buffer);
 
-  CLOG_STR_ERROR(&LOG, md->error);
+#ifndef NDEBUG
+  if ((md->mode & eModifierMode_Virtual) == 0) {
+    /* Ensure correct object is passed in. */
+    const Object *ob_orig = (Object *)DEG_get_original_id((ID *)&ob->id);
+    const ModifierData *md_orig = md->orig_modifier_data ? md->orig_modifier_data : md;
+    BLI_assert(BLI_findindex(&ob_orig->modifiers, md_orig) != -1);
+  }
+#endif
+
+  CLOG_ERROR(&LOG, "Object: \"%s\", Modifier: \"%s\", %s", ob->id.name + 2, md->name, md->error);
 }
 
 /* used for buttons, to find out if the 'draw deformed in editmode' option is
