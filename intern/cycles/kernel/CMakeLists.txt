@@ -433,8 +433,8 @@ if(WITH_CYCLES_CUDA_BINARIES)
     set(cuda_kernel_src "/kernels/cuda/${name}.cu")
 
     set(cuda_flags
-      -D CCL_NAMESPACE_BEGIN=
-      -D CCL_NAMESPACE_END=
+      -D CCL_NAMESPACE_BEGIN=namespace\ ccl\ {
+      -D CCL_NAMESPACE_END=}
       -D NVCC
       -m ${CUDA_BITS}
       -I ${CMAKE_CURRENT_SOURCE_DIR}/..

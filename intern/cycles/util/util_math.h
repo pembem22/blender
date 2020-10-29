@@ -99,10 +99,13 @@ ccl_device_inline float fminf(float a, float b)
 #  endif /* !__KERNEL_OPENCL__ */
 #endif   /* _WIN32 */
 
-#ifndef __KERNEL_GPU__
+#ifndef __KERNEL_CUDA__
 using std::isfinite;
 using std::isnan;
 using std::sqrt;
+#else
+using ::isfinite;
+#endif
 
 ccl_device_inline int abs(int x)
 {
@@ -154,7 +157,6 @@ template<typename T> ccl_device_inline T max4(const T &a, const T &b, const T &c
 {
   return max(max(a, b), max(c, d));
 }
-#endif /* __KERNEL_GPU__ */
 
 ccl_device_inline float min4(float a, float b, float c, float d)
 {
@@ -311,12 +313,15 @@ ccl_device_inline float smoothstep(float edge0, float edge1, float x)
 
 #endif /* __KERNEL_OPENCL__ */
 
-#ifndef __KERNEL_CUDA__
+ccl_device_inline float floor(float f)
+{
+  return floorf(f);
+}
+
 ccl_device_inline float saturate(float a)
 {
   return clamp(a, 0.0f, 1.0f);
 }
-#endif /* __KERNEL_CUDA__ */
 
 ccl_device_inline int float_to_int(float f)
 {

@@ -27,8 +27,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-#ifndef __KERNEL_GPU__
-#  ifdef __KERNEL_SSE__
+#ifdef __KERNEL_SSE__
 __forceinline int4::int4()
 {
 }
@@ -56,7 +55,7 @@ __forceinline int4 &int4::operator=(const int4 &a)
   m128 = a.m128;
   return *this;
 }
-#  endif /* __KERNEL_SSE__ */
+#endif /* __KERNEL_SSE__ */
 
 __forceinline int int4::operator[](int i) const
 {
@@ -74,44 +73,45 @@ __forceinline int &int4::operator[](int i)
 
 ccl_device_inline int4 make_int4(int i)
 {
-#  ifdef __KERNEL_SSE__
+#ifdef __KERNEL_SSE__
   int4 a(_mm_set1_epi32(i));
-#  else
+#else
   int4 a = {i, i, i, i};
-#  endif
+#endif
   return a;
 }
 
 ccl_device_inline int4 make_int4(int x, int y, int z, int w)
 {
-#  ifdef __KERNEL_SSE__
+#ifdef __KERNEL_SSE__
   int4 a(_mm_set_epi32(w, z, y, x));
-#  else
+#else
   int4 a = {x, y, z, w};
-#  endif
+#endif
   return a;
 }
 
 ccl_device_inline int4 make_int4(const float3 &f)
 {
-#  ifdef __KERNEL_SSE__
+#ifdef __KERNEL_SSE__
   int4 a(_mm_cvtps_epi32(f.m128));
-#  else
+#else
   int4 a = {(int)f.x, (int)f.y, (int)f.z, (int)f.w};
-#  endif
+#endif
   return a;
 }
 
 ccl_device_inline int4 make_int4(const float4 &f)
 {
-#  ifdef __KERNEL_SSE__
+#ifdef __KERNEL_SSE__
   int4 a(_mm_cvtps_epi32(f.m128));
-#  else
+#else
   int4 a = {(int)f.x, (int)f.y, (int)f.z, (int)f.w};
-#  endif
+#endif
   return a;
 }
 
+#ifndef __KERNEL_GPU__
 ccl_device_inline void print_int4(const char *label, const int4 &a)
 {
   printf("%s: %d %d %d %d\n", label, a.x, a.y, a.z, a.w);

@@ -19,6 +19,8 @@
 #  include "nanovdb/util/SampleFromVoxels.h"
 #endif
 
+CCL_NAMESPACE_BEGIN
+
 /* w0, w1, w2, and w3 are the four cubic B-spline basis functions. */
 ccl_device float cubic_w0(float a)
 {
@@ -159,11 +161,11 @@ ccl_device float4 kernel_tex_image_interp(KernelGlobals *kg, int id, float x, fl
   if (texture_type == IMAGE_DATA_TYPE_FLOAT4 || texture_type == IMAGE_DATA_TYPE_BYTE4 ||
       texture_type == IMAGE_DATA_TYPE_HALF4 || texture_type == IMAGE_DATA_TYPE_USHORT4) {
     if (info.interpolation == INTERPOLATION_CUBIC) {
-      return kernel_tex_image_interp_bicubic<float4>(info, x, y);
+      return kernel_tex_image_interp_bicubic<::float4>(info, x, y);
     }
     else {
       CUtexObject tex = (CUtexObject)info.data;
-      return tex2D<float4>(tex, x, y);
+      return tex2D<::float4>(tex, x, y);
     }
   }
   /* float, byte and half */
@@ -214,11 +216,11 @@ ccl_device float4 kernel_tex_image_interp_3d(KernelGlobals *kg,
   if (texture_type == IMAGE_DATA_TYPE_FLOAT4 || texture_type == IMAGE_DATA_TYPE_BYTE4 ||
       texture_type == IMAGE_DATA_TYPE_HALF4 || texture_type == IMAGE_DATA_TYPE_USHORT4) {
     if (interpolation == INTERPOLATION_CUBIC) {
-      return kernel_tex_image_interp_bicubic_3d<float4>(info, x, y, z);
+      return kernel_tex_image_interp_bicubic_3d<::float4>(info, x, y, z);
     }
     else {
       CUtexObject tex = (CUtexObject)info.data;
-      return tex3D<float4>(tex, x, y, z);
+      return tex3D<::float4>(tex, x, y, z);
     }
   }
   else {
@@ -235,3 +237,5 @@ ccl_device float4 kernel_tex_image_interp_3d(KernelGlobals *kg,
     return make_float4(f, f, f, 1.0f);
   }
 }
+
+CCL_NAMESPACE_END

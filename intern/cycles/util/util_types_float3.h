@@ -23,10 +23,9 @@
 
 CCL_NAMESPACE_BEGIN
 
-#ifndef __KERNEL_GPU__
-struct ccl_try_align(16) float3
+struct ccl_align(16) float3
 {
-#  ifdef __KERNEL_SSE__
+#ifdef __KERNEL_SSE__
   union {
     __m128 m128;
     struct {
@@ -35,16 +34,16 @@ struct ccl_try_align(16) float3
   };
 
   __forceinline float3();
-  __forceinline float3(const float3 &a);
   __forceinline explicit float3(const __m128 &a);
 
   __forceinline operator const __m128 &() const;
   __forceinline operator __m128 &();
 
   __forceinline float3 &operator=(const float3 &a);
-#  else  /* __KERNEL_SSE__ */
+
+#else  /* __KERNEL_SSE__ */
   float x, y, z, w;
-#  endif /* __KERNEL_SSE__ */
+#endif /* __KERNEL_SSE__ */
 
   __forceinline float operator[](int i) const;
   __forceinline float &operator[](int i);
@@ -52,8 +51,8 @@ struct ccl_try_align(16) float3
 
 ccl_device_inline float3 make_float3(float f);
 ccl_device_inline float3 make_float3(float x, float y, float z);
+ccl_device_inline float3 make_float3(const int3 &i);
 ccl_device_inline void print_float3(const char *label, const float3 &a);
-#endif /* __KERNEL_GPU__ */
 
 CCL_NAMESPACE_END
 

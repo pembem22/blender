@@ -24,6 +24,8 @@
 
 #include "kernel/filter/filter_kernel.h"
 
+CCL_NAMESPACE_BEGIN
+
 /* kernels */
 
 extern "C" __global__ void
@@ -411,3 +413,4 @@ kernel_cuda_filter_finalize(float *buffer,
 
 #endif
 
+CCL_NAMESPACE_END

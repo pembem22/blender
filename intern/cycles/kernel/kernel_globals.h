@@ -131,13 +131,13 @@ extern "C" __constant__ KernelParams __params;
 
 #  ifdef __KERNEL_CUDA__
 
-__constant__ KernelData __data;
+extern "C" __constant__ KernelData __data;
 typedef struct KernelGlobals {
   /* NOTE: Keep the size in sync with SHADOW_STACK_MAX_HITS. */
   Intersection hits_stack[64];
 } KernelGlobals;
 
-#    define KERNEL_TEX(type, name) const __constant__ __device__ type *name;
+#    define KERNEL_TEX(type, name) extern "C" const __constant__ __device__ type *name;
 #    include "kernel/kernel_textures.h"
 
 #  endif /* __KERNEL_CUDA__ */

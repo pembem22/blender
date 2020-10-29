@@ -23,12 +23,15 @@
 
 CCL_NAMESPACE_BEGIN
 
-#ifndef __KERNEL_GPU__
 struct int4;
 
-struct ccl_try_align(16) float4
+#ifdef __KERNEL_CUDA__
+typedef ::float4 cuda_float4;
+#endif
+
+struct ccl_align(16) float4
 {
-#  ifdef __KERNEL_SSE__
+#ifdef __KERNEL_SSE__
   union {
     __m128 m128;
     struct {
@@ -43,20 +46,55 @@ struct ccl_try_align(16) float4
   __forceinline operator __m128 &();
 
   __forceinline float4 &operator=(const float4 &a);
-
-#  else  /* __KERNEL_SSE__ */
+#else  /* __KERNEL_SSE__ */
   float x, y, z, w;
-#  endif /* __KERNEL_SSE__ */
+#endif /* __KERNEL_SSE__ */
 
-  __forceinline float operator[](int i) const;
-  __forceinline float &operator[](int i);
+#ifdef __KERNEL_CUDA__
+  ccl_device_inline float4()
+  {
+  }
+
+  ccl_device_inline float4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w)
+  {
+  }
+
+  ccl_device_inline float4(cuda_float4 f4)
+  {
+    x = f4.x;
+    y = f4.y;
+    z = f4.z;
+    w = f4.w;
+  }
+
+  ccl_device_inline operator ::float4() const
+  {
+    return ::make_float4(x, y, z, w);
+  }
+#endif
+
+/* TODO: Cleanup. */
+#ifdef __KERNEL_GPU__
+  ccl_device_forceinline
+#else
+  __forceinline
+#endif
+      float
+      operator[](int i) const;
+
+#ifdef __KERNEL_GPU__
+  ccl_device_forceinline
+#else
+  __forceinline
+#endif
+      float &
+      operator[](int i);
 };
 
 ccl_device_inline float4 make_float4(float f);
 ccl_device_inline float4 make_float4(float x, float y, float z, float w);
 ccl_device_inline float4 make_float4(const int4 &i);
 ccl_device_inline void print_float4(const char *label, const float4 &a);
-#endif /* __KERNEL_GPU__ */
 
 CCL_NAMESPACE_END
 

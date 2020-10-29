@@ -35,6 +35,8 @@
 #include "kernel/kernel_work_stealing.h"
 #include "kernel/kernel_adaptive_sampling.h"
 
+CCL_NAMESPACE_BEGIN
+
 /* kernels */
 extern "C" __global__ void
 CUDA_LAUNCH_BOUNDS(CUDA_THREADS_BLOCK_WIDTH, CUDA_KERNEL_MAX_REGISTERS)
@@ -229,4 +231,6 @@ kernel_cuda_bake(WorkTile *tile, uint total_work_size)
 #endif
 
 #endif
+
+CCL_NAMESPACE_END
 

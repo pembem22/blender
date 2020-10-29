@@ -19,8 +19,8 @@
 
 #define __KERNEL_GPU__
 #define __KERNEL_CUDA__
-#define CCL_NAMESPACE_BEGIN
-#define CCL_NAMESPACE_END
+#define CCL_NAMESPACE_BEGIN namespace ccl {
+#define CCL_NAMESPACE_END }
 
 /* Selective nodes compilation. */
 #ifndef __NODES_MAX_GROUP__
@@ -91,6 +91,8 @@ __device__ half __float2half(const float f)
 
 #include "util/util_half.h"
 #include "util/util_types.h"
+
+typedef unsigned int uint;
 
 /* Work item functions */
 
