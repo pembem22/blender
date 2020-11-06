@@ -43,13 +43,14 @@
 #include "BKE_mask.h"
 #include "BKE_movieclip.h"
 #include "BKE_report.h"
-#include "BKE_sequencer.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
 
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
+
+#include "SEQ_sequencer.h"
 
 /* For menu, popup, icons, etc. */
 #include "ED_screen.h"
@@ -724,7 +725,7 @@ void SEQUENCER_OT_movie_strip_add(struct wmOperatorType *ot)
                                  WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH | WM_FILESEL_FILES |
                                      WM_FILESEL_SHOW_PROPS | WM_FILESEL_DIRECTORY,
                                  FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_ALPHA);
+                                 FILE_SORT_DEFAULT);
   sequencer_generic_props__internal(ot, SEQPROP_STARTFRAME);
   RNA_def_boolean(ot->srna, "sound", true, "Sound", "Load sound with the movie");
   RNA_def_boolean(ot->srna,
@@ -779,7 +780,7 @@ void SEQUENCER_OT_sound_strip_add(struct wmOperatorType *ot)
                                  WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH | WM_FILESEL_FILES |
                                      WM_FILESEL_SHOW_PROPS | WM_FILESEL_DIRECTORY,
                                  FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_ALPHA);
+                                 FILE_SORT_DEFAULT);
   sequencer_generic_props__internal(ot, SEQPROP_STARTFRAME);
   RNA_def_boolean(ot->srna, "cache", false, "Cache", "Cache the sound in memory");
   RNA_def_boolean(ot->srna, "mono", false, "Mono", "Merge all the sound's channels into one");
@@ -902,7 +903,7 @@ static int sequencer_add_image_strip_exec(bContext *C, wmOperator *op)
     }
   }
 
-  BKE_sequence_init_colorspace(seq);
+  SEQ_render_init_colorspace(seq);
   BKE_sequence_calc_disp(scene, seq);
   BKE_sequencer_sort(scene);
 
@@ -971,7 +972,7 @@ void SEQUENCER_OT_image_strip_add(struct wmOperatorType *ot)
                                  WM_FILESEL_DIRECTORY | WM_FILESEL_RELPATH | WM_FILESEL_FILES |
                                      WM_FILESEL_SHOW_PROPS | WM_FILESEL_DIRECTORY,
                                  FILE_DEFAULTDISPLAY,
-                                 FILE_SORT_ALPHA);
+                                 FILE_SORT_DEFAULT);
   sequencer_generic_props__internal(ot, SEQPROP_STARTFRAME | SEQPROP_ENDFRAME);
 
   RNA_def_boolean(ot->srna,

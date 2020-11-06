@@ -570,6 +570,11 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
   endif()
 endif()
 
+if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+  option(WITH_COMPILER_SHORT_FILE_MACRO "Make paths in macros like __FILE__ relative to top level source and build directories." ON)
+  mark_as_advanced(WITH_COMPILER_SHORT_FILE_MACRO)
+endif()
+
 if(WIN32)
   # Use hardcoded paths or find_package to find externals
   option(WITH_WINDOWS_FIND_MODULES "Use find_package to locate libraries" OFF)
@@ -1652,6 +1657,41 @@ endif()
 if(UNIX AND NOT APPLE)
   if(NOT WITH_CXX11_ABI)
     set(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} -D_GLIBCXX_USE_CXX11_ABI=0")
+  endif()
+endif()
+
+if(WITH_COMPILER_SHORT_FILE_MACRO)
+  # Use '-fmacro-prefix-map' for Clang and GCC (MSVC doesn't support this).
+  ADD_CHECK_C_COMPILER_FLAG(C_PREFIX_MAP_FLAGS C_MACRO_PREFIX_MAP -fmacro-prefix-map=foo=bar)
+  ADD_CHECK_CXX_COMPILER_FLAG(CXX_PREFIX_MAP_FLAGS CXX_MACRO_PREFIX_MAP -fmacro-prefix-map=foo=bar)
+  if(C_MACRO_PREFIX_MAP AND CXX_MACRO_PREFIX_MAP)
+    if(APPLE)
+      if(XCODE AND ${XCODE_VERSION} VERSION_LESS 12.0)
+      # Developers may have say LLVM Clang-10.0.1 toolchain (which supports the flag)
+      # with Xcode-11 (the Clang of which doesn't support the flag).
+        message(WARNING
+          "-fmacro-prefix-map flag is NOT supported by Clang shipped with Xcode-${XCODE_VERSION}."
+          " Some Xcode functionality in Product menu may not work. Disabling WITH_COMPILER_SHORT_FILE_MACRO."
+        )
+        set(WITH_COMPILER_SHORT_FILE_MACRO OFF)
+      endif()
+    endif()
+    if(WITH_COMPILER_SHORT_FILE_MACRO)
+      path_ensure_trailing_slash(_src_dir "${CMAKE_SOURCE_DIR}")
+      path_ensure_trailing_slash(_bin_dir "${CMAKE_BINARY_DIR}")
+      # Keep this variable so it can be stripped from build-info.
+      set(PLATFORM_CFLAGS_FMACRO_PREFIX_MAP
+        "-fmacro-prefix-map=\"${_src_dir}\"=\"\" -fmacro-prefix-map=\"${_bin_dir}\"=\"\"")
+      set(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} ${PLATFORM_CFLAGS_FMACRO_PREFIX_MAP}")
+      unset(_src_dir)
+      unset(_bin_dir)
+    endif()
+  else()
+    message(WARNING
+      "-fmacro-prefix-map flag is NOT supported by C/C++ compiler."
+      " Disabling WITH_COMPILER_SHORT_FILE_MACRO."
+    )
+    set(WITH_COMPILER_SHORT_FILE_MACRO OFF)
   endif()
 endif()
 

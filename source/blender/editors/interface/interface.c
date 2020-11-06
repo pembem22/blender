@@ -900,6 +900,8 @@ static bool ui_but_update_from_old_block(const bContext *C,
     /* Move button over from oldblock to new block. */
     BLI_remlink(&oldblock->buttons, oldbut);
     BLI_insertlinkafter(&block->buttons, but, oldbut);
+    /* Add the old button to the button groups in the new block. */
+    ui_button_group_replace_but_ptr(block, but, oldbut);
     oldbut->block = block;
     *but_p = oldbut;
 
@@ -4067,6 +4069,11 @@ static uiBut *ui_def_but(uiBlock *block,
   }
 #endif
 
+  /* Always keep text in radio-buttons (expanded enums) center aligned. */
+  if (ELEM(but->type, UI_BTYPE_ROW)) {
+    but->drawflag &= ~UI_BUT_TEXT_LEFT;
+  }
+
   but->drawflag |= (block->flag & UI_BUT_ALIGN);
 
   if (block->lock == true) {
@@ -4254,8 +4261,8 @@ static void ui_def_but_rna__menu(bContext *UNUSED(C), uiLayout *layout, void *bu
                    0,
                    "");
         }
-        uiItemS(column);
       }
+      uiItemS(column);
     }
     else {
       if (item->icon) {

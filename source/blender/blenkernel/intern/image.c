@@ -84,7 +84,6 @@
 #include "BKE_packedFile.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
-#include "BKE_sequencer.h" /* seq_foreground_frame_get() */
 #include "BKE_workspace.h"
 
 #include "BLF_api.h"
@@ -92,6 +91,8 @@
 #include "PIL_time.h"
 
 #include "RE_pipeline.h"
+
+#include "SEQ_sequencer.h" /* seq_foreground_frame_get() */
 
 #include "GPU_texture.h"
 
@@ -324,6 +325,8 @@ IDTypeInfo IDType_ID_IM = {
     .blend_read_data = image_blend_read_data,
     .blend_read_lib = image_blend_read_lib,
     .blend_read_expand = NULL,
+
+    .blend_read_undo_preserve = NULL,
 };
 
 /* prototypes */

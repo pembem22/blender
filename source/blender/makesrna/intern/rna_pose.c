@@ -1241,14 +1241,14 @@ static void rna_def_pose_channel(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "use_ik_rotation_control", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "ikflag", BONE_IK_ROTCTL);
-  RNA_def_property_ui_text(prop, "IK rot control", "Apply channel rotation as IK constraint");
+  RNA_def_property_ui_text(prop, "IK Rotation Control", "Apply channel rotation as IK constraint");
   RNA_def_property_editable_func(prop, "rna_PoseChannel_proxy_editable");
   RNA_def_property_update(prop, NC_OBJECT | ND_POSE, "rna_Pose_IK_update");
 
   prop = RNA_def_property(srna, "use_ik_linear_control", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "ikflag", BONE_IK_LINCTL);
   RNA_def_property_ui_text(
-      prop, "IK rot control", "Apply channel size as IK constraint if stretching is enabled");
+      prop, "IK Linear Control", "Apply channel size as IK constraint if stretching is enabled");
   RNA_def_property_editable_func(prop, "rna_PoseChannel_proxy_editable");
   RNA_def_property_update(prop, NC_OBJECT | ND_POSE, "rna_Pose_IK_update");
 
@@ -1325,7 +1325,7 @@ static void rna_def_pose_channel(BlenderRNA *brna)
   prop = RNA_def_property(srna, "ik_rotation_weight", PROP_FLOAT, PROP_FACTOR);
   RNA_def_property_float_sdna(prop, NULL, "ikrotweight");
   RNA_def_property_range(prop, 0.0f, 1.0f);
-  RNA_def_property_ui_text(prop, "IK Rot Weight", "Weight of rotation constraint for IK");
+  RNA_def_property_ui_text(prop, "IK Rotation Weight", "Weight of rotation constraint for IK");
   RNA_def_property_editable_func(prop, "rna_PoseChannel_proxy_editable");
   RNA_def_property_update(prop, NC_OBJECT | ND_POSE, "rna_Pose_update");
 
@@ -1695,6 +1695,8 @@ static void rna_def_pose(BlenderRNA *brna)
   RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_ui_text(prop, "IK Param", "Parameters for IK solver");
 
+  RNA_define_lib_overridable(true);
+
   /* pose edit options */
   prop = RNA_def_property(srna, "use_mirror_x", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", POSE_MIRROR_EDIT);
@@ -1721,6 +1723,8 @@ static void rna_def_pose(BlenderRNA *brna)
   RNA_def_struct_path_func(srna, "rna_Pose_path");
   RNA_def_property_update(prop, 0, "rna_Pose_update");
   RNA_def_property_flag(prop, PROP_LIB_EXCEPTION);
+
+  RNA_define_lib_overridable(false);
 
   /* animviz */
   rna_def_animviz_common(srna);
