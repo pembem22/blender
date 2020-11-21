@@ -519,7 +519,7 @@ enum {
 
 static int image_view_zoom_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
-  if (event->type == MOUSEZOOM || event->type == MOUSEPAN) {
+  if (ELEM(event->type, MOUSEZOOM, MOUSEPAN)) {
     SpaceImage *sima = CTX_wm_space_image(C);
     ARegion *region = CTX_wm_region(C);
     float delta, factor, location[2];
@@ -1436,8 +1436,7 @@ static bool image_open_draw_check_prop(PointerRNA *UNUSED(ptr),
 {
   const char *prop_id = RNA_property_identifier(prop);
 
-  return !(STREQ(prop_id, "filepath") || STREQ(prop_id, "directory") ||
-           STREQ(prop_id, "filename"));
+  return !(STR_ELEM(prop_id, "filepath", "directory", "filename"));
 }
 
 static void image_open_draw(bContext *UNUSED(C), wmOperator *op)
@@ -3038,8 +3037,12 @@ void IMAGE_OT_unpack(wmOperatorType *ot)
  * \{ */
 
 /* Returns color in linear space, matching ED_space_node_color_sample(). */
-bool ED_space_image_color_sample(SpaceImage *sima, ARegion *region, int mval[2], float r_col[3])
+bool ED_space_image_color_sample(
+    SpaceImage *sima, ARegion *region, int mval[2], float r_col[3], bool *r_is_data)
 {
+  if (r_is_data) {
+    *r_is_data = false;
+  }
   if (sima->image == NULL) {
     return false;
   }
@@ -3075,6 +3078,10 @@ bool ED_space_image_color_sample(SpaceImage *sima, ARegion *region, int mval[2],
       IMB_colormanagement_colorspace_to_scene_linear_v3(r_col, ibuf->rect_colorspace);
       ret = true;
     }
+  }
+
+  if (r_is_data) {
+    *r_is_data = (ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA) != 0;
   }
 
   ED_space_image_release_buffer(sima, ibuf, lock);

@@ -50,8 +50,9 @@
 
 #include "SEQ_sequencer.h"
 
-#include "render.h"
-#include "sequencer.h"
+#include "image_cache.h"
+#include "prefetch.h"
+#include "strip_time.h"
 
 /**
  * Sequencer Cache Design Notes
@@ -740,11 +741,10 @@ static float seq_cache_timeline_frame_to_frame_index(Sequence *seq, float timeli
    * images or extended frame range of movies will only generate one cache entry. No special
    * treatment in converting frame index to timeline_frame is needed. */
   if (type == SEQ_CACHE_STORE_RAW) {
-    return seq_give_stripelem_index(seq, timeline_frame);
+    return seq_give_frame_index(seq, timeline_frame);
   }
-  else {
-    return timeline_frame - seq->start;
-  }
+
+  return timeline_frame - seq->start;
 }
 
 static float seq_cache_frame_index_to_timeline_frame(Sequence *seq, float frame_index)

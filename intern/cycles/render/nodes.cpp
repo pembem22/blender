@@ -959,7 +959,7 @@ void SkyTextureNode::compile(OSLCompiler &compiler)
   else
     assert(false);
 
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "sky_type");
   compiler.parameter("theta", sunsky.theta);
   compiler.parameter("phi", sunsky.phi);
   compiler.parameter_color("radiance",
@@ -1088,7 +1088,7 @@ void GradientTextureNode::compile(OSLCompiler &compiler)
 {
   tex_mapping.compile(compiler);
 
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "gradient_type");
   compiler.add(this, "node_gradient_texture");
 }
 
@@ -1498,7 +1498,7 @@ void MusgraveTextureNode::compile(OSLCompiler &compiler)
 {
   tex_mapping.compile(compiler);
 
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "musgrave_type");
   compiler.parameter(this, "dimensions");
   compiler.add(this, "node_musgrave_texture");
 }
@@ -1598,7 +1598,7 @@ void WaveTextureNode::compile(OSLCompiler &compiler)
 {
   tex_mapping.compile(compiler);
 
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "wave_type");
   compiler.parameter(this, "bands_direction");
   compiler.parameter(this, "rings_direction");
   compiler.parameter(this, "profile");
@@ -2044,7 +2044,7 @@ void MappingNode::compile(SVMCompiler &compiler)
 
 void MappingNode::compile(OSLCompiler &compiler)
 {
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "mapping_type");
   compiler.add(this, "node_mapping");
 }
 
@@ -2217,7 +2217,9 @@ void ConvertNode::compile(SVMCompiler &compiler)
   ShaderInput *in = inputs[0];
   ShaderOutput *out = outputs[0];
 
-  if (from == SocketType::COLOR && to == SocketType::SPECTRAL) {
+  if ((from == SocketType::COLOR || from == SocketType::VECTOR || from == SocketType::NORMAL ||
+       from == SocketType::POINT) &&
+      to == SocketType::SPECTRAL) {
     compiler.add_node(NODE_RGB_TO_SPECTRUM, compiler.stack_assign(in), compiler.stack_assign(out));
     return;
   }
@@ -2873,7 +2875,7 @@ void PrincipledBsdfNode::expand(ShaderGraph *graph)
   ShaderInput *emission_strength_in = input("Emission Strength");
   if ((emission_in->link || emission != make_float3(0.0f, 0.0f, 0.0f)) &&
       (emission_strength_in->link || emission_strength != 0.0f)) {
-    /* Create add closure and emission. */
+    /* Create add closure and emission, and relink inputs. */
     AddClosureNode *add = graph->create_node<AddClosureNode>();
     EmissionNode *emission_node = graph->create_node<EmissionNode>();
     ShaderOutput *new_out = add->output("Closure");
@@ -2888,6 +2890,16 @@ void PrincipledBsdfNode::expand(ShaderGraph *graph)
     graph->connect(principled_out, add->input("Closure2"));
 
     principled_out = new_out;
+  }
+  else {
+    /* Disconnect unused links if the other value is zero, required before
+     * we remove the input from the node entirely. */
+    if (emission_in->link) {
+      emission_in->disconnect();
+    }
+    if (emission_strength_in->link) {
+      emission_strength_in->disconnect();
+    }
   }
 
   ShaderInput *alpha_in = input("Alpha");
@@ -2906,6 +2918,7 @@ void PrincipledBsdfNode::expand(ShaderGraph *graph)
   }
 
   remove_input(emission_in);
+  remove_input(emission_strength_in);
   remove_input(alpha_in);
 }
 
@@ -5013,7 +5026,7 @@ void MixNode::compile(SVMCompiler &compiler)
 
 void MixNode::compile(OSLCompiler &compiler)
 {
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "mix_type");
   compiler.parameter(this, "use_clamp");
   compiler.add(this, "node_mix");
 }
@@ -5774,6 +5787,7 @@ NODE_DEFINE(GaussianSpectrumNode)
 
   SOCKET_IN_FLOAT(wavelength, "Wavelength", 500.0f);
   SOCKET_IN_FLOAT(width, "Width", 5.0f);
+  SOCKET_IN_BOOLEAN(normalize, "Normalize", false);
   SOCKET_OUT_SPECTRAL(color, "Spectrum");
 
   return type;
@@ -6000,7 +6014,7 @@ void MapRangeNode::compile(SVMCompiler &compiler)
 
 void MapRangeNode::compile(OSLCompiler &compiler)
 {
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "range_type");
   compiler.add(this, "node_map_range");
 }
 
@@ -6061,7 +6075,7 @@ void ClampNode::compile(SVMCompiler &compiler)
 
 void ClampNode::compile(OSLCompiler &compiler)
 {
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "clamp_type");
   compiler.add(this, "node_clamp");
 }
 
@@ -6228,7 +6242,7 @@ void MathNode::compile(SVMCompiler &compiler)
 
 void MathNode::compile(OSLCompiler &compiler)
 {
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "math_type");
   compiler.add(this, "node_math");
 }
 /* Spectrum Math */
@@ -6268,18 +6282,19 @@ SpectrumMathNode::SpectrumMathNode() : ShaderNode(node_type)
 
 void SpectrumMathNode::compile(SVMCompiler &compiler)
 {
-  ShaderInput *value1_in = input("Value1");
-  ShaderInput *value2_in = input("Value2");
-  ShaderOutput *value_out = output("Value");
+  ShaderInput *spectrum1_in = input("Spectrum1");
+  ShaderInput *spectrum2_in = input("Spectrum2");
+  ShaderOutput *spectrum_out = output("Spectrum");
 
-  int value1_stack_offset = compiler.stack_assign(value1_in);
-  int value2_stack_offset = compiler.stack_assign(value2_in);
-  int value_stack_offset = compiler.stack_assign(value_out);
+  int spectrum1_stack_offset = compiler.stack_assign(spectrum1_in);
+  int spectrum2_stack_offset = compiler.stack_assign(spectrum2_in);
+  int spectrum_stack_offset = compiler.stack_assign(spectrum_out);
 
-  compiler.add_node(NODE_SPECTRUM_MATH,
-                    spectrum_math_type,
-                    compiler.encode_uchar4(value1_stack_offset, value2_stack_offset, use_clamp),
-                    value_stack_offset);
+  compiler.add_node(
+      NODE_SPECTRUM_MATH,
+      spectrum_math_type,
+      compiler.encode_uchar4(spectrum1_stack_offset, spectrum2_stack_offset, use_clamp),
+      spectrum_stack_offset);
 }
 
 void SpectrumMathNode::compile(OSLCompiler &compiler)
@@ -6395,7 +6410,7 @@ void VectorMathNode::compile(SVMCompiler &compiler)
 
 void VectorMathNode::compile(OSLCompiler &compiler)
 {
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "math_type");
   compiler.add(this, "node_vector_math");
 }
 
@@ -6451,7 +6466,7 @@ void VectorRotateNode::compile(SVMCompiler &compiler)
 
 void VectorRotateNode::compile(OSLCompiler &compiler)
 {
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "rotate_type");
   compiler.parameter(this, "invert");
   compiler.add(this, "node_vector_rotate");
 }
@@ -6498,7 +6513,7 @@ void VectorTransformNode::compile(SVMCompiler &compiler)
 
 void VectorTransformNode::compile(OSLCompiler &compiler)
 {
-  compiler.parameter(this, "type");
+  compiler.parameter(this, "transform_type");
   compiler.parameter(this, "convert_from");
   compiler.parameter(this, "convert_to");
   compiler.add(this, "node_vector_transform");

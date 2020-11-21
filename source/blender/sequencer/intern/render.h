@@ -28,11 +28,16 @@ extern "C" {
 #endif
 
 struct Editing;
-struct SeqRenderData;
-struct ListBase;
 struct ImBuf;
+struct ListBase;
 struct Scene;
+struct SeqRenderData;
 struct Sequence;
+
+#define EARLY_NO_INPUT -1
+#define EARLY_DO_EFFECT 0
+#define EARLY_USE_INPUT_1 1
+#define EARLY_USE_INPUT_2 2
 
 /* mutable state for sequencer */
 typedef struct SeqRenderState {
@@ -42,31 +47,30 @@ typedef struct SeqRenderState {
 void seq_render_state_init(SeqRenderState *state);
 
 struct ImBuf *seq_render_give_ibuf_seqbase(const struct SeqRenderData *context,
-                                           float cfra,
+                                           float timeline_frame,
                                            int chan_shown,
                                            struct ListBase *seqbasep);
 struct ImBuf *seq_render_effect_execute_threaded(struct SeqEffectHandle *sh,
                                                  const SeqRenderData *context,
                                                  struct Sequence *seq,
-                                                 float cfra,
+                                                 float timeline_frame,
                                                  float facf0,
                                                  float facf1,
                                                  struct ImBuf *ibuf1,
                                                  struct ImBuf *ibuf2,
                                                  struct ImBuf *ibuf3);
 void seq_imbuf_to_sequencer_space(struct Scene *scene, struct ImBuf *ibuf, bool make_float);
-float seq_give_stripelem_index(struct Sequence *seq, float cfra);
 int seq_get_shown_sequences(struct ListBase *seqbasep,
-                            int cfra,
+                            int timeline_frame,
                             int chanshown,
                             struct Sequence **seq_arr_out);
 struct ImBuf *seq_render_strip(const struct SeqRenderData *context,
                                struct SeqRenderState *state,
                                struct Sequence *seq,
-                               float cfra);
+                               float timeline_frame);
 struct ImBuf *seq_render_mask(const struct SeqRenderData *context,
                               struct Mask *mask,
-                              float nr,
+                              float frame_index,
                               bool make_float);
 void seq_imbuf_assign_spaces(struct Scene *scene, struct ImBuf *ibuf);
 

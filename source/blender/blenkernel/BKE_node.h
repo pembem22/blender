@@ -501,7 +501,7 @@ void ntreeInterfaceTypeUpdate(struct bNodeTree *ntree);
 struct bNodeType *nodeTypeFind(const char *idname);
 void nodeRegisterType(struct bNodeType *ntype);
 void nodeUnregisterType(struct bNodeType *ntype);
-bool nodeIsRegistered(struct bNode *node);
+bool nodeTypeUndefined(struct bNode *node);
 struct GHashIterator *nodeTypeGetIterator(void);
 
 /* helper macros for iterating over node types */
@@ -1341,8 +1341,8 @@ int ntreeTexExecTree(struct bNodeTree *ntree,
 
 /** \} */
 
-void init_nodesystem(void);
-void free_nodesystem(void);
+void BKE_node_system_init(void);
+void BKE_node_system_exit(void);
 
 /* -------------------------------------------------------------------- */
 /* evaluation support, */

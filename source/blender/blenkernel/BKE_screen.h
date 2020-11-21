@@ -33,6 +33,9 @@ extern "C" {
 #endif
 
 struct ARegion;
+struct BlendDataReader;
+struct BlendLibReader;
+struct BlendWriter;
 struct Header;
 struct ID;
 struct LibraryForeachIDData;
@@ -58,9 +61,6 @@ struct wmMsgBus;
 struct wmNotifier;
 struct wmWindow;
 struct wmWindowManager;
-struct BlendWriter;
-struct BlendDataReader;
-struct BlendLibReader;
 
 /* spacetype has everything stored to get an editor working, it gets initialized via
  * ED_spacetypes_init() in editors/space_api/spacetypes.c   */
@@ -278,6 +278,21 @@ typedef struct PanelType {
   ExtensionRNA rna_ext;
 } PanelType;
 
+/* #PanelType.flag */
+enum {
+  PANEL_TYPE_DEFAULT_CLOSED = (1 << 0),
+  PANEL_TYPE_NO_HEADER = (1 << 1),
+  /** Makes buttons in the header shrink/stretch to fill full layout width. */
+  PANEL_TYPE_HEADER_EXPAND = (1 << 2),
+  PANEL_TYPE_LAYOUT_VERT_BAR = (1 << 3),
+  /** This panel type represents data external to the UI. */
+  PANEL_TYPE_INSTANCED = (1 << 4),
+  /** Draw panel like a box widget. */
+  PANEL_TYPE_DRAW_BOX = (1 << 6),
+  /** Don't search panels with this type during property search. */
+  PANEL_TYPE_NO_SEARCH = (1 << 7),
+};
+
 /* uilist types */
 
 /* Draw an item in the uiList */
@@ -465,6 +480,7 @@ void BKE_screen_view3d_do_versions_250(struct View3D *v3d, ListBase *regions);
 void BKE_screen_area_blend_read_lib(struct BlendLibReader *reader,
                                     struct ID *parent_id,
                                     struct ScrArea *area);
+bool BKE_screen_blend_read_data(struct BlendDataReader *reader, struct bScreen *screen);
 
 #ifdef __cplusplus
 }

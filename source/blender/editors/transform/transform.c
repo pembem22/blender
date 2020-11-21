@@ -684,7 +684,7 @@ wmKeyMap *transform_modal_keymap(wmKeyConfig *keyconf)
       {TFM_MODAL_ROTATE, "ROTATE", 0, "Rotate", ""},
       {TFM_MODAL_RESIZE, "RESIZE", 0, "Resize", ""},
       {TFM_MODAL_AUTOCONSTRAINT, "AUTOCONSTRAIN", 0, "Automatic Constraint", ""},
-      {TFM_MODAL_AUTOCONSTRAINTPLANE, "AUTOCONSTRAINPLANE", 0, "Automatic Constraint", ""},
+      {TFM_MODAL_AUTOCONSTRAINTPLANE, "AUTOCONSTRAINPLANE", 0, "Automatic Constraint Plane", ""},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -1947,7 +1947,7 @@ int transformEnd(bContext *C, TransInfo *t)
 
   t->context = C;
 
-  if (t->state != TRANS_STARTING && t->state != TRANS_RUNNING) {
+  if (!ELEM(t->state, TRANS_STARTING, TRANS_RUNNING)) {
     /* handle restoring objects */
     if (t->state == TRANS_CANCEL) {
       exit_code = OPERATOR_CANCELLED;

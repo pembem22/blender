@@ -2347,8 +2347,8 @@ static void rna_SpaceClipEditor_lock_selection_update(Main *UNUSED(bmain),
 {
   SpaceClip *sc = (SpaceClip *)(ptr->data);
 
-  sc->xlockof = 0.f;
-  sc->ylockof = 0.f;
+  sc->xlockof = 0.0f;
+  sc->ylockof = 0.0f;
 }
 
 static void rna_SpaceClipEditor_view_type_update(Main *UNUSED(bmain),
@@ -3047,7 +3047,6 @@ static void rna_def_space_outliner(BlenderRNA *brna)
   static const EnumPropertyItem filter_state_items[] = {
       {SO_FILTER_OB_ALL, "ALL", 0, "All", "Show all objects in the view layer"},
       {SO_FILTER_OB_VISIBLE, "VISIBLE", 0, "Visible", "Show visible objects"},
-      {SO_FILTER_OB_HIDDEN, "HIDDEN", 0, "Hidden", "Show hidden objects"},
       {SO_FILTER_OB_SELECTED, "SELECTED", 0, "Selected", "Show selected objects"},
       {SO_FILTER_OB_ACTIVE, "ACTIVE", 0, "Active", "Show only the active object"},
       {SO_FILTER_OB_SELECTABLE, "SELECTABLE", 0, "Selectable", "Show only selectable objects"},
@@ -3169,6 +3168,11 @@ static void rna_def_space_outliner(BlenderRNA *brna)
   RNA_def_property_enum_sdna(prop, NULL, "filter_state");
   RNA_def_property_enum_items(prop, filter_state_items);
   RNA_def_property_ui_text(prop, "Object State Filter", "");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
+
+  prop = RNA_def_property(srna, "filter_invert", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "filter", SO_FILTER_OB_STATE_INVERSE);
+  RNA_def_property_ui_text(prop, "Invert", "Invert the object state filter");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_OUTLINER, NULL);
 
   /* Filters object type. */
@@ -3712,6 +3716,16 @@ static void rna_def_space_view3d_overlay(BlenderRNA *brna)
                            "Wireframe Threshold",
                            "Adjust the angle threshold for displaying edges "
                            "(1.0 for all)");
+  RNA_def_property_range(prop, 0.0f, 1.0f);
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+  prop = RNA_def_property(srna, "wireframe_opacity", PROP_FLOAT, PROP_FACTOR);
+  RNA_def_property_float_sdna(prop, NULL, "overlay.wireframe_opacity");
+  RNA_def_property_ui_text(prop,
+                           "Wireframe Opacity",
+                           "Opacity of the displayed edges "
+                           "(1.0 for opaque)");
   RNA_def_property_range(prop, 0.0f, 1.0f);
   RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
@@ -5175,15 +5189,6 @@ static void rna_def_space_dopesheet(BlenderRNA *brna)
                            "(Action and Shape Key Editors only)");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_DOPESHEET, NULL);
 
-  prop = RNA_def_property(srna, "show_group_colors", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SACTION_NODRAWGCOLORS);
-  RNA_def_property_ui_text(
-      prop,
-      "Show Group Colors",
-      "Display groups and channels with colors matching their corresponding groups "
-      "(pose bones only currently)");
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_DOPESHEET, NULL);
-
   prop = RNA_def_property(srna, "show_interpolation", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "flag", SACTION_SHOW_INTERPOLATION);
   RNA_def_property_ui_text(prop,
@@ -5349,14 +5354,6 @@ static void rna_def_space_graph(BlenderRNA *brna)
                            "Use High Quality Display",
                            "Display F-Curves using Anti-Aliasing and other fancy effects "
                            "(disable for better performance)");
-  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_GRAPH, NULL);
-
-  prop = RNA_def_property(srna, "show_group_colors", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SIPO_NODRAWGCOLORS);
-  RNA_def_property_ui_text(
-      prop,
-      "Show Group Colors",
-      "Display groups and channels with colors matching their corresponding groups");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_GRAPH, NULL);
 
   prop = RNA_def_property(srna, "show_markers", PROP_BOOLEAN, PROP_NONE);
@@ -5612,7 +5609,11 @@ static void rna_def_fileselect_idfilter(BlenderRNA *brna)
        ICON_GREASEPENCIL,
        "Grease Pencil",
        "Show Grease pencil data-blocks"},
-      {FILTER_ID_GR, "filter_group", ICON_GROUP, "Collections", "Show Collection data-blocks"},
+      {FILTER_ID_GR,
+       "filter_group",
+       ICON_OUTLINER_COLLECTION,
+       "Collections",
+       "Show Collection data-blocks"},
       {FILTER_ID_HA, "filter_hair", ICON_HAIR_DATA, "Hairs", "Show/hide Hair data-blocks"},
       {FILTER_ID_IM, "filter_image", ICON_IMAGE_DATA, "Images", "Show Image data-blocks"},
       {FILTER_ID_LA, "filter_light", ICON_LIGHT_DATA, "Lights", "Show Light data-blocks"},
@@ -5686,7 +5687,7 @@ static void rna_def_fileselect_idfilter(BlenderRNA *brna)
       {FILTER_ID_AC, "category_animation", ICON_ANIM_DATA, "Animations", "Show animation data"},
       {FILTER_ID_OB | FILTER_ID_GR,
        "category_object",
-       ICON_GROUP,
+       ICON_OUTLINER_COLLECTION,
        "Objects & Collections",
        "Show objects and collections"},
       {FILTER_ID_AR | FILTER_ID_CU | FILTER_ID_LT | FILTER_ID_MB | FILTER_ID_ME | FILTER_ID_HA |

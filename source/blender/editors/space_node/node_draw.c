@@ -768,7 +768,8 @@ static bool is_socket_spectral(bNodeSocket *sock, bNode *node)
                                                                SH_NODE_TEX_SKY_SPECTRAL,
                                                                SH_NODE_BLACKBODY_SPECTRAL,
                                                                SH_NODE_GAUSSIAN_SPECTRUM)) &&
-          sock->type == SOCK_RGBA);
+          sock->type == SOCK_RGBA) ||
+         (sock->type == SOCK_VECTOR && STREQ(sock->name, "Subsurface Radius"));
 }
 
 /* Usual convention here would be node_socket_get_color(), but that's already used (for setting a
@@ -1320,7 +1321,7 @@ static void node_draw_basis(const bContext *C,
   }
 
   /* body */
-  if (!nodeIsRegistered(node)) {
+  if (nodeTypeUndefined(node)) {
     /* use warning color to indicate undefined types */
     UI_GetThemeColor4fv(TH_REDALERT, color);
   }

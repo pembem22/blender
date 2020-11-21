@@ -28,6 +28,10 @@
 /* XXX, temp feature - campbell */
 #define DURIAN_CAMERA_SWITCH
 
+/* check for cyclic set-scene,
+ * libs can cause this case which is normally prevented, see (T#####) */
+#define USE_SETSCENE_CHECK
+
 #include "DNA_ID.h"
 #include "DNA_collection_types.h"
 #include "DNA_color_types.h" /* color management */
@@ -1090,7 +1094,7 @@ typedef struct GP_Sculpt_Settings {
   int lock_axis;
   /** Threshold for intersections */
   float isect_threshold;
-  char _pad_[4];
+  char _pad[4];
   /** Multiframe edit falloff effect by frame. */
   struct CurveMapping *cur_falloff;
   /** Curve used for primitive tools. */
@@ -2207,7 +2211,7 @@ typedef enum eSculptFlags {
   SCULPT_HIDE_MASK = (1 << 15),
 
   /* Don't display face sets in viewport. */
-  SCULPT_HIDE_FACE_SETS = (1 << 16),
+  SCULPT_HIDE_FACE_SETS = (1 << 17),
 } eSculptFlags;
 
 /* ImagePaintSettings.mode */
@@ -2275,6 +2279,8 @@ typedef enum eGPencil_Flags {
   GP_TOOL_FLAG_THUMBNAIL_LIST = (1 << 3),
   /* Generate wheight data for new strokes */
   GP_TOOL_FLAG_CREATE_WEIGHTS = (1 << 4),
+  /* Automerge with last stroke */
+  GP_TOOL_FLAG_AUTOMERGE_STROKE = (1 << 5),
 } eGPencil_Flags;
 
 /* scene->r.simplify_gpencil */

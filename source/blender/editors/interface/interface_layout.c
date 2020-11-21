@@ -956,7 +956,7 @@ static uiBut *ui_item_with_label(uiLayout *layout,
 #endif
 
   const bool is_keymapitem_ptr = RNA_struct_is_a(ptr->type, &RNA_KeyMapItem);
-  if ((flag & flag & UI_ITEM_R_FULL_EVENT) && !is_keymapitem_ptr) {
+  if ((flag & UI_ITEM_R_FULL_EVENT) && !is_keymapitem_ptr) {
     RNA_warning("Data is not a keymap item struct: %s. Ignoring 'full_event' option.",
                 RNA_struct_identifier(ptr->type));
   }
@@ -1002,7 +1002,7 @@ static uiBut *ui_item_with_label(uiLayout *layout,
   const PropertySubType subtype = RNA_property_subtype(prop);
 
   uiBut *but;
-  if (subtype == PROP_FILEPATH || subtype == PROP_DIRPATH) {
+  if (ELEM(subtype, PROP_FILEPATH, PROP_DIRPATH)) {
     UI_block_layout_set_current(block, uiLayoutRow(sub, true));
     but = uiDefAutoButR(block, ptr, prop, index, "", icon, x, y, prop_but_width - UI_UNIT_X, h);
 
@@ -1886,7 +1886,7 @@ static void ui_item_rna_size(uiLayout *layout,
     else if (type == PROP_ENUM && !icon_only) {
       w += UI_UNIT_X / 4;
     }
-    else if (type == PROP_FLOAT || type == PROP_INT) {
+    else if (ELEM(type, PROP_FLOAT, PROP_INT)) {
       w += UI_UNIT_X * 3;
     }
   }
@@ -2295,7 +2295,7 @@ void uiItemFullR(uiLayout *layout,
     ui_item_enum_expand(layout, block, ptr, prop, name, h, icon_only);
   }
   /* property with separate label */
-  else if (type == PROP_ENUM || type == PROP_STRING || type == PROP_POINTER) {
+  else if (ELEM(type, PROP_ENUM, PROP_STRING, PROP_POINTER)) {
     but = ui_item_with_label(layout, block, name, icon, ptr, prop, index, 0, 0, w, h, flag);
     but = ui_but_add_search(but, ptr, prop, NULL, NULL);
 
@@ -5169,13 +5169,23 @@ bool UI_block_apply_search_filter(uiBlock *block, const char *search_filter)
     return false;
   }
 
+  Panel *panel = block->panel;
+
+  if (panel != NULL && panel->type->flag & PANEL_TYPE_NO_SEARCH) {
+    /* Panels for active blocks should always have a type, otherwise they wouldn't be created. */
+    BLI_assert(block->panel->type != NULL);
+    if (panel->type->flag & PANEL_TYPE_NO_SEARCH) {
+      return false;
+    }
+  }
+
   const bool panel_label_matches = block_search_panel_label_matches(block, search_filter);
 
   const bool has_result = (panel_label_matches) ?
                               true :
                               block_search_filter_tag_buttons(block, search_filter);
 
-  if (block->panel != NULL) {
+  if (panel != NULL) {
     if (has_result) {
       ui_panel_tag_search_filter_match(block->panel);
     }
@@ -5480,7 +5490,7 @@ uiLayout *UI_block_layout(uiBlock *block,
   layout->context = NULL;
   layout->emboss = UI_EMBOSS_UNDEFINED;
 
-  if (type == UI_LAYOUT_MENU || type == UI_LAYOUT_PIEMENU) {
+  if (ELEM(type, UI_LAYOUT_MENU, UI_LAYOUT_PIEMENU)) {
     layout->space = 0;
   }
 

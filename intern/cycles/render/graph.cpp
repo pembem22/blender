@@ -762,6 +762,7 @@ void ShaderGraph::compute_displacement_hash()
     foreach (ShaderInput *input, node->inputs) {
       int link_id = (input->link) ? input->link->parent->id : 0;
       md5.append((uint8_t *)&link_id, sizeof(link_id));
+      md5.append((input->link) ? input->link->name().c_str() : "");
     }
 
     if (node->special_type == SHADER_SPECIAL_TYPE_OSL) {
@@ -833,22 +834,6 @@ void ShaderGraph::expand()
   foreach (ShaderNode *node, nodes) {
     node->expand(this);
   }
-
-  /* Connect "RGB to Spectrum" node to unconnected spectral sockets to force color to spectrum
-   * conversion. */
-  foreach (ShaderNode *node, nodes) {
-    foreach (ShaderInput *input, node->inputs) {
-      if (input->type() == SocketType::SPECTRAL && !input->link) {
-        RGBColor color = input->parent->get_float3(input->socket_type);
-
-        RGBToSpectrumNode *node = create_node<RGBToSpectrumNode>();
-        node->set_color(color);
-
-        add(node);
-        connect(node->output("Spectrum"), input);
-      }
-    }
-  }
 }
 
 void ShaderGraph::default_inputs(bool do_osl)
@@ -861,6 +846,18 @@ void ShaderGraph::default_inputs(bool do_osl)
 
   foreach (ShaderNode *node, nodes) {
     foreach (ShaderInput *input, node->inputs) {
+      /* Connect "RGB to Spectrum" node to unconnected spectral sockets to force color to spectrum
+       * conversion. */
+      if (input->type() == SocketType::SPECTRAL && !input->link) {
+        RGBColor color = input->parent->get_float3(input->socket_type);
+
+        RGBToSpectrumNode *node = create_node<RGBToSpectrumNode>();
+        node->set_color(color);
+
+        add(node);
+        connect(node->output("Spectrum"), input);
+      }
+
       if (!input->link && (!(input->flags() & SocketType::OSL_INTERNAL) || do_osl)) {
         if (input->flags() & SocketType::LINK_TEXTURE_GENERATED) {
           if (!texco)
