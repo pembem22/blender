@@ -24,11 +24,11 @@
 #include "node_shader_util.h"
 
 static bNodeSocketTemplate sh_node_spectrum_math_in[] = {
-    {SOCK_RGBA, N_("Value"), 0.5f, 0.5f, 0.5f, 1.0f},
-    {SOCK_RGBA, N_("Value"), 0.5f, 0.5f, 0.5f, 1.0f},
+    {SOCK_RGBA, N_("Spectrum"), 0.5f, 0.5f, 0.5f, 1.0f},
+    {SOCK_RGBA, N_("Spectrum"), 0.5f, 0.5f, 0.5f, 1.0f},
     {-1, ""}};
 
-static bNodeSocketTemplate sh_node_spectrum_math_out[] = {{SOCK_RGBA, N_("Value")}, {-1, ""}};
+static bNodeSocketTemplate sh_node_spectrum_math_out[] = {{SOCK_RGBA, N_("Spectrum")}, {-1, ""}};
 
 void register_node_type_sh_spectrum_math(void)
 {
