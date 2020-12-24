@@ -203,7 +203,7 @@ const EnumPropertyItem rna_enum_node_math_items[] = {
     {NODE_MATH_PINGPONG,
      "PINGPONG",
      0,
-     "Ping-pong",
+     "Ping-Pong",
      "Wraps a value and reverses every other cycle (A,B)"},
     {0, "", 0, N_("Trigonometric"), ""},
     {NODE_MATH_SINE, "SINE", 0, "Sine", "sin(A)"},
@@ -473,6 +473,11 @@ static const EnumPropertyItem rna_node_geometry_triangulate_ngon_method_items[] 
 static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_float[] = {
     ITEM_ATTRIBUTE,
     ITEM_FLOAT,
+    {0, NULL, 0, NULL, NULL},
+};
+static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_vector[] = {
+    ITEM_ATTRIBUTE,
+    ITEM_VECTOR,
     {0, NULL, 0, NULL, NULL},
 };
 static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_no_boolean[] = {
@@ -4176,19 +4181,19 @@ static const EnumPropertyItem node_principled_hair_items[] = {
     {SHD_PRINCIPLED_HAIR_DIRECT_ABSORPTION,
      "ABSORPTION",
      0,
-     "Absorption coefficient",
-     "Directly set the absorption coefficient sigma_a (this is not the most intuitive way to "
+     "Absorption Coefficient",
+     "Directly set the absorption coefficient \"sigma_a\" (this is not the most intuitive way to "
      "color hair)"},
     {SHD_PRINCIPLED_HAIR_PIGMENT_CONCENTRATION,
      "MELANIN",
      0,
-     "Melanin concentration",
-     "Define the melanin concentrations below to get the most realistic-looking hair"
+     "Melanin Concentration",
+     "Define the melanin concentrations below to get the most realistic-looking hair "
      "(you can get the concentrations for different types of hair online)"},
     {SHD_PRINCIPLED_HAIR_REFLECTANCE,
      "COLOR",
      0,
-     "Direct coloring",
+     "Direct Coloring",
      "Choose the color of your preference, and the shader will approximate the absorption "
      "coefficient to render lookalike hair"},
     {0, NULL, 0, NULL, NULL},
@@ -4738,7 +4743,7 @@ static void def_sh_tex_sky(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
   prop = RNA_def_property(srna, "ozone_density", PROP_FLOAT, PROP_FACTOR);
-  RNA_def_property_ui_text(prop, "Ozone", "Density of Ozone layer");
+  RNA_def_property_ui_text(prop, "Ozone", "Density of ozone layer");
   RNA_def_property_range(prop, 0.0f, 10.0f);
   RNA_def_property_float_default(prop, 1.0f);
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
@@ -4981,7 +4986,7 @@ static void def_sh_tex_gradient(StructRNA *srna)
       {SHD_BLEND_QUADRATIC_SPHERE,
        "QUADRATIC_SPHERE",
        0,
-       "Quadratic sphere",
+       "Quadratic Sphere",
        "Create a quadratic progression in the shape of a sphere"},
       {SHD_BLEND_RADIAL, "RADIAL", 0, "Radial", "Create a radial progression"},
       {0, NULL, 0, NULL, NULL},
@@ -5149,7 +5154,7 @@ static void def_sh_tex_voronoi(StructRNA *srna)
   prop = RNA_def_property(srna, "distance", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "distance");
   RNA_def_property_enum_items(prop, prop_distance_items);
-  RNA_def_property_ui_text(prop, "Distance metric", "");
+  RNA_def_property_ui_text(prop, "Distance Metric", "");
   RNA_def_property_update(prop, 0, "rna_ShaderNode_socket_update");
 
   prop = RNA_def_property(srna, "feature", PROP_ENUM, PROP_NONE);
@@ -5569,7 +5574,7 @@ static void def_hair_principled(StructRNA *srna)
   prop = RNA_def_property(srna, "parametrization", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "custom1");
   RNA_def_property_ui_text(
-      prop, "Color parametrization", "Select the shader's color parametrization");
+      prop, "Color Parametrization", "Select the shader's color parametrization");
   RNA_def_property_enum_items(prop, node_principled_hair_items);
   RNA_def_property_enum_default(prop, SHD_PRINCIPLED_HAIR_REFLECTANCE);
   /* Upon editing, update both the node data AND the UI representation */
@@ -6268,7 +6273,7 @@ static void def_cmp_image(StructRNA *srna)
   RNA_def_property_boolean_sdna(prop, NULL, "custom1", CMP_NODE_IMAGE_USE_STRAIGHT_OUTPUT);
   RNA_def_property_ui_text(prop,
                            "Straight Alpha Output",
-                           "Put Node output buffer to straight alpha instead of premultiplied");
+                           "Put node output buffer to straight alpha instead of premultiplied");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
   /* NB: image user properties used in the UI are redefined in def_node_image_user,
@@ -6614,13 +6619,13 @@ static void def_cmp_color_matte(StructRNA *srna)
   prop = RNA_def_property(srna, "color_saturation", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "t2");
   RNA_def_property_range(prop, 0.0f, 1.0f);
-  RNA_def_property_ui_text(prop, "S", "Saturation Tolerance for the color");
+  RNA_def_property_ui_text(prop, "S", "Saturation tolerance for the color");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
   prop = RNA_def_property(srna, "color_value", PROP_FLOAT, PROP_NONE);
   RNA_def_property_float_sdna(prop, NULL, "t3");
   RNA_def_property_range(prop, 0.0f, 1.0f);
-  RNA_def_property_ui_text(prop, "V", "Value Tolerance for the color");
+  RNA_def_property_ui_text(prop, "V", "Value tolerance for the color");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
@@ -6630,7 +6635,7 @@ static void def_cmp_distance_matte(StructRNA *srna)
 
   static const EnumPropertyItem color_space_items[] = {
       {1, "RGB", 0, "RGB", "RGB color space"},
-      {2, "YCC", 0, "YCC", "YCbCr Suppression"},
+      {2, "YCC", 0, "YCC", "YCbCr suppression"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -6663,22 +6668,22 @@ static void def_cmp_color_spill(StructRNA *srna)
   PropertyRNA *prop;
 
   static const EnumPropertyItem channel_items[] = {
-      {1, "R", 0, "R", "Red Spill Suppression"},
-      {2, "G", 0, "G", "Green Spill Suppression"},
-      {3, "B", 0, "B", "Blue Spill Suppression"},
+      {1, "R", 0, "R", "Red spill suppression"},
+      {2, "G", 0, "G", "Green spill suppression"},
+      {3, "B", 0, "B", "Blue spill suppression"},
       {0, NULL, 0, NULL, NULL},
   };
 
   static const EnumPropertyItem limit_channel_items[] = {
-      {0, "R", 0, "R", "Limit by Red"},
-      {1, "G", 0, "G", "Limit by Green"},
-      {2, "B", 0, "B", "Limit by Blue"},
+      {0, "R", 0, "R", "Limit by red"},
+      {1, "G", 0, "G", "Limit by green"},
+      {2, "B", 0, "B", "Limit by blue"},
       {0, NULL, 0, NULL, NULL},
   };
 
   static const EnumPropertyItem algorithm_items[] = {
-      {0, "SIMPLE", 0, "Simple", "Simple Limit Algorithm"},
-      {1, "AVERAGE", 0, "Average", "Average Limit Algorithm"},
+      {0, "SIMPLE", 0, "Simple", "Simple limit algorithm"},
+      {1, "AVERAGE", 0, "Average", "Average limit algorithm"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -6810,10 +6815,10 @@ static void def_cmp_channel_matte(StructRNA *srna)
   PropertyRNA *prop;
 
   static const EnumPropertyItem color_space_items[] = {
-      {CMP_NODE_CHANNEL_MATTE_CS_RGB, "RGB", 0, "RGB", "RGB Color Space"},
-      {CMP_NODE_CHANNEL_MATTE_CS_HSV, "HSV", 0, "HSV", "HSV Color Space"},
-      {CMP_NODE_CHANNEL_MATTE_CS_YUV, "YUV", 0, "YUV", "YUV Color Space"},
-      {CMP_NODE_CHANNEL_MATTE_CS_YCC, "YCC", 0, "YCbCr", "YCbCr Color Space"},
+      {CMP_NODE_CHANNEL_MATTE_CS_RGB, "RGB", 0, "RGB", "RGB color space"},
+      {CMP_NODE_CHANNEL_MATTE_CS_HSV, "HSV", 0, "HSV", "HSV color space"},
+      {CMP_NODE_CHANNEL_MATTE_CS_YUV, "YUV", 0, "YUV", "YUV color space"},
+      {CMP_NODE_CHANNEL_MATTE_CS_YCC, "YCC", 0, "YCbCr", "YCbCr color space"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -7453,7 +7458,7 @@ static void def_cmp_colorbalance(StructRNA *srna)
   RNA_def_property_array(prop, 3);
   RNA_def_property_float_array_default(prop, default_1);
   RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
-  RNA_def_property_ui_text(prop, "Lift", "Correction for Shadows");
+  RNA_def_property_ui_text(prop, "Lift", "Correction for shadows");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeColorBalance_update_lgg");
 
   prop = RNA_def_property(srna, "gamma", PROP_FLOAT, PROP_COLOR_GAMMA);
@@ -7461,7 +7466,7 @@ static void def_cmp_colorbalance(StructRNA *srna)
   RNA_def_property_array(prop, 3);
   RNA_def_property_float_array_default(prop, default_1);
   RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
-  RNA_def_property_ui_text(prop, "Gamma", "Correction for Midtones");
+  RNA_def_property_ui_text(prop, "Gamma", "Correction for midtones");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeColorBalance_update_lgg");
 
   prop = RNA_def_property(srna, "gain", PROP_FLOAT, PROP_COLOR_GAMMA);
@@ -7469,7 +7474,7 @@ static void def_cmp_colorbalance(StructRNA *srna)
   RNA_def_property_array(prop, 3);
   RNA_def_property_float_array_default(prop, default_1);
   RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
-  RNA_def_property_ui_text(prop, "Gain", "Correction for Highlights");
+  RNA_def_property_ui_text(prop, "Gain", "Correction for highlights");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeColorBalance_update_lgg");
 
   prop = RNA_def_property(srna, "offset", PROP_FLOAT, PROP_COLOR_GAMMA);
@@ -7485,7 +7490,7 @@ static void def_cmp_colorbalance(StructRNA *srna)
   RNA_def_property_float_array_default(prop, default_1);
   RNA_def_property_range(prop, 0.0f, FLT_MAX);
   RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
-  RNA_def_property_ui_text(prop, "Power", "Correction for Midtones");
+  RNA_def_property_ui_text(prop, "Power", "Correction for midtones");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeColorBalance_update_cdl");
 
   prop = RNA_def_property(srna, "slope", PROP_FLOAT, PROP_COLOR_GAMMA);
@@ -7494,7 +7499,7 @@ static void def_cmp_colorbalance(StructRNA *srna)
   RNA_def_property_float_array_default(prop, default_1);
   RNA_def_property_range(prop, 0.0f, FLT_MAX);
   RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
-  RNA_def_property_ui_text(prop, "Slope", "Correction for Highlights");
+  RNA_def_property_ui_text(prop, "Slope", "Correction for highlights");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeColorBalance_update_cdl");
 
   prop = RNA_def_property(srna, "offset_basis", PROP_FLOAT, PROP_NONE);
@@ -7522,7 +7527,7 @@ static void def_cmp_zcombine(StructRNA *srna)
   prop = RNA_def_property(srna, "use_alpha", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "custom1", 0);
   RNA_def_property_ui_text(
-      prop, "Use Alpha", "Take Alpha channel into account when doing the Z operation");
+      prop, "Use Alpha", "Take alpha channel into account when doing the Z operation");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
   prop = RNA_def_property(srna, "use_antialias_z", PROP_BOOLEAN, PROP_NONE);
@@ -8706,6 +8711,66 @@ static void def_geo_attribute_color_ramp(StructRNA *srna)
   RNA_def_property_struct_type(prop, "ColorRamp");
   RNA_def_property_ui_text(prop, "Color Ramp", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
+static void def_geo_rotate_points(StructRNA *srna)
+{
+  static const EnumPropertyItem type_items[] = {
+      {GEO_NODE_ROTATE_POINTS_TYPE_AXIS_ANGLE,
+       "AXIS_ANGLE",
+       ICON_NONE,
+       "Axis Angle",
+       "Rotate around an axis by an angle"},
+      {GEO_NODE_ROTATE_POINTS_TYPE_EULER,
+       "EULER",
+       ICON_NONE,
+       "Euler",
+       "Rotate around the x, y and z axis"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  static const EnumPropertyItem space_items[] = {
+      {GEO_NODE_ROTATE_POINTS_SPACE_OBJECT,
+       "OBJECT",
+       ICON_NONE,
+       "Object",
+       "Rotate points in the local space of the object"},
+      {GEO_NODE_ROTATE_POINTS_SPACE_POINT,
+       "POINT",
+       ICON_NONE,
+       "Point",
+       "Rotate every point in its local space (as defined by the 'rotation' attribute)"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryRotatePoints", "storage");
+
+  prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, type_items);
+  RNA_def_property_ui_text(prop, "Type", "Method used to describe the rotation");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "space", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, space_items);
+  RNA_def_property_ui_text(prop, "Space", "Base orientation of the points");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "input_type_axis", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_vector);
+  RNA_def_property_ui_text(prop, "Input Type Axis", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "input_type_angle", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float);
+  RNA_def_property_ui_text(prop, "Input Type Angle", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "input_type_rotation", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_vector);
+  RNA_def_property_ui_text(prop, "Input Type Rotation", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
 /* -------------------------------------------------------------------------- */
