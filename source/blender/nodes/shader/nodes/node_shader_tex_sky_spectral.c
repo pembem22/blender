@@ -46,21 +46,15 @@ static void node_shader_init_tex_sky_spectral(bNodeTree *UNUSED(ntree), bNode *n
   NodeTexSky *tex = MEM_callocN(sizeof(NodeTexSky), "NodeTexSky");
   BKE_texture_mapping_default(&tex->base.tex_mapping, TEXMAP_TYPE_POINT);
   BKE_texture_colormapping_default(&tex->base.color_mapping);
-  //   tex->sun_direction[0] = 0.0f;
-  //   tex->sun_direction[1] = 0.0f;
-  //   tex->sun_direction[2] = 1.0f;
-  //   tex->turbidity = 2.2f;
-  //   tex->ground_albedo = 0.3f;
   tex->sun_disc = true;
   tex->sun_size = DEG2RADF(0.545);
   tex->sun_intensity = 1.0f;
-  tex->sun_elevation = M_PI_2;
+  tex->sun_elevation = DEG2RADF(15.0f);
   tex->sun_rotation = 0.0f;
   tex->altitude = 0.0f;
   tex->air_density = 1.0f;
   tex->dust_density = 1.0f;
   tex->ozone_density = 1.0f;
-  //   tex->sky_model = SHD_SKY_NISHITA;
   node->storage = tex;
 }
 
