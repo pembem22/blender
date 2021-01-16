@@ -459,7 +459,8 @@ static const EnumPropertyItem rna_node_geometry_point_distribute_method_items[] 
      "POISSON",
      0,
      "Poisson Disk",
-     "Project points on the surface evenly with a Poisson disk distribution"},
+     "Distribute the points randomly on the surface while taking a minimum distance between "
+     "points into account"},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -6413,6 +6414,12 @@ static void rna_def_cmp_output_file_slot_file(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Use Node Format", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, NULL);
 
+  prop = RNA_def_property(srna, "save_as_render", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "save_as_render", 1);
+  RNA_def_property_ui_text(
+      prop, "Save as Render", "Apply render part of display transform when saving byte image");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, NULL);
+
   prop = RNA_def_property(srna, "format", PROP_POINTER, PROP_NONE);
   RNA_def_property_struct_type(prop, "ImageFormatSettings");
 
@@ -8838,29 +8845,29 @@ static void def_geo_attribute_color_ramp(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
 
-static void def_geo_rotate_points(StructRNA *srna)
+static void def_geo_point_rotate(StructRNA *srna)
 {
   static const EnumPropertyItem type_items[] = {
-      {GEO_NODE_ROTATE_POINTS_TYPE_AXIS_ANGLE,
+      {GEO_NODE_POINT_ROTATE_TYPE_AXIS_ANGLE,
        "AXIS_ANGLE",
        ICON_NONE,
        "Axis Angle",
        "Rotate around an axis by an angle"},
-      {GEO_NODE_ROTATE_POINTS_TYPE_EULER,
+      {GEO_NODE_POINT_ROTATE_TYPE_EULER,
        "EULER",
        ICON_NONE,
        "Euler",
-       "Rotate around the x, y and z axis"},
+       "Rotate around the X, Y, and Z axes"},
       {0, NULL, 0, NULL, NULL},
   };
 
   static const EnumPropertyItem space_items[] = {
-      {GEO_NODE_ROTATE_POINTS_SPACE_OBJECT,
+      {GEO_NODE_POINT_ROTATE_SPACE_OBJECT,
        "OBJECT",
        ICON_NONE,
        "Object",
        "Rotate points in the local space of the object"},
-      {GEO_NODE_ROTATE_POINTS_SPACE_POINT,
+      {GEO_NODE_POINT_ROTATE_SPACE_POINT,
        "POINT",
        ICON_NONE,
        "Point",
@@ -8895,6 +8902,71 @@ static void def_geo_rotate_points(StructRNA *srna)
   prop = RNA_def_property(srna, "input_type_rotation", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_vector);
   RNA_def_property_ui_text(prop, "Input Type Rotation", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_align_rotation_to_vector(StructRNA *srna)
+{
+  static const EnumPropertyItem axis_items[] = {
+      {GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_X,
+       "X",
+       ICON_NONE,
+       "X",
+       "Align the X axis with the vector"},
+      {GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Y,
+       "Y",
+       ICON_NONE,
+       "Y",
+       "Align the Y axis with the vector"},
+      {GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Z,
+       "Z",
+       ICON_NONE,
+       "Z",
+       "Align the Z axis with the vector"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryAlignRotationToVector", "storage");
+
+  prop = RNA_def_property(srna, "axis", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, axis_items);
+  RNA_def_property_ui_text(prop, "Axis", "Axis to align to the vector");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "input_type_factor", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float);
+  RNA_def_property_ui_text(prop, "Input Type Factor", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "input_type_vector", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_vector);
+  RNA_def_property_ui_text(prop, "Input Type Vector", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_point_scale(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryPointScale", "storage");
+
+  prop = RNA_def_property(srna, "input_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_vector);
+  RNA_def_property_ui_text(prop, "Input Type", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_point_translate(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryPointTranslate", "storage");
+
+  prop = RNA_def_property(srna, "input_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_vector);
+  RNA_def_property_ui_text(prop, "Input Type", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
@@ -9399,7 +9471,6 @@ static void rna_def_node_socket_vector(BlenderRNA *brna,
   prop = RNA_def_property(srna, "default_value", PROP_FLOAT, subtype);
   RNA_def_property_float_sdna(prop, NULL, "value");
   RNA_def_property_float_array_default(prop, value_default);
-  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
   RNA_def_property_float_funcs(prop, NULL, NULL, "rna_NodeSocketStandard_vector_range");
   RNA_def_property_ui_text(prop, "Default Value", "Input value used for unconnected socket");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeSocketStandard_value_update");

@@ -735,7 +735,8 @@ typedef struct NodeImageMultiFileSocket {
   short use_render_format DNA_DEPRECATED;
   /** Use overall node image format. */
   short use_node_format;
-  char _pad1[4];
+  char save_as_render;
+  char _pad1[3];
   /** 1024 = FILE_MAX. */
   char path[1024];
   ImageFormatData format;
@@ -1145,6 +1146,31 @@ typedef struct NodeGeometryRotatePoints {
   uint8_t input_type_rotation;
   char _pad[3];
 } NodeGeometryRotatePoints;
+
+typedef struct NodeGeometryAlignRotationToVector {
+  /* GeometryNodeAlignRotationToVectorAxis */
+  uint8_t axis;
+
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type_factor;
+  uint8_t input_type_vector;
+
+  char _pad[5];
+} NodeGeometryAlignRotationToVector;
+
+typedef struct NodeGeometryPointScale {
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type;
+
+  char _pad[7];
+} NodeGeometryPointScale;
+
+typedef struct NodeGeometryPointTranslate {
+  /* GeometryNodeAttributeInputMode */
+  uint8_t input_type;
+
+  char _pad[7];
+} NodeGeometryPointTranslate;
 
 /* script node mode */
 #define NODE_SCRIPT_INTERNAL 0
@@ -1588,14 +1614,20 @@ typedef enum GeometryNodePointDistributeMethod {
 } GeometryNodePointDistributeMethod;
 
 typedef enum GeometryNodeRotatePointsType {
-  GEO_NODE_ROTATE_POINTS_TYPE_EULER = 0,
-  GEO_NODE_ROTATE_POINTS_TYPE_AXIS_ANGLE = 1,
+  GEO_NODE_POINT_ROTATE_TYPE_EULER = 0,
+  GEO_NODE_POINT_ROTATE_TYPE_AXIS_ANGLE = 1,
 } GeometryNodeRotatePointsType;
 
 typedef enum GeometryNodeRotatePointsSpace {
-  GEO_NODE_ROTATE_POINTS_SPACE_OBJECT = 0,
-  GEO_NODE_ROTATE_POINTS_SPACE_POINT = 1,
+  GEO_NODE_POINT_ROTATE_SPACE_OBJECT = 0,
+  GEO_NODE_POINT_ROTATE_SPACE_POINT = 1,
 } GeometryNodeRotatePointsSpace;
+
+typedef enum GeometryNodeAlignRotationToVectorAxis {
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_X = 0,
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Y = 1,
+  GEO_NODE_ALIGN_ROTATION_TO_VECTOR_AXIS_Z = 2,
+} GeometryNodeAlignRotationToVectorAxis;
 
 #ifdef __cplusplus
 }
