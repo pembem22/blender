@@ -443,28 +443,17 @@ ccl_device_inline float8 pow(float8 v, float8 e)
 
 ccl_device_inline float8 pow(float8 v, float e)
 {
-#if defined(__KERNEL_AVX2__) && defined(_INCLUDED_IMM)
-  return float8(_mm256_pow_ps(v.m256, _mm256_set1_ps(e)));
-#else
   return pow(v, make_float8(e));
-#endif
 }
 
 ccl_device_inline float8 exp(float8 v)
 {
-#if defined(__KERNEL_AVX2__) && defined(_INCLUDED_IMM)
-  return float8(_mm256_exp_ps(v.m256));
-#else
   return make_float8(
       expf(v.a), expf(v.b), expf(v.c), expf(v.d), expf(v.e), expf(v.f), expf(v.g), expf(v.h));
-#endif
 }
 
 ccl_device_inline float8 expm1(float8 v)
 {
-#if defined(__KERNEL_AVX2__) && defined(_INCLUDED_IMM)
-  return float8(_mm256_expm1_ps(v.m256));
-#else
   return make_float8(expm1f(v.a),
                      expm1f(v.b),
                      expm1f(v.c),
@@ -473,17 +462,12 @@ ccl_device_inline float8 expm1(float8 v)
                      expm1f(v.f),
                      expm1f(v.g),
                      expm1f(v.h));
-#endif
 }
 
 ccl_device_inline float8 log(float8 v)
 {
-#if defined(__KERNEL_AVX2__) && defined(_INCLUDED_IMM)
-  return float8(_mm256_log_ps(v.m256));
-#else
   return make_float8(
       logf(v.a), logf(v.b), logf(v.c), logf(v.d), logf(v.e), logf(v.f), logf(v.g), logf(v.h));
-#endif
 }
 
 ccl_device_inline float dot(const float8 &a, const float8 &b)
