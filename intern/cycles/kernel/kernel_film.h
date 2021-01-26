@@ -40,8 +40,8 @@ ccl_device float4 film_get_pass_result(KernelGlobals *kg,
     if (display_divide_pass_stride != -1) {
       ccl_global float4 *divide_in = (ccl_global float4 *)(buffer + display_divide_pass_stride +
                                                            index * kernel_data.film.pass_stride);
-      float3 divided = safe_divide_even(float4_to_float3(pass_result),
-                                        float4_to_float3(*divide_in));
+      float3 divided = safe_divide_even_color(float4_to_float3(pass_result),
+                                              float4_to_float3(*divide_in));
       pass_result = make_float4(divided.x, divided.y, divided.z, pass_result.w);
     }
 

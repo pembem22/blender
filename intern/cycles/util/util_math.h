@@ -501,6 +501,42 @@ ccl_device_inline void make_orthonormals(const float3 N, float3 *a, float3 *b)
   *b = cross(N, *a);
 }
 
+ccl_device_inline float3 safe_divide_even_color(float3 a, float3 b)
+{
+  float x, y, z;
+
+  x = (b.x != 0.0f) ? a.x / b.x : 0.0f;
+  y = (b.y != 0.0f) ? a.y / b.y : 0.0f;
+  z = (b.z != 0.0f) ? a.z / b.z : 0.0f;
+
+  /* try to get gray even if b is zero */
+  if (b.x == 0.0f) {
+    if (b.y == 0.0f) {
+      x = z;
+      y = z;
+    }
+    else if (b.z == 0.0f) {
+      x = y;
+      z = y;
+    }
+    else
+      x = 0.5f * (y + z);
+  }
+  else if (b.y == 0.0f) {
+    if (b.z == 0.0f) {
+      y = x;
+      z = x;
+    }
+    else
+      y = 0.5f * (x + z);
+  }
+  else if (b.z == 0.0f) {
+    z = 0.5f * (x + y);
+  }
+
+  return make_float3(x, y, z);
+}
+
 /* Rotation of point around axis and angle */
 
 ccl_device_inline float3 rotate_around_axis(float3 p, float3 axis, float angle)
