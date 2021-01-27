@@ -1664,8 +1664,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
   /* Initialize Camera Response Function curve. */
   if (!DNA_struct_elem_find(
           fd->filesdna, "RenderData", "CurveMapping", "camera_response_function_curve")) {
-    Scene *scene;
-    for (scene = bmain->scenes.first; scene != NULL; scene = scene->id.next) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
       CurveMapping *curve_mapping = &scene->r.camera_response_function_curve;
       BKE_curvemapping_set_defaults_spectrum(curve_mapping, 3);
       BKE_curvemapping_init(curve_mapping);
@@ -1676,8 +1675,7 @@ void blo_do_versions_290(FileData *fd, Library *UNUSED(lib), Main *bmain)
   /* Initialize Wavelength Sampling curve. */
   if (!DNA_struct_elem_find(
           fd->filesdna, "RenderData", "CurveMapping", "wavelength_importance_curve")) {
-    Scene *scene;
-    for (scene = bmain->scenes.first; scene != NULL; scene = scene->id.next) {
+    LISTBASE_FOREACH (Scene *, scene, &bmain->scenes) {
       CurveMapping *curve_mapping = &scene->r.wavelength_importance_curve;
       BKE_curvemapping_set_defaults_spectrum(curve_mapping, 1);
       BKE_curvemapping_init(curve_mapping);
