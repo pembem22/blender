@@ -99,6 +99,8 @@ class Integrator : public Node {
     UPDATE_NONE = 0u,
   };
 
+  NODE_SOCKET_API(bool, spectral_rendering);
+
   Integrator();
   ~Integrator();
 

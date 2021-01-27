@@ -1396,7 +1396,9 @@ typedef struct KernelIntegrator {
 
   int max_closures;
 
-  int pad1, pad2;
+  int spectral_rendering;
+
+  int pad1;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 

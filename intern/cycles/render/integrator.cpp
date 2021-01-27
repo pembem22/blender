@@ -93,6 +93,8 @@ NODE_DEFINE(Integrator)
   sampling_pattern_enum.insert("pmj", SAMPLING_PATTERN_PMJ);
   SOCKET_ENUM(sampling_pattern, "Sampling Pattern", sampling_pattern_enum, SAMPLING_PATTERN_SOBOL);
 
+  SOCKET_BOOLEAN(spectral_rendering, "Spectral Rendering", true);
+
   return type;
 }
 
@@ -271,6 +273,8 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
       dscene->sample_pattern_lut.copy_to_device();
     }
   }
+
+  kintegrator->spectral_rendering = spectral_rendering;
 
   clear_modified();
 }
