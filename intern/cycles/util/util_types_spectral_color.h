@@ -32,6 +32,9 @@ typedef SPECTRAL_COLOR_DATA_TYPE SpectralColor;
 #define load_spectral_color(f) CONCAT(load_, SPECTRAL_COLOR_DATA_TYPE(f))
 #define store_spectral_color(s, f) CONCAT(store_, SPECTRAL_COLOR_DATA_TYPE((s), (f)))
 
+#define spectral_color_to_float3(f) CONCAT(SPECTRAL_COLOR_DATA_TYPE, _to_float3(f))
+#define float3_to_spectral_color(f) CONCAT(float3_to_, SPECTRAL_COLOR_DATA_TYPE(f))
+
 #define FOR_EACH_CHANNEL(counter) for (int counter = 0; counter < CHANNELS_PER_RAY; counter++)
 
 #define MIN_WAVELENGTH 380.0f
