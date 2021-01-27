@@ -1308,9 +1308,9 @@ static void add_nodes(Scene *scene,
           ShaderInput *input = node_find_input_by_name(node, b_node, b_input);
           if (!input) {
             fprintf(stderr,
-                    "Failed to find input socket \"%s\" in node \"%s\"\n",
+                    "Failed to find input socket \"%s\" in node \"%s\".\n",
                     b_input.name().c_str(),
-                    node->name);
+                    node->name.c_str());
             continue;
           }
           input_map[b_input.ptr.data] = input;
@@ -1321,9 +1321,9 @@ static void add_nodes(Scene *scene,
           ShaderOutput *output = node_find_output_by_name(node, b_node, b_output);
           if (!output) {
             fprintf(stderr,
-                    "Failed to find output socket \"%s\" in node \"%s\"\n",
+                    "Failed to find output socket \"%s\" in node \"%s\".\n",
                     b_output.name().c_str(),
-                    node->name);
+                    node->name.c_str());
             continue;
           }
           output_map[b_output.ptr.data] = output;
