@@ -715,8 +715,8 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
   bGPDstroke *gps = tgpi->gpf->strokes.first;
   GP_Sculpt_Settings *gset = &ts->gp_sculpt;
   int depth_margin = (ts->gpencil_v3d_align & GP_PROJECT_DEPTH_STROKE) ? 4 : 0;
-  const char *align_flag = &ts->gpencil_v3d_align;
-  bool is_depth = (bool)(*align_flag & (GP_PROJECT_DEPTH_VIEW | GP_PROJECT_DEPTH_STROKE));
+  const char align_flag = ts->gpencil_v3d_align;
+  bool is_depth = (bool)(align_flag & (GP_PROJECT_DEPTH_VIEW | GP_PROJECT_DEPTH_STROKE));
   const bool is_camera = (bool)(ts->gp_sculpt.lock_axis == 0) &&
                          (tgpi->rv3d->persp == RV3D_CAMOB) && (!is_depth);
 
@@ -1022,7 +1022,7 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
       tpt->uv_fac = 0.0f;
     }
 
-    tpt->uv_rot = p2d->uv_rot;
+    tpt->uv_rot = 0.0f;
 
     gpd->runtime.sbuffer_used++;
 
@@ -1044,6 +1044,7 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
     pt->time = 0.0f;
     pt->flag = 0;
     pt->uv_fac = tpt->uv_fac;
+    pt->uv_rot = 0.0f;
     ED_gpencil_point_vertex_color_set(ts, brush, pt, tpt);
 
     if (gps->dvert != NULL) {
@@ -1080,8 +1081,8 @@ static void gpencil_primitive_update_strokes(bContext *C, tGPDprimitive *tgpi)
     gpencil_apply_parent_point(tgpi->depsgraph, tgpi->ob, tgpi->gpl, pt);
   }
 
-  /* if camera view, reproject flat to view to avoid perspective effect */
-  if (is_camera) {
+  /* If camera view or view projection, reproject flat to view to avoid perspective effect. */
+  if ((align_flag & GP_PROJECT_VIEWSPACE) || is_camera) {
     ED_gpencil_project_stroke_to_view(C, tgpi->gpl, gps);
   }
 

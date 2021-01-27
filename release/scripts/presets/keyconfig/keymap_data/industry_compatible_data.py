@@ -2277,7 +2277,7 @@ def km_grease_pencil(_params):
 
 def _grease_pencil_selection(params):
     return [
-        ("gpencil.select", {"type": 'LEFTMOUSE', "value": 'PRESS', "shift": True},
+        ("gpencil.select", {"type": 'LEFTMOUSE', "value": 'CLICK', "shift": True},
          {"properties": [("extend", True), ("toggle", True)]}),
         # Select all
         ("gpencil.select_all", {"type": 'A', "value": 'PRESS', "ctrl": True}, {"properties": [("action", 'SELECT')]}),
@@ -3997,6 +3997,19 @@ def km_3d_view_tool_edit_gpencil_select(params):
     )
 
 
+def km_3d_view_tool_interactive_add(params):
+    return (
+        "3D View Tool: Object, Add Primitive",
+        {"space_type": 'VIEW_3D', "region_type": 'WINDOW'},
+        {"items": [
+            ("view3d.interactive_add", {"type": params.tool_tweak, "value": 'ANY'},
+             {"properties": [("wait_for_input", False)]}),
+            ("view3d.interactive_add", {"type": params.tool_tweak, "value": 'ANY', "ctrl": True},
+             {"properties": [("wait_for_input", False)]}),
+        ]},
+    )
+
+
 # Fallback for gizmos that don't have custom a custom key-map.
 
 
@@ -4135,6 +4148,7 @@ def generate_keymaps_impl(params=None):
         km_3d_view_tool_select(params),
         km_image_editor_tool_uv_select(params),
         km_3d_view_tool_edit_gpencil_select(params),
+        km_3d_view_tool_interactive_add(params),
     ]
 
 

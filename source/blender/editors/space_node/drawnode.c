@@ -25,6 +25,7 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 #include "BLI_system.h"
+#include "BLI_threads.h"
 
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
@@ -451,7 +452,7 @@ static void node_draw_frame(const bContext *C,
 
   const rctf *rct = &node->totr;
   UI_draw_roundbox_corner_set(UI_CNR_ALL);
-  UI_draw_roundbox_aa(true, rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD, color);
+  UI_draw_roundbox_aa(rct, true, BASIS_RAD, color);
 
   /* outline active and selected emphasis */
   if (node->flag & SELECT) {
@@ -462,11 +463,11 @@ static void node_draw_frame(const bContext *C,
       UI_GetThemeColorShadeAlpha4fv(TH_SELECT, 0, -40, color);
     }
 
-    UI_draw_roundbox_aa(false, rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD, color);
+    UI_draw_roundbox_aa(rct, false, BASIS_RAD, color);
   }
 
   /* label */
-  node_draw_frame_label(ntree, node, snode->aspect);
+  node_draw_frame_label(ntree, node, snode->runtime->aspect);
 
   UI_block_end(C, node->block);
   UI_block_draw(C, node->block);
@@ -3218,13 +3219,80 @@ static void node_geometry_buts_random_attribute(uiLayout *layout,
   uiItemR(layout, ptr, "data_type", DEFAULT_FLAGS, "", ICON_NONE);
 }
 
+static bool node_attribute_math_operation_use_input_b(const NodeMathOperation operation)
+{
+  switch (operation) {
+    case NODE_MATH_ADD:
+    case NODE_MATH_SUBTRACT:
+    case NODE_MATH_MULTIPLY:
+    case NODE_MATH_DIVIDE:
+    case NODE_MATH_POWER:
+    case NODE_MATH_LOGARITHM:
+    case NODE_MATH_MINIMUM:
+    case NODE_MATH_MAXIMUM:
+    case NODE_MATH_LESS_THAN:
+    case NODE_MATH_GREATER_THAN:
+    case NODE_MATH_MODULO:
+    case NODE_MATH_ARCTAN2:
+    case NODE_MATH_SNAP:
+    case NODE_MATH_WRAP:
+    case NODE_MATH_COMPARE:
+    case NODE_MATH_MULTIPLY_ADD:
+    case NODE_MATH_PINGPONG:
+    case NODE_MATH_SMOOTH_MIN:
+    case NODE_MATH_SMOOTH_MAX:
+      return true;
+    case NODE_MATH_SINE:
+    case NODE_MATH_COSINE:
+    case NODE_MATH_TANGENT:
+    case NODE_MATH_ARCSINE:
+    case NODE_MATH_ARCCOSINE:
+    case NODE_MATH_ARCTANGENT:
+    case NODE_MATH_ROUND:
+    case NODE_MATH_ABSOLUTE:
+    case NODE_MATH_FLOOR:
+    case NODE_MATH_CEIL:
+    case NODE_MATH_FRACTION:
+    case NODE_MATH_SQRT:
+    case NODE_MATH_INV_SQRT:
+    case NODE_MATH_SIGN:
+    case NODE_MATH_EXPONENT:
+    case NODE_MATH_RADIANS:
+    case NODE_MATH_DEGREES:
+    case NODE_MATH_SINH:
+    case NODE_MATH_COSH:
+    case NODE_MATH_TANH:
+    case NODE_MATH_TRUNC:
+      return false;
+  }
+  BLI_assert(false);
+  return false;
+}
+
 static void node_geometry_buts_attribute_math(uiLayout *layout,
                                               bContext *UNUSED(C),
                                               PointerRNA *ptr)
 {
+  bNode *node = (bNode *)ptr->data;
+  NodeAttributeMath *node_storage = (NodeAttributeMath *)node->storage;
+  NodeMathOperation operation = (NodeMathOperation)node_storage->operation;
+
   uiItemR(layout, ptr, "operation", DEFAULT_FLAGS, "", ICON_NONE);
   uiItemR(layout, ptr, "input_type_a", DEFAULT_FLAGS, IFACE_("Type A"), ICON_NONE);
-  uiItemR(layout, ptr, "input_type_b", DEFAULT_FLAGS, IFACE_("Type B"), ICON_NONE);
+
+  /* These "use input b / c" checks are copied from the node's code.
+   * They could be de-duplicated if the drawing code was moved to the node's file. */
+  if (node_attribute_math_operation_use_input_b(operation)) {
+    uiItemR(layout, ptr, "input_type_b", DEFAULT_FLAGS, IFACE_("Type B"), ICON_NONE);
+  }
+  if (ELEM(operation,
+           NODE_MATH_MULTIPLY_ADD,
+           NODE_MATH_SMOOTH_MIN,
+           NODE_MATH_SMOOTH_MAX,
+           NODE_MATH_WRAP,
+           NODE_MATH_COMPARE)) {
+    uiItemR(layout, ptr, "input_type_c", DEFAULT_FLAGS, IFACE_("Type C"), ICON_NONE);
+  }
 }
 
 static void node_geometry_buts_attribute_vector_math(uiLayout *layout,
@@ -3337,6 +3405,28 @@ static void node_geometry_buts_point_scale(uiLayout *layout, bContext *UNUSED(C)
   uiItemR(layout, ptr, "input_type", DEFAULT_FLAGS, IFACE_("Type"), ICON_NONE);
 }
 
+static void node_geometry_buts_object_info(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "transform_space", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+}
+
+static void node_geometry_buts_attribute_sample_texture(uiLayout *layout,
+                                                        bContext *C,
+                                                        PointerRNA *ptr)
+{
+  uiTemplateID(layout, C, ptr, "texture", "texture.new", NULL, NULL, 0, ICON_NONE, NULL);
+}
+
+static void node_geometry_buts_points_to_volume(uiLayout *layout,
+                                                bContext *UNUSED(C),
+                                                PointerRNA *ptr)
+{
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  uiItemR(layout, ptr, "resolution_mode", DEFAULT_FLAGS, IFACE_("Resolution"), ICON_NONE);
+  uiItemR(layout, ptr, "input_type_radius", DEFAULT_FLAGS, IFACE_("Radius"), ICON_NONE);
+}
+
 static void node_geometry_set_butfunc(bNodeType *ntype)
 {
   switch (ntype->type) {
@@ -3387,6 +3477,15 @@ static void node_geometry_set_butfunc(bNodeType *ntype)
       break;
     case GEO_NODE_POINT_SCALE:
       ntype->draw_buttons = node_geometry_buts_point_scale;
+      break;
+    case GEO_NODE_OBJECT_INFO:
+      ntype->draw_buttons = node_geometry_buts_object_info;
+      break;
+    case GEO_NODE_ATTRIBUTE_SAMPLE_TEXTURE:
+      ntype->draw_buttons = node_geometry_buts_attribute_sample_texture;
+      break;
+    case GEO_NODE_POINTS_TO_VOLUME:
+      ntype->draw_buttons = node_geometry_buts_points_to_volume;
       break;
   }
 }
@@ -3815,7 +3914,9 @@ void draw_nodespace_back_pix(const bContext *C,
   /* The draw manager is used to draw the backdrop image. */
   GPUFrameBuffer *old_fb = GPU_framebuffer_active_get();
   GPU_framebuffer_restore();
+  BLI_thread_lock(LOCK_DRAW_IMAGE);
   DRW_draw_view(C);
+  BLI_thread_unlock(LOCK_DRAW_IMAGE);
   GPU_framebuffer_bind_no_srgb(old_fb);
   /* Draw manager changes the depth state. Set it back to NONE. Without this the node preview
    * images aren't drawn correctly. */
@@ -3878,10 +3979,10 @@ static bool node_link_bezier_handles(const View2D *v2d,
   float cursor[2] = {0.0f, 0.0f};
 
   /* this function can be called with snode null (via cut_links_intersect) */
-  /* XXX map snode->cursor back to view space */
+  /* XXX map snode->runtime->cursor back to view space */
   if (snode) {
-    cursor[0] = snode->cursor[0] * UI_DPI_FAC;
-    cursor[1] = snode->cursor[1] * UI_DPI_FAC;
+    cursor[0] = snode->runtime->cursor[0] * UI_DPI_FAC;
+    cursor[1] = snode->runtime->cursor[1] * UI_DPI_FAC;
   }
 
   /* in v0 and v3 we put begin/end points */
@@ -4152,7 +4253,7 @@ static void nodelink_batch_draw(const SpaceNode *snode)
 
   GPU_batch_program_set_builtin(g_batch_link.batch, GPU_SHADER_2D_NODELINK_INST);
   GPU_batch_uniform_4fv_array(g_batch_link.batch, "colors", 6, colors);
-  GPU_batch_uniform_1f(g_batch_link.batch, "expandSize", snode->aspect * LINK_WIDTH);
+  GPU_batch_uniform_1f(g_batch_link.batch, "expandSize", snode->runtime->aspect * LINK_WIDTH);
   GPU_batch_uniform_1f(g_batch_link.batch, "arrowSize", ARROW_SIZE);
   GPU_batch_draw(g_batch_link.batch);
 
@@ -4239,7 +4340,7 @@ void node_draw_link_bezier(const View2D *v2d,
       GPU_batch_program_set_builtin(batch, GPU_SHADER_2D_NODELINK);
       GPU_batch_uniform_2fv_array(batch, "bezierPts", 4, vec);
       GPU_batch_uniform_4fv_array(batch, "colors", 3, colors);
-      GPU_batch_uniform_1f(batch, "expandSize", snode->aspect * LINK_WIDTH);
+      GPU_batch_uniform_1f(batch, "expandSize", snode->runtime->aspect * LINK_WIDTH);
       GPU_batch_uniform_1f(batch, "arrowSize", ARROW_SIZE);
       GPU_batch_uniform_1i(batch, "doArrow", drawarrow);
       GPU_batch_draw(batch);

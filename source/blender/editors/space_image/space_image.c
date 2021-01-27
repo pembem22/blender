@@ -320,8 +320,11 @@ static void image_refresh(const bContext *C, ScrArea *area)
   }
 }
 
-static void image_listener(wmWindow *win, ScrArea *area, wmNotifier *wmn, Scene *UNUSED(scene))
+static void image_listener(const wmSpaceTypeListenerParams *params)
 {
+  wmWindow *win = params->window;
+  ScrArea *area = params->area;
+  wmNotifier *wmn = params->notifier;
   SpaceImage *sima = (SpaceImage *)area->spacedata.first;
 
   /* context changes */
@@ -603,8 +606,8 @@ static void image_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
-  /* Image space manages own v2d. */
-  // UI_view2d_region_reinit(&region->v2d, V2D_COMMONVIEW_STANDARD, region->winx, region->winy);
+  /* NOTE: don't use `UI_view2d_region_reinit(&region->v2d, ...)`
+   * since the space clip manages own v2d in #image_main_region_set_view2d */
 
   /* mask polls mode */
   keymap = WM_keymap_ensure(wm->defaultconf, "Mask Editing", 0, 0);
@@ -639,6 +642,8 @@ static void image_main_region_draw(const bContext *C, ARegion *region)
   Mask *mask = NULL;
   Scene *scene = CTX_data_scene(C);
   View2D *v2d = &region->v2d;
+  Image *image = ED_space_image(sima);
+  const bool show_viewer = (image && image->source == IMA_SRC_VIEWER);
 
   /* XXX not supported yet, disabling for now */
   scene->r.scemode &= ~R_COMP_CROP;
@@ -653,8 +658,14 @@ static void image_main_region_draw(const bContext *C, ARegion *region)
     mask = ED_space_image_get_mask(sima);
   }
 
-  /* we draw image in pixelspace */
+  if (show_viewer) {
+    BLI_thread_lock(LOCK_DRAW_IMAGE);
+  }
   DRW_draw_view(C);
+  if (show_viewer) {
+    BLI_thread_unlock(LOCK_DRAW_IMAGE);
+  }
+
   draw_image_main_helpers(C, region);
 
   /* Draw Meta data of the image isn't added to the DrawManager as it is
@@ -682,11 +693,8 @@ static void image_main_region_draw(const bContext *C, ARegion *region)
   UI_view2d_view_restore(C);
 
   if (mask) {
-    Image *image = ED_space_image(sima);
-    int width, height, show_viewer;
+    int width, height;
     float aspx, aspy;
-
-    show_viewer = (image && image->source == IMA_SRC_VIEWER);
 
     if (show_viewer) {
       /* ED_space_image_get* will acquire image buffer which requires
@@ -723,12 +731,12 @@ static void image_main_region_draw(const bContext *C, ARegion *region)
   draw_image_cache(C, region);
 }
 
-static void image_main_region_listener(wmWindow *UNUSED(win),
-                                       ScrArea *area,
-                                       ARegion *region,
-                                       wmNotifier *wmn,
-                                       const Scene *UNUSED(scene))
+static void image_main_region_listener(const wmRegionListenerParams *params)
 {
+  ScrArea *area = params->area;
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
   /* context changes */
   switch (wmn->category) {
     case NC_GEOM:
@@ -838,12 +846,11 @@ static void image_buttons_region_draw(const bContext *C, ARegion *region)
   ED_region_panels_draw(C, region);
 }
 
-static void image_buttons_region_listener(wmWindow *UNUSED(win),
-                                          ScrArea *UNUSED(area),
-                                          ARegion *region,
-                                          wmNotifier *wmn,
-                                          const Scene *UNUSED(scene))
+static void image_buttons_region_listener(const wmRegionListenerParams *params)
 {
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
   /* context changes */
   switch (wmn->category) {
     case NC_TEXTURE:
@@ -901,12 +908,11 @@ static void image_tools_region_draw(const bContext *C, ARegion *region)
   ED_region_panels(C, region);
 }
 
-static void image_tools_region_listener(wmWindow *UNUSED(win),
-                                        ScrArea *UNUSED(area),
-                                        ARegion *region,
-                                        wmNotifier *wmn,
-                                        const Scene *UNUSED(scene))
+static void image_tools_region_listener(const wmRegionListenerParams *params)
 {
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
   /* context changes */
   switch (wmn->category) {
     case NC_GPENCIL:
@@ -958,12 +964,11 @@ static void image_header_region_draw(const bContext *C, ARegion *region)
   ED_region_header(C, region);
 }
 
-static void image_header_region_listener(wmWindow *UNUSED(win),
-                                         ScrArea *UNUSED(area),
-                                         ARegion *region,
-                                         wmNotifier *wmn,
-                                         const Scene *UNUSED(scene))
+static void image_header_region_listener(const wmRegionListenerParams *params)
 {
+  ARegion *region = params->region;
+  wmNotifier *wmn = params->notifier;
+
   /* context changes */
   switch (wmn->category) {
     case NC_SCENE:

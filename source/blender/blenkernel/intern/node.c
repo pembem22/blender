@@ -889,6 +889,8 @@ IDTypeInfo IDType_ID_NT = {
     .blend_read_expand = ntree_blend_read_expand,
 
     .blend_read_undo_preserve = NULL,
+
+    .lib_override_apply_post = NULL,
 };
 
 static void node_add_sockets_from_type(bNodeTree *ntree, bNode *node, bNodeType *ntype)
@@ -3573,7 +3575,7 @@ typedef struct bNodeClipboard {
 
 static bNodeClipboard node_clipboard = {{NULL}};
 
-void BKE_node_clipboard_init(struct bNodeTree *ntree)
+void BKE_node_clipboard_init(const struct bNodeTree *ntree)
 {
   node_clipboard.type = ntree->type;
 }
@@ -3717,11 +3719,11 @@ static bNodeInstanceKey node_hash_int_str(bNodeInstanceKey hash, const char *str
   return hash;
 }
 
-bNodeInstanceKey BKE_node_instance_key(bNodeInstanceKey parent_key, bNodeTree *ntree, bNode *node)
+bNodeInstanceKey BKE_node_instance_key(bNodeInstanceKey parent_key,
+                                       const bNodeTree *ntree,
+                                       const bNode *node)
 {
-  bNodeInstanceKey key;
-
-  key = node_hash_int_str(parent_key, ntree->id.name + 2);
+  bNodeInstanceKey key = node_hash_int_str(parent_key, ntree->id.name + 2);
 
   if (node) {
     key = node_hash_int_str(key, node->name);
@@ -4753,6 +4755,8 @@ static void registerGeometryNodes(void)
   register_node_type_geo_attribute_color_ramp();
   register_node_type_geo_point_rotate();
   register_node_type_geo_align_rotation_to_vector();
+  register_node_type_geo_sample_texture();
+  register_node_type_geo_points_to_volume();
 }
 
 static void registerFunctionNodes(void)

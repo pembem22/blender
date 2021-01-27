@@ -984,7 +984,7 @@ void node_draw_shadow(const SpaceNode *snode, const bNode *node, float radius, f
 {
   const rctf *rct = &node->totr;
   UI_draw_roundbox_corner_set(UI_CNR_ALL);
-  ui_draw_dropshadow(rct, radius, snode->aspect, alpha, node->flag & SELECT);
+  ui_draw_dropshadow(rct, radius, snode->runtime->aspect, alpha, node->flag & SELECT);
 }
 
 void node_draw_sockets(const View2D *v2d,
@@ -1188,7 +1188,15 @@ static void node_draw_basis(const bContext *C,
   rctf *rct = &node->totr;
   UI_draw_roundbox_corner_set(UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT);
   UI_draw_roundbox_aa(
-      true, rct->xmin, rct->ymax - NODE_DY, rct->xmax, rct->ymax, BASIS_RAD, color);
+      &(const rctf){
+          .xmin = rct->xmin,
+          .xmax = rct->xmax,
+          .ymin = rct->ymax - NODE_DY,
+          .ymax = rct->ymax,
+      },
+      true,
+      BASIS_RAD,
+      color);
 
   /* show/hide icons */
   float iconofs = rct->xmax - 0.35f * U.widget_unit;
@@ -1339,7 +1347,15 @@ static void node_draw_basis(const bContext *C,
 
   UI_draw_roundbox_corner_set(UI_CNR_BOTTOM_LEFT | UI_CNR_BOTTOM_RIGHT);
   UI_draw_roundbox_aa(
-      true, rct->xmin, rct->ymin, rct->xmax, rct->ymax - NODE_DY, BASIS_RAD, color);
+      &(const rctf){
+          .xmin = rct->xmin,
+          .xmax = rct->xmax,
+          .ymin = rct->ymin,
+          .ymax = rct->ymax - NODE_DY,
+      },
+      true,
+      BASIS_RAD,
+      color);
 
   /* outline active and selected emphasis */
   if (node->flag & SELECT) {
@@ -1347,7 +1363,16 @@ static void node_draw_basis(const bContext *C,
         (node->flag & NODE_ACTIVE) ? TH_ACTIVE : TH_SELECT, 0, -40, color);
 
     UI_draw_roundbox_corner_set(UI_CNR_ALL);
-    UI_draw_roundbox_aa(false, rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD, color);
+    UI_draw_roundbox_aa(
+        &(const rctf){
+            .xmin = rct->xmin,
+            .xmax = rct->xmax,
+            .ymin = rct->ymin,
+            .ymax = rct->ymax,
+        },
+        false,
+        BASIS_RAD,
+        color);
   }
 
   /* disable lines */
@@ -1402,14 +1427,14 @@ static void node_draw_hidden(const bContext *C,
     UI_GetThemeColor4fv(color_id, color);
   }
 
-  UI_draw_roundbox_aa(true, rct->xmin, rct->ymin, rct->xmax, rct->ymax, hiddenrad, color);
+  UI_draw_roundbox_aa(rct, true, hiddenrad, color);
 
   /* outline active and selected emphasis */
   if (node->flag & SELECT) {
     UI_GetThemeColorShadeAlpha4fv(
         (node->flag & NODE_ACTIVE) ? TH_ACTIVE : TH_SELECT, 0, -40, color);
 
-    UI_draw_roundbox_aa(false, rct->xmin, rct->ymin, rct->xmax, rct->ymax, hiddenrad, color);
+    UI_draw_roundbox_aa(rct, false, hiddenrad, color);
   }
 
   /* custom color inline */
@@ -1417,14 +1442,17 @@ static void node_draw_hidden(const bContext *C,
     GPU_blend(GPU_BLEND_ALPHA);
     GPU_line_smooth(true);
 
-    UI_draw_roundbox_3fv_alpha(false,
-                               rct->xmin + 1,
-                               rct->ymin + 1,
-                               rct->xmax - 1,
-                               rct->ymax - 1,
-                               hiddenrad,
-                               node->color,
-                               1.0f);
+    UI_draw_roundbox_3fv_alpha(
+        &(const rctf){
+            .xmin = rct->xmin + 1,
+            .xmax = rct->xmax - 1,
+            .ymin = rct->ymin + 1,
+            .ymax = rct->ymax - 1,
+        },
+        false,
+        hiddenrad,
+        node->color,
+        1.0f);
 
     GPU_line_smooth(false);
     GPU_blend(GPU_BLEND_NONE);
@@ -1506,19 +1534,19 @@ static void node_draw_hidden(const bContext *C,
   immVertex2f(pos, rct->xmax - dx, centy - 4.0f);
   immVertex2f(pos, rct->xmax - dx, centy + 4.0f);
 
-  immVertex2f(pos, rct->xmax - dx - 3.0f * snode->aspect, centy - 4.0f);
-  immVertex2f(pos, rct->xmax - dx - 3.0f * snode->aspect, centy + 4.0f);
+  immVertex2f(pos, rct->xmax - dx - 3.0f * snode->runtime->aspect, centy - 4.0f);
+  immVertex2f(pos, rct->xmax - dx - 3.0f * snode->runtime->aspect, centy + 4.0f);
   immEnd();
 
   immUniformThemeColorShade(color_id, 30);
-  dx -= snode->aspect;
+  dx -= snode->runtime->aspect;
 
   immBegin(GPU_PRIM_LINES, 4);
   immVertex2f(pos, rct->xmax - dx, centy - 4.0f);
   immVertex2f(pos, rct->xmax - dx, centy + 4.0f);
 
-  immVertex2f(pos, rct->xmax - dx - 3.0f * snode->aspect, centy - 4.0f);
-  immVertex2f(pos, rct->xmax - dx - 3.0f * snode->aspect, centy + 4.0f);
+  immVertex2f(pos, rct->xmax - dx - 3.0f * snode->runtime->aspect, centy - 4.0f);
+  immVertex2f(pos, rct->xmax - dx - 3.0f * snode->runtime->aspect, centy + 4.0f);
   immEnd();
 
   immUnbindProgram();
@@ -1694,7 +1722,7 @@ static void snode_setup_v2d(SpaceNode *snode, ARegion *region, const float cente
   UI_view2d_view_ortho(v2d);
 
   /* aspect+font, set each time */
-  snode->aspect = BLI_rctf_size_x(&v2d->cur) / (float)region->winx;
+  snode->runtime->aspect = BLI_rctf_size_x(&v2d->cur) / (float)region->winx;
   // XXX snode->curfont = uiSetCurFont_ext(snode->aspect);
 }
 
@@ -1723,7 +1751,7 @@ static void draw_group_overlay(const bContext *C, ARegion *region)
 
   UI_GetThemeColorShadeAlpha4fv(TH_NODE_GROUP, 0, 0, color);
   UI_draw_roundbox_corner_set(UI_CNR_NONE);
-  UI_draw_roundbox_4fv(true, rect.xmin, rect.ymin, rect.xmax, rect.ymax, 0, color);
+  UI_draw_roundbox_4fv(&rect, true, 0, color);
   GPU_blend(GPU_BLEND_NONE);
 
   /* set the block bounds to clip mouse events from underlying nodes */
@@ -1750,14 +1778,15 @@ void node_draw_space(const bContext *C, ARegion *region)
   GPU_depth_test(GPU_DEPTH_NONE);
   GPU_scissor_test(true);
 
-  /* XXX snode->cursor set in coordspace for placing new nodes, used for drawing noodles too */
+  /* XXX snode->runtime->cursor set in coordspace for placing new nodes, used for drawing noodles
+   * too */
   UI_view2d_region_to_view(&region->v2d,
                            win->eventstate->x - region->winrct.xmin,
                            win->eventstate->y - region->winrct.ymin,
-                           &snode->cursor[0],
-                           &snode->cursor[1]);
-  snode->cursor[0] /= UI_DPI_FAC;
-  snode->cursor[1] /= UI_DPI_FAC;
+                           &snode->runtime->cursor[0],
+                           &snode->runtime->cursor[1]);
+  snode->runtime->cursor[0] /= UI_DPI_FAC;
+  snode->runtime->cursor[1] /= UI_DPI_FAC;
 
   int grid_levels = UI_GetThemeValueType(TH_NODE_GRID_LEVELS, SPACE_NODE);
 
@@ -1847,7 +1876,7 @@ void node_draw_space(const bContext *C, ARegion *region)
     /* temporary links */
     GPU_blend(GPU_BLEND_ALPHA);
     GPU_line_smooth(true);
-    LISTBASE_FOREACH (bNodeLinkDrag *, nldrag, &snode->linkdrag) {
+    LISTBASE_FOREACH (bNodeLinkDrag *, nldrag, &snode->runtime->linkdrag) {
       LISTBASE_FOREACH (LinkData *, linkdata, &nldrag->links) {
         node_draw_link(v2d, snode, (bNodeLink *)linkdata->data);
       }

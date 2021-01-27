@@ -312,6 +312,13 @@ void NODE_OT_add_reroute(wmOperatorType *ot)
 
 /* ****************** Add File Node Operator  ******************* */
 
+static bool node_add_file_poll(bContext *C)
+{
+  const SpaceNode *snode = CTX_wm_space_node(C);
+  return ED_operator_node_editable(C) &&
+         ELEM(snode->nodetree->type, NTREE_SHADER, NTREE_TEXTURE, NTREE_COMPOSIT);
+}
+
 static int node_add_file_exec(bContext *C, wmOperator *op)
 {
   Main *bmain = CTX_data_main(C);
@@ -341,7 +348,7 @@ static int node_add_file_exec(bContext *C, wmOperator *op)
 
   ED_preview_kill_jobs(CTX_wm_manager(C), CTX_data_main(C));
 
-  node = node_add_node(C, NULL, type, snode->cursor[0], snode->cursor[1]);
+  node = node_add_node(C, NULL, type, snode->runtime->cursor[0], snode->runtime->cursor[1]);
 
   if (!node) {
     BKE_report(op->reports, RPT_WARNING, "Could not add an image node");
@@ -370,11 +377,14 @@ static int node_add_file_invoke(bContext *C, wmOperator *op, const wmEvent *even
   SpaceNode *snode = CTX_wm_space_node(C);
 
   /* convert mouse coordinates to v2d space */
-  UI_view2d_region_to_view(
-      &region->v2d, event->mval[0], event->mval[1], &snode->cursor[0], &snode->cursor[1]);
+  UI_view2d_region_to_view(&region->v2d,
+                           event->mval[0],
+                           event->mval[1],
+                           &snode->runtime->cursor[0],
+                           &snode->runtime->cursor[1]);
 
-  snode->cursor[0] /= UI_DPI_FAC;
-  snode->cursor[1] /= UI_DPI_FAC;
+  snode->runtime->cursor[0] /= UI_DPI_FAC;
+  snode->runtime->cursor[1] /= UI_DPI_FAC;
 
   if (RNA_struct_property_is_set(op->ptr, "filepath") ||
       RNA_struct_property_is_set(op->ptr, "name")) {
@@ -393,7 +403,7 @@ void NODE_OT_add_file(wmOperatorType *ot)
   /* callbacks */
   ot->exec = node_add_file_exec;
   ot->invoke = node_add_file_invoke;
-  ot->poll = ED_operator_node_editable;
+  ot->poll = node_add_file_poll;
 
   /* flags */
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
@@ -435,7 +445,8 @@ static int node_add_mask_exec(bContext *C, wmOperator *op)
 
   ED_preview_kill_jobs(CTX_wm_manager(C), CTX_data_main(C));
 
-  node = node_add_node(C, NULL, CMP_NODE_MASK, snode->cursor[0], snode->cursor[1]);
+  node = node_add_node(
+      C, NULL, CMP_NODE_MASK, snode->runtime->cursor[0], snode->runtime->cursor[1]);
 
   if (!node) {
     BKE_report(op->reports, RPT_WARNING, "Could not add a mask node");

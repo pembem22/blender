@@ -24,6 +24,7 @@
 #include <iostream>
 
 #include "BLI_float3.hh"
+#include "BLI_float4x4.hh"
 #include "BLI_hash.hh"
 #include "BLI_map.hh"
 #include "BLI_set.hh"
@@ -36,6 +37,7 @@ struct Collection;
 struct Mesh;
 struct Object;
 struct PointCloud;
+struct Volume;
 
 /* Each geometry component has a specific type. The type determines what kind of data the component
  * stores. Functions modifying a geometry will usually just modify a subset of the component types.
@@ -44,6 +46,7 @@ enum class GeometryComponentType {
   Mesh = 0,
   PointCloud = 1,
   Instances = 2,
+  Volume = 3,
 };
 
 enum class GeometryOwnershipType {
@@ -319,10 +322,13 @@ struct GeometrySet {
   bool has_mesh() const;
   bool has_pointcloud() const;
   bool has_instances() const;
+  bool has_volume() const;
   const Mesh *get_mesh_for_read() const;
   const PointCloud *get_pointcloud_for_read() const;
+  const Volume *get_volume_for_read() const;
   Mesh *get_mesh_for_write();
   PointCloud *get_pointcloud_for_write();
+  Volume *get_volume_for_write();
 
   /* Utility methods for replacement. */
   void replace_mesh(Mesh *mesh, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
@@ -422,9 +428,7 @@ class PointCloudComponent : public GeometryComponent {
 /** A geometry component that stores instances. */
 class InstancesComponent : public GeometryComponent {
  private:
-  blender::Vector<blender::float3> positions_;
-  blender::Vector<blender::float3> rotations_;
-  blender::Vector<blender::float3> scales_;
+  blender::Vector<blender::float4x4> transforms_;
   blender::Vector<int> ids_;
   blender::Vector<InstancedData> instanced_data_;
 
@@ -434,31 +438,39 @@ class InstancesComponent : public GeometryComponent {
   GeometryComponent *copy() const override;
 
   void clear();
-  void add_instance(Object *object,
-                    blender::float3 position,
-                    blender::float3 rotation = {0, 0, 0},
-                    blender::float3 scale = {1, 1, 1},
-                    const int id = -1);
-  void add_instance(Collection *collection,
-                    blender::float3 position,
-                    blender::float3 rotation = {0, 0, 0},
-                    blender::float3 scale = {1, 1, 1},
-                    const int id = -1);
-  void add_instance(InstancedData data,
-                    blender::float3 position,
-                    blender::float3 rotation,
-                    blender::float3 scale,
-                    const int id = -1);
+  void add_instance(Object *object, blender::float4x4 transform, const int id = -1);
+  void add_instance(Collection *collection, blender::float4x4 transform, const int id = -1);
+  void add_instance(InstancedData data, blender::float4x4 transform, const int id = -1);
 
   blender::Span<InstancedData> instanced_data() const;
-  blender::Span<blender::float3> positions() const;
-  blender::Span<blender::float3> rotations() const;
-  blender::Span<blender::float3> scales() const;
+  blender::Span<blender::float4x4> transforms() const;
   blender::Span<int> ids() const;
-  blender::MutableSpan<blender::float3> positions();
+  blender::MutableSpan<blender::float4x4> transforms();
   int instances_amount() const;
 
   bool is_empty() const final;
 
   static constexpr inline GeometryComponentType static_type = GeometryComponentType::Instances;
+};
+
+/** A geometry component that stores volume grids. */
+class VolumeComponent : public GeometryComponent {
+ private:
+  Volume *volume_ = nullptr;
+  GeometryOwnershipType ownership_ = GeometryOwnershipType::Owned;
+
+ public:
+  VolumeComponent();
+  ~VolumeComponent();
+  GeometryComponent *copy() const override;
+
+  void clear();
+  bool has_volume() const;
+  void replace(Volume *volume, GeometryOwnershipType ownership = GeometryOwnershipType::Owned);
+  Volume *release();
+
+  const Volume *get_for_read() const;
+  Volume *get_for_write();
+
+  static constexpr inline GeometryComponentType static_type = GeometryComponentType::Volume;
 };

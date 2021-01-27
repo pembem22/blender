@@ -148,15 +148,13 @@ BlenderAttributeType blender_attribute_name_split_type(ustring name, string *r_r
 
 static BL::NodeSocket get_node_output(BL::Node &b_node, const string &name)
 {
-  BL::Node::outputs_iterator b_out;
-
-  for (b_node.outputs.begin(b_out); b_out != b_node.outputs.end(); ++b_out)
-    if (b_out->name() == name)
-      return *b_out;
-
+  for (BL::NodeSocket &b_out : b_node.outputs) {
+    if (b_out.name() == name) {
+      return b_out;
+    }
+  }
   assert(0);
-
-  return *b_out;
+  return *b_node.outputs.begin();
 }
 
 static float3 get_node_output_rgba(BL::Node &b_node, const string &name)
@@ -779,9 +777,8 @@ static ShaderNode *add_node(Scene *scene,
       image->set_alpha_type(get_image_alpha_type(b_image));
 
       array<int> tiles;
-      BL::Image::tiles_iterator b_iter;
-      for (b_image.tiles.begin(b_iter); b_iter != b_image.tiles.end(); ++b_iter) {
-        tiles.push_back_slow(b_iter->number());
+      for (BL::UDIMTile &b_tile : b_image.tiles) {
+        tiles.push_back_slow(b_tile.number());
       }
       image->set_tiles(tiles);
 
@@ -1084,18 +1081,18 @@ static ShaderInput *node_find_input_by_name(ShaderNode *node,
   string name = b_socket.name();
 
   if (node_use_modified_socket_name(node)) {
-    BL::Node::inputs_iterator b_input;
     bool found = false;
     int counter = 0, total = 0;
 
-    for (b_node.inputs.begin(b_input); b_input != b_node.inputs.end(); ++b_input) {
-      if (b_input->name() == name) {
-        if (!found)
+    for (BL::NodeSocket &b_input : b_node.inputs) {
+      if (b_input.name() == name) {
+        if (!found) {
           counter++;
+        }
         total++;
       }
 
-      if (b_input->ptr.data == b_socket.ptr.data)
+      if (b_input.ptr.data == b_socket.ptr.data)
         found = true;
     }
 
@@ -1117,19 +1114,20 @@ static ShaderOutput *node_find_output_by_name(ShaderNode *node,
   string name = b_socket.name();
 
   if (node_use_modified_socket_name(node)) {
-    BL::Node::outputs_iterator b_output;
     bool found = false;
     int counter = 0, total = 0;
 
-    for (b_node.outputs.begin(b_output); b_output != b_node.outputs.end(); ++b_output) {
-      if (b_output->name() == name) {
-        if (!found)
+    for (BL::NodeSocket &b_output : b_node.outputs) {
+      if (b_output.name() == name) {
+        if (!found) {
           counter++;
+        }
         total++;
       }
 
-      if (b_output->ptr.data == b_socket.ptr.data)
+      if (b_output.ptr.data == b_socket.ptr.data) {
         found = true;
+      }
     }
 
     /* rename if needed */
@@ -1154,41 +1152,32 @@ static void add_nodes(Scene *scene,
                       const ProxyMap &proxy_output_map)
 {
   /* add nodes */
-  BL::ShaderNodeTree::nodes_iterator b_node;
   PtrInputMap input_map;
   PtrOutputMap output_map;
-
-  BL::Node::inputs_iterator b_input;
-  BL::Node::outputs_iterator b_output;
 
   /* find the node to use for output if there are multiple */
   BL::ShaderNode output_node = b_ntree.get_output_node(
       BL::ShaderNodeOutputMaterial::target_CYCLES);
 
   /* add nodes */
-  for (b_ntree.nodes.begin(b_node); b_node != b_ntree.nodes.end(); ++b_node) {
-    if (b_node->mute() || b_node->is_a(&RNA_NodeReroute)) {
+  for (BL::Node &b_node : b_ntree.nodes) {
+    if (b_node.mute() || b_node.is_a(&RNA_NodeReroute)) {
       /* replace muted node with internal links */
-      BL::Node::internal_links_iterator b_internal_link;
-      for (b_node->internal_links.begin(b_internal_link);
-           b_internal_link != b_node->internal_links.end();
-           ++b_internal_link) {
-        BL::NodeSocket to_socket(b_internal_link->to_socket());
+      for (BL::NodeLink &b_internal_link : b_node.internal_links) {
+        BL::NodeSocket to_socket(b_internal_link.to_socket());
         SocketType::Type to_socket_type = convert_socket_type(to_socket);
 
         /* Hack to support spectral socket for reroute nodes. Iterate down the node tree until
          * first non-reroute node is found and check if connected socket is spectral. */
-        auto iter_node = *b_node;
+        auto iter_node = b_node;
         BL::NodeSocket iter_socket = to_socket;
         while (iter_node.is_a(&RNA_NodeReroute)) {
-          BL::NodeTree::links_iterator b_link;
-
           bool found = false;
-          for (b_ntree.links.begin(b_link); b_link != b_ntree.links.end(); ++b_link) {
-            if (b_link->to_socket().ptr.data == iter_node.inputs[0].ptr.data) {
+          for (BL::NodeLink &b_link : b_ntree.links) {
+            if (b_link.to_socket().ptr.data == iter_node.inputs[0].ptr.data) {
               found = true;
-              iter_node = b_link->from_socket().node();
-              iter_socket = b_link->from_socket();
+              iter_node = b_link.from_socket().node();
+              iter_socket = b_link.from_socket();
               break;
             }
           }
@@ -1208,22 +1197,22 @@ static void add_nodes(Scene *scene,
 
         ConvertNode *proxy = graph->create_node<ConvertNode>(to_socket_type, to_socket_type, true);
 
-        input_map[b_internal_link->from_socket().ptr.data] = proxy->inputs[0];
-        output_map[b_internal_link->to_socket().ptr.data] = proxy->outputs[0];
+        input_map[b_internal_link.from_socket().ptr.data] = proxy->inputs[0];
+        output_map[b_internal_link.to_socket().ptr.data] = proxy->outputs[0];
 
         graph->add(proxy);
       }
     }
-    else if (b_node->is_a(&RNA_ShaderNodeGroup) || b_node->is_a(&RNA_NodeCustomGroup) ||
-             b_node->is_a(&RNA_ShaderNodeCustomGroup)) {
+    else if (b_node.is_a(&RNA_ShaderNodeGroup) || b_node.is_a(&RNA_NodeCustomGroup) ||
+             b_node.is_a(&RNA_ShaderNodeCustomGroup)) {
 
       BL::ShaderNodeTree b_group_ntree(PointerRNA_NULL);
-      if (b_node->is_a(&RNA_ShaderNodeGroup))
-        b_group_ntree = BL::ShaderNodeTree(((BL::NodeGroup)(*b_node)).node_tree());
-      else if (b_node->is_a(&RNA_NodeCustomGroup))
-        b_group_ntree = BL::ShaderNodeTree(((BL::NodeCustomGroup)(*b_node)).node_tree());
+      if (b_node.is_a(&RNA_ShaderNodeGroup))
+        b_group_ntree = BL::ShaderNodeTree(((BL::NodeGroup)(b_node)).node_tree());
+      else if (b_node.is_a(&RNA_NodeCustomGroup))
+        b_group_ntree = BL::ShaderNodeTree(((BL::NodeCustomGroup)(b_node)).node_tree());
       else
-        b_group_ntree = BL::ShaderNodeTree(((BL::ShaderNodeCustomGroup)(*b_node)).node_tree());
+        b_group_ntree = BL::ShaderNodeTree(((BL::ShaderNodeCustomGroup)(b_node)).node_tree());
 
       ProxyMap group_proxy_input_map, group_proxy_output_map;
 
@@ -1231,8 +1220,8 @@ static void add_nodes(Scene *scene,
        * Do this even if the node group has no internal tree,
        * so that links have something to connect to and assert won't fail.
        */
-      for (b_node->inputs.begin(b_input); b_input != b_node->inputs.end(); ++b_input) {
-        SocketType::Type input_type = convert_socket_type(*b_input);
+      for (BL::NodeSocket &b_input : b_node.inputs) {
+        SocketType::Type input_type = convert_socket_type(b_input);
         if (input_type == SocketType::UNDEFINED) {
           continue;
         }
@@ -1241,14 +1230,14 @@ static void add_nodes(Scene *scene,
         graph->add(proxy);
 
         /* register the proxy node for internal binding */
-        group_proxy_input_map[b_input->identifier()] = proxy;
+        group_proxy_input_map[b_input.identifier()] = proxy;
 
-        input_map[b_input->ptr.data] = proxy->inputs[0];
+        input_map[b_input.ptr.data] = proxy->inputs[0];
 
-        set_default_value(proxy->inputs[0], *b_input, b_data, b_ntree, graph);
+        set_default_value(proxy->inputs[0], b_input, b_data, b_ntree, graph);
       }
-      for (b_node->outputs.begin(b_output); b_output != b_node->outputs.end(); ++b_output) {
-        SocketType::Type output_type = convert_socket_type(*b_output);
+      for (BL::NodeSocket &b_output : b_node.outputs) {
+        SocketType::Type output_type = convert_socket_type(b_output);
         if (output_type == SocketType::UNDEFINED) {
           continue;
         }
@@ -1257,9 +1246,9 @@ static void add_nodes(Scene *scene,
         graph->add(proxy);
 
         /* register the proxy node for internal binding */
-        group_proxy_output_map[b_output->identifier()] = proxy;
+        group_proxy_output_map[b_output.identifier()] = proxy;
 
-        output_map[b_output->ptr.data] = proxy->outputs[0];
+        output_map[b_output.ptr.data] = proxy->outputs[0];
       }
 
       if (b_group_ntree) {
@@ -1274,30 +1263,30 @@ static void add_nodes(Scene *scene,
                   group_proxy_output_map);
       }
     }
-    else if (b_node->is_a(&RNA_NodeGroupInput)) {
+    else if (b_node.is_a(&RNA_NodeGroupInput)) {
       /* map each socket to a proxy node */
-      for (b_node->outputs.begin(b_output); b_output != b_node->outputs.end(); ++b_output) {
-        ProxyMap::const_iterator proxy_it = proxy_input_map.find(b_output->identifier());
+      for (BL::NodeSocket &b_output : b_node.outputs) {
+        ProxyMap::const_iterator proxy_it = proxy_input_map.find(b_output.identifier());
         if (proxy_it != proxy_input_map.end()) {
           ConvertNode *proxy = proxy_it->second;
 
-          output_map[b_output->ptr.data] = proxy->outputs[0];
+          output_map[b_output.ptr.data] = proxy->outputs[0];
         }
       }
     }
-    else if (b_node->is_a(&RNA_NodeGroupOutput)) {
-      BL::NodeGroupOutput b_output_node(*b_node);
+    else if (b_node.is_a(&RNA_NodeGroupOutput)) {
+      BL::NodeGroupOutput b_output_node(b_node);
       /* only the active group output is used */
       if (b_output_node.is_active_output()) {
         /* map each socket to a proxy node */
-        for (b_node->inputs.begin(b_input); b_input != b_node->inputs.end(); ++b_input) {
-          ProxyMap::const_iterator proxy_it = proxy_output_map.find(b_input->identifier());
+        for (BL::NodeSocket &b_input : b_node.inputs) {
+          ProxyMap::const_iterator proxy_it = proxy_output_map.find(b_input.identifier());
           if (proxy_it != proxy_output_map.end()) {
             ConvertNode *proxy = proxy_it->second;
 
-            input_map[b_input->ptr.data] = proxy->inputs[0];
+            input_map[b_input.ptr.data] = proxy->inputs[0];
 
-            set_default_value(proxy->inputs[0], *b_input, b_data, b_ntree, graph);
+            set_default_value(proxy->inputs[0], b_input, b_data, b_ntree, graph);
           }
         }
       }
@@ -1305,58 +1294,55 @@ static void add_nodes(Scene *scene,
     else {
       ShaderNode *node = NULL;
 
-      if (b_node->ptr.data == output_node.ptr.data) {
+      if (b_node.ptr.data == output_node.ptr.data) {
         node = graph->output();
       }
       else {
-        BL::ShaderNode b_shader_node(*b_node);
+        BL::ShaderNode b_shader_node(b_node);
         node = add_node(
             scene, b_engine, b_data, b_depsgraph, b_scene, graph, b_ntree, b_shader_node);
       }
 
       if (node) {
         /* map node sockets for linking */
-        for (b_node->inputs.begin(b_input); b_input != b_node->inputs.end(); ++b_input) {
-          ShaderInput *input = node_find_input_by_name(node, *b_node, *b_input);
+        for (BL::NodeSocket &b_input : b_node.inputs) {
+          ShaderInput *input = node_find_input_by_name(node, b_node, b_input);
           if (!input) {
             fprintf(stderr,
                     "Failed to find input socket \"%s\" in node \"%s\"\n",
-                    b_input->name().c_str(),
+                    b_input.name().c_str(),
                     node->name);
             continue;
           }
-          input_map[b_input->ptr.data] = input;
+          input_map[b_input.ptr.data] = input;
 
-          set_default_value(input, *b_input, b_data, b_ntree, graph);
+          set_default_value(input, b_input, b_data, b_ntree, graph);
         }
-        for (b_node->outputs.begin(b_output); b_output != b_node->outputs.end(); ++b_output) {
-          ShaderOutput *output = node_find_output_by_name(node, *b_node, *b_output);
+        for (BL::NodeSocket &b_output : b_node.outputs) {
+          ShaderOutput *output = node_find_output_by_name(node, b_node, b_output);
           if (!output) {
             fprintf(stderr,
                     "Failed to find output socket \"%s\" in node \"%s\"\n",
-                    b_output->name().c_str(),
+                    b_output.name().c_str(),
                     node->name);
             continue;
           }
-          output_map[b_output->ptr.data] = output;
+          output_map[b_output.ptr.data] = output;
         }
       }
     }
   }
 
   /* connect nodes */
-  BL::NodeTree::links_iterator b_link;
-
-  for (b_ntree.links.begin(b_link); b_link != b_ntree.links.end(); ++b_link) {
+  for (BL::NodeLink &b_link : b_ntree.links) {
     /* Ignore invalid links to avoid unwanted cycles created in graph.
      * Also ignore links with unavailable sockets. */
-    if (!(b_link->is_valid() && b_link->from_socket().enabled() &&
-          b_link->to_socket().enabled())) {
+    if (!(b_link.is_valid() && b_link.from_socket().enabled() && b_link.to_socket().enabled())) {
       continue;
     }
     /* get blender link data */
-    BL::NodeSocket b_from_sock = b_link->from_socket();
-    BL::NodeSocket b_to_sock = b_link->to_socket();
+    BL::NodeSocket b_from_sock = b_link.from_socket();
+    BL::NodeSocket b_to_sock = b_link.to_socket();
 
     ShaderOutput *output = 0;
     ShaderInput *input = 0;
@@ -1404,13 +1390,12 @@ void BlenderSync::sync_materials(BL::Depsgraph &b_depsgraph, bool update_all)
   TaskPool pool;
   set<Shader *> updated_shaders;
 
-  BL::Depsgraph::ids_iterator b_id;
-  for (b_depsgraph.ids.begin(b_id); b_id != b_depsgraph.ids.end(); ++b_id) {
-    if (!b_id->is_a(&RNA_Material)) {
+  for (BL::ID &b_id : b_depsgraph.ids) {
+    if (!b_id.is_a(&RNA_Material)) {
       continue;
     }
 
-    BL::Material b_mat(*b_id);
+    BL::Material b_mat(b_id);
     Shader *shader;
 
     /* test if we need to sync */
@@ -1603,7 +1588,6 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
 
     shader->set_graph(graph);
     shader->tag_update(scene);
-    background->tag_update(scene);
   }
 
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
@@ -1623,8 +1607,7 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
                              viewport_parameters.custom_viewport_parameters());
   background->set_use_ao(background->get_use_ao() && view_layer.use_background_ao);
 
-  if (background->is_modified())
-    background->tag_update(scene);
+  background->tag_update(scene);
 }
 
 /* Sync Lights */
@@ -1633,13 +1616,12 @@ void BlenderSync::sync_lights(BL::Depsgraph &b_depsgraph, bool update_all)
 {
   shader_map.set_default(scene->default_light);
 
-  BL::Depsgraph::ids_iterator b_id;
-  for (b_depsgraph.ids.begin(b_id); b_id != b_depsgraph.ids.end(); ++b_id) {
-    if (!b_id->is_a(&RNA_Light)) {
+  for (BL::ID &b_id : b_depsgraph.ids) {
+    if (!b_id.is_a(&RNA_Light)) {
       continue;
     }
 
-    BL::Light b_light(*b_id);
+    BL::Light b_light(b_id);
     Shader *shader;
 
     /* test if we need to sync */
