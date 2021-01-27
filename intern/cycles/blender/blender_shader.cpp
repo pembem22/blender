@@ -220,8 +220,7 @@ static SocketType::Type convert_socket_type(BL::NodeSocket &b_socket)
 static void set_default_value(ShaderInput *input,
                               BL::NodeSocket &b_sock,
                               BL::BlendData &b_data,
-                              BL::ID &b_id,
-                              ShaderGraph *graph)
+                              BL::ID &b_id)
 {
   Node *node = input->parent;
   const SocketType &socket = input->socket_type;
@@ -1234,7 +1233,7 @@ static void add_nodes(Scene *scene,
 
         input_map[b_input.ptr.data] = proxy->inputs[0];
 
-        set_default_value(proxy->inputs[0], b_input, b_data, b_ntree, graph);
+        set_default_value(proxy->inputs[0], b_input, b_data, b_ntree);
       }
       for (BL::NodeSocket &b_output : b_node.outputs) {
         SocketType::Type output_type = convert_socket_type(b_output);
@@ -1286,7 +1285,7 @@ static void add_nodes(Scene *scene,
 
             input_map[b_input.ptr.data] = proxy->inputs[0];
 
-            set_default_value(proxy->inputs[0], b_input, b_data, b_ntree, graph);
+            set_default_value(proxy->inputs[0], b_input, b_data, b_ntree);
           }
         }
       }
@@ -1316,7 +1315,7 @@ static void add_nodes(Scene *scene,
           }
           input_map[b_input.ptr.data] = input;
 
-          set_default_value(input, b_input, b_data, b_ntree, graph);
+          set_default_value(input, b_input, b_data, b_ntree);
         }
         for (BL::NodeSocket &b_output : b_node.outputs) {
           ShaderOutput *output = node_find_output_by_name(node, b_node, b_output);
