@@ -93,8 +93,8 @@ ccl_device_noinline_cpu SpectralColor direct_emissive_eval(KernelGlobals *kg,
   if (ls->lamp != LAMP_NONE) {
     const ccl_global KernelLight *klight = &kernel_tex_fetch(__lights, ls->lamp);
 
-    SpectralColor spectral = linear_to_wavelength_intensities(load_float3(klight->strength),
-                                                              state->wavelengths);
+    SpectralColor spectral = linear_to_wavelength_intensities(
+        kg, load_float3(klight->strength), state->wavelengths);
 
     eval *= spectral;
   }

@@ -534,15 +534,18 @@ ccl_device_inline SpectralColor bsdf_principled_hair_sigma_from_reflectance(
   return sigma * sigma;
 }
 
-ccl_device_inline SpectralColor bsdf_principled_hair_sigma_from_concentration(
-    const float eumelanin, const float pheomelanin, const SpectralColor wavelengths)
+ccl_device_inline SpectralColor
+bsdf_principled_hair_sigma_from_concentration(KernelGlobals *kg,
+                                              const float eumelanin,
+                                              const float pheomelanin,
+                                              const SpectralColor wavelengths)
 {
   /* TODO(Spectral Cycles): Use real spectral data. */
   const RGBColor eumelanin_c = make_float3(0.506f, 0.841f, 1.653f);
   const RGBColor pheomelanin_c = make_float3(0.343f, 0.733f, 1.924f);
 
-  return eumelanin * linear_to_wavelength_intensities(eumelanin_c, wavelengths) +
-         pheomelanin * linear_to_wavelength_intensities(pheomelanin_c, wavelengths);
+  return eumelanin * linear_to_wavelength_intensities(kg, eumelanin_c, wavelengths) +
+         pheomelanin * linear_to_wavelength_intensities(kg, pheomelanin_c, wavelengths);
 }
 
 CCL_NAMESPACE_END

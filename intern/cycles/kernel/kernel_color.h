@@ -644,7 +644,9 @@ ccl_device RGBColor wavelength_intensities_to_linear(KernelGlobals *kg,
   return xyz_to_rgb(kg, xyz_sum);
 }
 
-ccl_device SpectralColor linear_to_wavelength_intensities(RGBColor rgb, SpectralColor wavelengths)
+ccl_device SpectralColor linear_to_wavelength_intensities(KernelGlobals *kg,
+                                                          RGBColor rgb,
+                                                          SpectralColor wavelengths)
 {
 
   SpectralColor intensities;

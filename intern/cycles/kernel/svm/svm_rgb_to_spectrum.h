@@ -23,7 +23,7 @@ ccl_device void svm_node_rgb_to_spectrum(
 {
   /* Input */
   RGBColor color = stack_load_float3(stack, color_in);
-  SpectralColor spectrum = linear_to_wavelength_intensities(color, state->wavelengths);
+  SpectralColor spectrum = linear_to_wavelength_intensities(kg, color, state->wavelengths);
 
   stack_store_spectral(stack, spectrum_out, spectrum);
 }
