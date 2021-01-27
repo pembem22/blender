@@ -625,6 +625,10 @@ ccl_device RGBColor wavelength_intensities_to_linear(KernelGlobals *kg,
                                                      SpectralColor intensities,
                                                      SpectralColor wavelengths)
 {
+  if (!kernel_data.integrator.spectral_rendering) {
+    return spectral_color_to_float3(intensities);
+  }
+
   RGBColor xyz_sum = make_float3(0.0f);
   FOR_EACH_CHANNEL(i)
   {
@@ -648,6 +652,9 @@ ccl_device SpectralColor linear_to_wavelength_intensities(KernelGlobals *kg,
                                                           RGBColor rgb,
                                                           SpectralColor wavelengths)
 {
+  if (!kernel_data.integrator.spectral_rendering) {
+    return float3_to_spectral_color(rgb);
+  }
 
   SpectralColor intensities;
   FOR_EACH_CHANNEL(i)
