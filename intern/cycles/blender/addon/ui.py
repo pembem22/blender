@@ -588,10 +588,6 @@ class CYCLES_RENDER_PT_spectral_rendering(CyclesButtonsPanel, Panel):
     bl_label = "Spectral Rendering"
     bl_options = {'DEFAULT_CLOSED'}
 
-    def draw_header(self, context):
-        rd = context.scene.render
-        self.layout.prop(rd, "use_spectral_rendering", text="")
-
     def draw(self, context):
         layout = self.layout
         layout.use_property_split = True
@@ -610,8 +606,8 @@ class CYCLES_RENDER_PT_spectral_rendering_crf(CyclesButtonsPanel, Panel):
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        rd = context.scene.render
-        layout.active = rd.use_spectral_rendering
+        scene = context.scene
+        rd = scene.render
 
         col = layout.column()
 
@@ -632,7 +628,8 @@ class CYCLES_RENDER_PT_spectral_rendering_wavelength_importance(CyclesButtonsPan
         layout.use_property_split = True
         layout.use_property_decorate = False
 
-        rd = context.scene.render
+        scene = context.scene
+        rd = scene.render
         layout.active = rd.use_custom_wavelength_importance
 
         col = layout.column()
