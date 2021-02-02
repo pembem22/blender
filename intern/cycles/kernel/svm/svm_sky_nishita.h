@@ -214,51 +214,52 @@ ccl_device SpectralColor single_scattering(float3 ray_dir,
       float3 light_optical_depth = density_scale * ray_optical_depth(P, sun_dir);
       float3 total_optical_depth = optical_depth + light_optical_depth;
 
-      /* attenuation of light */
-      FOR_EACH_CHANNEL(wl)
-      {
-        float wavelength = wavelengths[wl];
-        float current_irradiance = find_position_in_lookup_unit_step(irradiance,
-                                                                     wavelength,
-                                                                     SKY_LUT_WAVELENGTH_MIN,
-                                                                     SKY_LUT_WAVELENGTH_MAX,
-                                                                     SKY_LUT_WAVELENGTH_STEP);
-        float current_rayleigh_coeff = find_position_in_lookup_unit_step(rayleigh_coeff,
-                                                                         wavelength,
-                                                                         SKY_LUT_WAVELENGTH_MIN,
-                                                                         SKY_LUT_WAVELENGTH_MAX,
-                                                                         SKY_LUT_WAVELENGTH_STEP);
-        float current_ozone_coeff = find_position_in_lookup_unit_step(ozone_coeff,
-                                                                      wavelength,
-                                                                      SKY_LUT_WAVELENGTH_MIN,
-                                                                      SKY_LUT_WAVELENGTH_MAX,
-                                                                      SKY_LUT_WAVELENGTH_STEP);
+      // /* attenuation of light */
+      // FOR_EACH_CHANNEL(wl)
+      // {
+      //   float wavelength = wavelengths[wl];
+      //   float current_irradiance = find_position_in_lookup_unit_step(irradiance,
+      //                                                                wavelength,
+      //                                                                SKY_LUT_WAVELENGTH_MIN,
+      //                                                                SKY_LUT_WAVELENGTH_MAX,
+      //                                                                SKY_LUT_WAVELENGTH_STEP);
+      //   float current_rayleigh_coeff = find_position_in_lookup_unit_step(rayleigh_coeff,
+      //                                                                    wavelength,
+      //                                                                    SKY_LUT_WAVELENGTH_MIN,
+      //                                                                    SKY_LUT_WAVELENGTH_MAX,
+      //                                                                    SKY_LUT_WAVELENGTH_STEP);
+      //   float current_ozone_coeff = find_position_in_lookup_unit_step(ozone_coeff,
+      //                                                                 wavelength,
+      //                                                                 SKY_LUT_WAVELENGTH_MIN,
+      //                                                                 SKY_LUT_WAVELENGTH_MAX,
+      //                                                                 SKY_LUT_WAVELENGTH_STEP);
 
-        float3 extinction_density = total_optical_depth * make_float3(current_rayleigh_coeff,
-                                                                      1.11f * mie_coeff,
-                                                                      current_ozone_coeff);
-        float attenuation = expf(-reduce_add_f(extinction_density));
+      //   float3 extinction_density = total_optical_depth * make_float3(current_rayleigh_coeff,
+      //                                                                 1.11f * mie_coeff,
+      //                                                                 current_ozone_coeff);
+      //   float attenuation = expf(-reduce_add_f(extinction_density));
 
-        float3 scattering_density = density * make_float3(current_rayleigh_coeff, mie_coeff, 0.0f);
+      //   float3 scattering_density = density * make_float3(current_rayleigh_coeff, mie_coeff,
+      //   0.0f);
 
-        /* The total inscattered radiance from one segment is:
-         * Tr(A<->B) * Tr(B<->C) * sigma_s * phase * L * segment_length
-         *
-         * These terms are:
-         * Tr(A<->B): Transmission from start to scattering position (tracked in optical_depth)
-         * Tr(B<->C): Transmission from scattering position to light (computed in
-         * ray_optical_depth)
-         * sigma_s: Scattering density
-         * phase: Phase function of the scattering type (Rayleigh or Mie)
-         * L: Radiance coming from the light source segment_length: The length of the segment
-         *
-         * The code here is just that, with a bit of additional optimization to not store full
-         * spectra for the optical depth.
-         */
+      //   /* The total inscattered radiance from one segment is:
+      //    * Tr(A<->B) * Tr(B<->C) * sigma_s * phase * L * segment_length
+      //    *
+      //    * These terms are:
+      //    * Tr(A<->B): Transmission from start to scattering position (tracked in optical_depth)
+      //    * Tr(B<->C): Transmission from scattering position to light (computed in
+      //    * ray_optical_depth)
+      //    * sigma_s: Scattering density
+      //    * phase: Phase function of the scattering type (Rayleigh or Mie)
+      //    * L: Radiance coming from the light source segment_length: The length of the segment
+      //    *
+      //    * The code here is just that, with a bit of additional optimization to not store full
+      //    * spectra for the optical depth.
+      //    */
 
-        spectrum[wl] += attenuation * reduce_add_f(phase_function * scattering_density) *
-                        current_irradiance * segment_length;
-      }
+      //   spectrum[wl] += attenuation * reduce_add_f(phase_function * scattering_density) *
+      //                   current_irradiance * segment_length;
+      // }
     }
 
     /* Advance along ray. */
@@ -281,26 +282,26 @@ ccl_device SpectralColor sun_radiation(float3 cam_dir,
 
   SpectralColor radiation;
 
-  /* Compute final spectrum. */
-  FOR_EACH_CHANNEL(i)
-  {
-    float wavelength = wavelengths[i];
-    float current_irradiance = find_position_in_lookup_unit_step(irradiance,
-                                                                 wavelength,
-                                                                 SKY_LUT_WAVELENGTH_MIN,
-                                                                 SKY_LUT_WAVELENGTH_MAX,
-                                                                 SKY_LUT_WAVELENGTH_STEP);
-    float current_rayleigh_coeff = find_position_in_lookup_unit_step(rayleigh_coeff,
-                                                                     wavelength,
-                                                                     SKY_LUT_WAVELENGTH_MIN,
-                                                                     SKY_LUT_WAVELENGTH_MAX,
-                                                                     SKY_LUT_WAVELENGTH_STEP);
+  // /* Compute final spectrum. */
+  // FOR_EACH_CHANNEL(i)
+  // {
+  //   float wavelength = wavelengths[i];
+  //   float current_irradiance = find_position_in_lookup_unit_step(irradiance,
+  //                                                                wavelength,
+  //                                                                SKY_LUT_WAVELENGTH_MIN,
+  //                                                                SKY_LUT_WAVELENGTH_MAX,
+  //                                                                SKY_LUT_WAVELENGTH_STEP);
+  //   float current_rayleigh_coeff = find_position_in_lookup_unit_step(rayleigh_coeff,
+  //                                                                    wavelength,
+  //                                                                    SKY_LUT_WAVELENGTH_MIN,
+  //                                                                    SKY_LUT_WAVELENGTH_MAX,
+  //                                                                    SKY_LUT_WAVELENGTH_STEP);
 
-    /* Combine spectra and the optical depth into transmittance. */
-    float transmittance = current_rayleigh_coeff * optical_depth.x * air_density +
-                          1.11f * mie_coeff * optical_depth.y * dust_density;
-    radiation[i] = current_irradiance * expf(-transmittance) / solid_angle;
-  }
+  //   /* Combine spectra and the optical depth into transmittance. */
+  //   float transmittance = current_rayleigh_coeff * optical_depth.x * air_density +
+  //                         1.11f * mie_coeff * optical_depth.y * dust_density;
+  //   radiation[i] = current_irradiance * expf(-transmittance) / solid_angle;
+  // }
 
   return radiation;
 }

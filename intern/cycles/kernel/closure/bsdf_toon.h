@@ -95,12 +95,12 @@ ccl_device SpectralColor bsdf_diffuse_toon_eval_reflect(const ShaderClosure *sc,
 
   SpectralColor eval = bsdf_toon_get_intensity(max_angle, smooth, angle);
 
-  if (eval[0] > 0.0f) {
-    float sample_angle = bsdf_toon_get_sample_angle(max_angle, smooth);
+  // if (eval[0] > 0.0f) {
+  float sample_angle = bsdf_toon_get_sample_angle(max_angle, smooth);
 
-    *pdf = 0.5f * M_1_PI_F / (1.0f - cosf(sample_angle));
-    return *pdf * eval;
-  }
+  *pdf = 0.5f * M_1_PI_F / (1.0f - cosf(sample_angle));
+  return *pdf * eval;
+  // }
 
   return make_spectral_color(0.0f);
 }

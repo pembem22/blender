@@ -214,10 +214,10 @@ ccl_device void bssrdf_burley_setup(Bssrdf *bssrdf)
   /* Surface albedo. */
   const SpectralColor A = bssrdf->albedo;
   SpectralColor s;
-  FOR_EACH_CHANNEL(i)
-  {
-    s[i] = bssrdf_burley_fitting(A[i]);
-  }
+  // FOR_EACH_CHANNEL(i)
+  // {
+  //   s[i] = bssrdf_burley_fitting(A[i]);
+  // }
 
   bssrdf->radius = l / s;
 }
@@ -351,16 +351,16 @@ ccl_device int bssrdf_setup(ShaderData *sd, Bssrdf *bssrdf, ClosureType type)
   int bssrdf_channels = CHANNELS_PER_RAY;
   SpectralColor diffuse_weight = make_spectral_color(0.0f);
 
-  FOR_EACH_CHANNEL(i)
-  {
-    /* Verify if the radii are large enough to sample without precision issues. */
-    if (bssrdf->radius[i] < BSSRDF_MIN_RADIUS) {
-      diffuse_weight[i] = bssrdf->weight[i];
-      bssrdf->weight[i] = 0.0f;
-      bssrdf->radius[i] = 0.0f;
-      bssrdf_channels--;
-    }
-  }
+  // FOR_EACH_CHANNEL(i)
+  // {
+  //   /* Verify if the radii are large enough to sample without precision issues. */
+  //   if (bssrdf->radius[i] < BSSRDF_MIN_RADIUS) {
+  //     diffuse_weight[i] = bssrdf->weight[i];
+  //     bssrdf->weight[i] = 0.0f;
+  //     bssrdf->radius[i] = 0.0f;
+  //     bssrdf_channels--;
+  //   }
+  // }
 
   if (bssrdf_channels < CHANNELS_PER_RAY) {
     /* Add diffuse BSDF if any radius too small. */
@@ -425,22 +425,22 @@ ccl_device void bssrdf_sample(const ShaderClosure *sc, float xi, float *r, float
    * may be used if their radius was too small to handle as BSSRDF. */
   xi *= bssrdf->channels;
 
-  /* TODO(Spectral Cycles): Make sure this works correctly. */
-  FOR_EACH_CHANNEL(i)
-  {
-    if (xi <= i + 1.0f) {
-      xi -= i;
+  // /* TODO(Spectral Cycles): Make sure this works correctly. */
+  // FOR_EACH_CHANNEL(i)
+  // {
+  //   if (xi <= i + 1.0f) {
+  //     xi -= i;
 
-      for (; i < CHANNELS_PER_RAY; i++) {
-        if (bssrdf->radius[i] > 0.0f || i == CHANNELS_PER_RAY - 1) {
-          radius = bssrdf->radius[i];
-          break;
-        }
-      }
+  //     for (; i < CHANNELS_PER_RAY; i++) {
+  //       if (bssrdf->radius[i] > 0.0f || i == CHANNELS_PER_RAY - 1) {
+  //         radius = bssrdf->radius[i];
+  //         break;
+  //       }
+  //     }
 
-      break;
-    }
-  }
+  //     break;
+  //   }
+  // }
 
   /* Sample BSSRDF. */
   if (bssrdf->type == CLOSURE_BSSRDF_CUBIC_ID) {
@@ -477,10 +477,10 @@ ccl_device_forceinline SpectralColor bssrdf_eval(const ShaderClosure *sc, float 
   const Bssrdf *bssrdf = (const Bssrdf *)sc;
 
   SpectralColor spectral;
-  FOR_EACH_CHANNEL(i)
-  {
-    spectral[i] = bssrdf_channel_pdf(bssrdf, bssrdf->radius[i], r);
-  }
+  // FOR_EACH_CHANNEL(i)
+  // {
+  //   spectral[i] = bssrdf_channel_pdf(bssrdf, bssrdf->radius[i], r);
+  // }
   return spectral;
 }
 

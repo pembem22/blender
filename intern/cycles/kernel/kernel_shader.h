@@ -989,13 +989,13 @@ ccl_device bool shader_constant_emission_eval(KernelGlobals *kg, int shader, Spe
   int shader_flag = kernel_tex_fetch(__shaders, shader_index).flags;
 
   /* TODO(Spectral Cycles): Fixme! */
-  if (shader_flag & SD_HAS_CONSTANT_EMISSION) {
-    FOR_EACH_CHANNEL(i)
-    {
-      (*eval)[i] = kernel_tex_fetch(__shaders, shader_index).constant_emission[i];
-    }
-    return true;
-  }
+  // if (shader_flag & SD_HAS_CONSTANT_EMISSION) {
+  //   FOR_EACH_CHANNEL(i)
+  //   {
+  //     (*eval)[i] = kernel_tex_fetch(__shaders, shader_index).constant_emission[i];
+  //   }
+  //   return true;
+  // }
 
   return false;
 }

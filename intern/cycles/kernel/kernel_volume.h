@@ -111,7 +111,8 @@ ccl_device SpectralColor volume_color_transmittance(SpectralColor sigma, float t
 
 ccl_device float kernel_volume_channel_get(SpectralColor value, int channel)
 {
-  return value[channel];
+  return 0.0f;
+  // return value[channel];
 }
 
 #ifdef __VOLUME__
@@ -413,10 +414,10 @@ ccl_device SpectralColor kernel_volume_emission_integrate(VolumeShaderCoefficien
   if (closure_flag & SD_EXTINCTION) {
     SpectralColor sigma_t = coeff->sigma_t;
 
-    FOR_EACH_CHANNEL(i)
-    {
-      emission[i] *= (sigma_t[i] > 0.0f) ? (1.0f - transmittance[i]) / sigma_t[i] : distance;
-    }
+    // FOR_EACH_CHANNEL(i)
+    // {
+    //   emission[i] *= (sigma_t[i] > 0.0f) ? (1.0f - transmittance[i]) / sigma_t[i] : distance;
+    // }
   }
   else {
     emission *= distance;
@@ -452,13 +453,13 @@ ccl_device int kernel_volume_sample_channel(SpectralColor albedo,
 
   /* OpenCL does not support -> on float3, so don't use pdf->x. */
   float sum = 0.0f;
-  FOR_EACH_CHANNEL(i)
-  {
-    sum += weights_pdf[i];
-    if (rand < sum) {
-      return i;
-    }
-  }
+  // FOR_EACH_CHANNEL(i)
+  // {
+  //   sum += weights_pdf[i];
+  //   if (rand < sum) {
+  //     return i;
+  //   }
+  // }
 
   return CHANNELS_PER_RAY - 1;
 }
