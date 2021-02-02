@@ -497,6 +497,8 @@ DeviceRequestedFeatures Scene::get_requested_device_features()
     requested_features.use_shadow_tricks = true;
   }
 
+  requested_features.use_spectral_rendering = integrator->get_spectral_rendering();
+
   return requested_features;
 }
 
