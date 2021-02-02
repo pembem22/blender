@@ -517,22 +517,6 @@ static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_no_bo
     {0, NULL, 0, NULL, NULL},
 };
 
-static const EnumPropertyItem rna_node_geometry_object_info_transform_space_items[] = {
-    {GEO_NODE_TRANSFORM_SPACE_ORIGINAL,
-     "ORIGINAL",
-     0,
-     "Original",
-     "Output the geometry relative to the input object transform, and the location, rotation and "
-     "scale relative to the world origin"},
-    {GEO_NODE_TRANSFORM_SPACE_RELATIVE,
-     "RELATIVE",
-     0,
-     "Relative",
-     "Bring the input object geometry, location, rotation and scale into the modified object, "
-     "maintaining the relative position between the two objects in the scene"},
-    {0, NULL, 0, NULL, NULL},
-};
-
 #endif
 
 #undef ITEM_ATTRIBUTE
@@ -4791,9 +4775,10 @@ static void def_sh_tex_sky(StructRNA *srna)
   RNA_def_property_float_default(prop, 0.0f);
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
-  prop = RNA_def_property(srna, "altitude", PROP_FLOAT, PROP_NONE);
+  prop = RNA_def_property(srna, "altitude", PROP_FLOAT, PROP_DISTANCE);
   RNA_def_property_ui_text(prop, "Altitude", "Height from sea level");
-  RNA_def_property_range(prop, 0.0f, 60.0f);
+  RNA_def_property_range(prop, 0.0f, 60000.0f);
+  RNA_def_property_ui_range(prop, 0.0f, 60000.0f, 10, 1);
   RNA_def_property_float_default(prop, 0.0f);
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
@@ -8812,7 +8797,7 @@ static void def_geo_attribute_attribute_compare(StructRNA *srna)
 
   prop = RNA_def_property(srna, "operation", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_items(prop, rna_enum_node_float_compare_items);
-  RNA_def_property_enum_default(prop, NODE_MATH_ADD);
+  RNA_def_property_enum_default(prop, NODE_FLOAT_COMPARE_GREATER_THAN);
   RNA_def_property_ui_text(prop, "Operation", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 
@@ -8992,6 +8977,23 @@ static void def_geo_attribute_sample_texture(StructRNA *srna)
 static void def_geo_object_info(StructRNA *srna)
 {
   PropertyRNA *prop;
+
+  static const EnumPropertyItem rna_node_geometry_object_info_transform_space_items[] = {
+      {GEO_NODE_TRANSFORM_SPACE_ORIGINAL,
+       "ORIGINAL",
+       0,
+       "Original",
+       "Output the geometry relative to the input object transform, and the location, rotation "
+       "and "
+       "scale relative to the world origin"},
+      {GEO_NODE_TRANSFORM_SPACE_RELATIVE,
+       "RELATIVE",
+       0,
+       "Relative",
+       "Bring the input object geometry, location, rotation and scale into the modified object, "
+       "maintaining the relative position between the two objects in the scene"},
+      {0, NULL, 0, NULL, NULL},
+  };
 
   RNA_def_struct_sdna_from(srna, "NodeGeometryObjectInfo", "storage");
 
