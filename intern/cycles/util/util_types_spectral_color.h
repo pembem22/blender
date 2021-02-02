@@ -23,8 +23,13 @@
 
 CCL_NAMESPACE_BEGIN
 
-#define SPECTRAL_COLOR_DATA_TYPE float8
-#define CHANNELS_PER_RAY 8
+#ifdef __WITH_SPECTRAL_RENDERING__
+#  define SPECTRAL_COLOR_DATA_TYPE float8
+#  define CHANNELS_PER_RAY 8
+#else
+#  define SPECTRAL_COLOR_DATA_TYPE float3
+#  define CHANNELS_PER_RAY 3
+#endif
 
 typedef SPECTRAL_COLOR_DATA_TYPE SpectralColor;
 

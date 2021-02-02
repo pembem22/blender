@@ -106,7 +106,9 @@ struct Node {
   void set(const SocketType &input, float value);
   void set(const SocketType &input, float2 value);
   void set(const SocketType &input, float3 value);
+#ifdef __WITH_SPECTRAL_CYCLES__
   void set(const SocketType &input, SpectralColor value);
+#endif
   void set(const SocketType &input, const char *value);
   void set(const SocketType &input, ustring value);
   void set(const SocketType &input, const Transform &value);

@@ -309,8 +309,9 @@ ccl_device void kernel_bake_evaluate(
   state.sample = sample;
   state.num_samples = num_samples;
   state.min_ray_pdf = FLT_MAX;
+#  ifdef __WITH_SPECTRAL_CYCLES__
   state.wavelengths = generate_wavelengths(kg, &state);
-
+#  endif
   SpectralColor wavelengths = state.wavelengths;
 
   /* Light passes if we need more than color. */
@@ -494,7 +495,9 @@ ccl_device void kernel_background_evaluate(KernelGlobals *kg,
 {
   ShaderData sd;
   PathState state = {0};
+#ifdef __WITH_SPECTRAL_CYCLES__
   state.wavelengths = generate_wavelengths(kg, &state);
+#endif
   uint4 in = input[i];
 
   /* setup ray */
