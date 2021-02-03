@@ -104,7 +104,7 @@ void Node::set(const SocketType &input, float3 value)
   set_if_different(input, value);
 }
 
-#ifdef __WITH_SPECTRAL_CYCLES__
+#ifdef __WITH_SPECTRAL_RENDERING__
 void Node::set(const SocketType &input, SpectralColor value)
 {
   assert(is_socket_float3(input));

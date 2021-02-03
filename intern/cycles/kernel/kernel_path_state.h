@@ -18,7 +18,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-#ifdef __WITH_SPECTRAL_CYCLES__
+#ifdef __WITH_SPECTRAL_RENDERING__
 ccl_device_inline SpectralColor generate_wavelengths(KernelGlobals *kg,
                                                      const ccl_addr_space PathState *state)
 {
@@ -92,7 +92,7 @@ ccl_device_inline void path_state_init(KernelGlobals *kg,
   }
 #endif
 
-#ifdef __WITH_SPECTRAL_CYCLES__
+#ifdef __WITH_SPECTRAL_RENDERING__
   state->wavelengths = generate_wavelengths(kg, state);
 #endif
 }
