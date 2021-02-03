@@ -24,7 +24,7 @@ ccl_device void svm_node_spectrum_curves(
 {
   uint out_offset = node.y;
   uint table_size = node.z;
-  int table_offset = *offset;
+  // int table_offset = *offset;
 
   SpectralColor out;
 

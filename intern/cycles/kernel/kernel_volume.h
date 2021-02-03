@@ -452,7 +452,7 @@ ccl_device int kernel_volume_sample_channel(SpectralColor albedo,
   *pdf = weights_pdf;
 
   /* OpenCL does not support -> on float3, so don't use pdf->x. */
-  float sum = 0.0f;
+  // float sum = 0.0f;
   // FOR_EACH_CHANNEL(i)
   // {
   //   sum += weights_pdf[i];

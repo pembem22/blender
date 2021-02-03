@@ -419,7 +419,7 @@ ccl_device int bssrdf_setup(ShaderData *sd, Bssrdf *bssrdf, ClosureType type)
 ccl_device void bssrdf_sample(const ShaderClosure *sc, float xi, float *r, float *h)
 {
   const Bssrdf *bssrdf = (const Bssrdf *)sc;
-  float radius;
+  // float radius;
 
   /* Sample color channel and reuse random number. Only a subset of channels
    * may be used if their radius was too small to handle as BSSRDF. */
@@ -441,6 +441,8 @@ ccl_device void bssrdf_sample(const ShaderClosure *sc, float xi, float *r, float
   //     break;
   //   }
   // }
+
+  float radius = 0.0f;
 
   /* Sample BSSRDF. */
   if (bssrdf->type == CLOSURE_BSSRDF_CUBIC_ID) {
@@ -474,7 +476,7 @@ ccl_device float bssrdf_channel_pdf(const Bssrdf *bssrdf, float radius, float r)
 
 ccl_device_forceinline SpectralColor bssrdf_eval(const ShaderClosure *sc, float r)
 {
-  const Bssrdf *bssrdf = (const Bssrdf *)sc;
+  // const Bssrdf *bssrdf = (const Bssrdf *)sc;
 
   SpectralColor spectral;
   // FOR_EACH_CHANNEL(i)
