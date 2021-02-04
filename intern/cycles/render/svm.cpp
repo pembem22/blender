@@ -204,7 +204,7 @@ int SVMCompiler::stack_size(SocketType::Type type)
       size = 0;
       break;
     case SocketType::SPECTRAL:
-      size = CHANNELS_PER_RAY;
+      size = SPECTRAL_CHANNELS_PER_RAY;
       break;
     default:
       assert(0);
