@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Blender Foundation
+ * Copyright 2011-2014 Blender Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-/* Optimized CPU kernel entry points. This file is compiled with AVX
+/* Optimized CPU kernel entry points. This file is compiled with AVX2
  * optimization flags and nearly all functions inlined, while kernel.cpp
  * is compiled without for other CPU's. */
 
-#define __SPLIT_KERNEL__
-#define KERNEL_NAME _rgb
+#define __WITH_SPECTRAL_RENDERING__
+#define KERNEL_NAME _spectral
 
 #include "util/util_optimization.h"
 
-#ifndef WITH_CYCLES_OPTIMIZED_KERNEL_AVX
+#ifndef WITH_CYCLES_OPTIMIZED_KERNEL_AVX2
 #  define KERNEL_STUB
 #else
 /* SSE optimization disabled for now on 32 bit, see bug T36316. */
@@ -34,9 +34,10 @@
 #    define __KERNEL_SSSE3__
 #    define __KERNEL_SSE41__
 #    define __KERNEL_AVX__
+#    define __KERNEL_AVX2__
 #  endif
-#endif /* WITH_CYCLES_OPTIMIZED_KERNEL_AVX */
+#endif /* WITH_CYCLES_OPTIMIZED_KERNEL_AVX2 */
 
 #include "kernel/kernel.h"
-#define KERNEL_ARCH cpu_avx
+#define KERNEL_ARCH cpu_avx2
 #include "kernel/kernels/cpu/kernel_cpu_impl.h"

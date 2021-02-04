@@ -23,6 +23,8 @@
 #  define __KERNEL_SSE2__
 #endif
 
+#define KERNEL_NAME _rgb
+
 /* When building kernel for native machine detect kernel features from the flags
  * set by compiler.
  */

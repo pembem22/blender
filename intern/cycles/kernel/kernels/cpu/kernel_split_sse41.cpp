@@ -19,6 +19,7 @@
  * is compiled without for other CPU's. */
 
 #define __SPLIT_KERNEL__
+#define KERNEL_NAME _rgb
 
 #include "util/util_optimization.h"
 

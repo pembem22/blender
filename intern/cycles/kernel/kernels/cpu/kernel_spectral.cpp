@@ -23,8 +23,8 @@
 #  define __KERNEL_SSE2__
 #endif
 
-#define __SPLIT_KERNEL__
-#define KERNEL_NAME _rgb
+#define __WITH_SPECTRAL_RENDERING__
+#define KERNEL_NAME _spectral
 
 /* When building kernel for native machine detect kernel features from the flags
  * set by compiler.
@@ -45,6 +45,7 @@
 #    define __KERNEL_SSE41__
 #  endif
 #  ifdef __AVX__
+#    define __KERNEL_SSE__
 #    define __KERNEL_AVX__
 #  endif
 #  ifdef __AVX2__

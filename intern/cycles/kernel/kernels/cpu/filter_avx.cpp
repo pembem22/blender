@@ -18,6 +18,8 @@
  * optimization flags and nearly all functions inlined, while kernel.cpp
  * is compiled without for other CPU's. */
 
+#define KERNEL_NAME _rgb
+
 #include "util/util_optimization.h"
 
 #ifndef WITH_CYCLES_OPTIMIZED_KERNEL_AVX

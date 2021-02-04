@@ -24,8 +24,14 @@
 
 CCL_NAMESPACE_BEGIN
 
-#define KERNEL_NAME_JOIN(x, y, z) x##_##y##_##z
-#define KERNEL_NAME_EVAL(arch, name) KERNEL_NAME_JOIN(kernel, arch, name)
+#ifndef KERNEL_NAME
+#  error KERNEL_NAME not defined
+#endif
+
+#define KERNEL_NAME_JOIN(x, y, z, w) x##y##_##z##_##w
+#define KERNEL_NAME_EVAL2(arch, kernel_name, name) \
+  KERNEL_NAME_JOIN(kernel, kernel_name, arch, name)
+#define KERNEL_NAME_EVAL(arch, name) KERNEL_NAME_EVAL2(arch, KERNEL_NAME, name)
 #define KERNEL_FUNCTION_FULL_NAME(name) KERNEL_NAME_EVAL(KERNEL_ARCH, name)
 
 struct KernelGlobals;

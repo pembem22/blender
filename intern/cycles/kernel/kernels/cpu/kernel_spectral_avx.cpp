@@ -18,8 +18,8 @@
  * optimization flags and nearly all functions inlined, while kernel.cpp
  * is compiled without for other CPU's. */
 
-#define __SPLIT_KERNEL__
-#define KERNEL_NAME _rgb
+#define __WITH_SPECTRAL_RENDERING__
+#define KERNEL_NAME _spectral
 
 #include "util/util_optimization.h"
 

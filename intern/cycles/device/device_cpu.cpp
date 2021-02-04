@@ -34,14 +34,23 @@
 #include "device/device_split_kernel.h"
 
 // clang-format off
+#define KERNEL_NAME _rgb
 #include "kernel/kernel.h"
+#undef KERNEL_NAME
+#define KERNEL_NAME _spectral
+#undef __KERNEL_H__
+#include "kernel/kernel.h"
+#undef KERNEL_NAME
+
 #include "kernel/kernel_compat_cpu.h"
 #include "kernel/kernel_types.h"
 #include "kernel/split/kernel_split_data.h"
 #include "kernel/kernel_globals.h"
 #include "kernel/kernel_adaptive_sampling.h"
 
+#define KERNEL_NAME _rgb
 #include "kernel/filter/filter.h"
+#undef KERNEL_NAME
 
 #include "kernel/osl/osl_shader.h"
 #include "kernel/osl/osl_globals.h"
@@ -173,6 +182,60 @@ class CPUSplitKernel : public DeviceSplitKernel {
   virtual uint64_t state_buffer_size(device_memory &kg, device_memory &data, size_t num_threads);
 };
 
+class ICPUKernel {
+ public:
+  KernelFunctions<void (*)(KernelGlobals *, float *, int, int, int, int, int)> path_trace_kernel;
+  KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int)>
+      convert_to_half_float_kernel;
+  KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int)>
+      convert_to_byte_kernel;
+  KernelFunctions<void (*)(KernelGlobals *, uint4 *, float4 *, int, int, int, int, int)>
+      shader_kernel;
+  KernelFunctions<void (*)(KernelGlobals *, float *, int, int, int, int, int)> bake_kernel;
+};
+
+class RGBKernel : public ICPUKernel {
+#define KERNEL_NAME _rgb
+#define KERNEL_FUNCTIONS(name) \
+  KERNEL_NAME_EVAL(cpu, name), KERNEL_NAME_EVAL(cpu_sse2, name), \
+      KERNEL_NAME_EVAL(cpu_sse3, name), KERNEL_NAME_EVAL(cpu_sse41, name), \
+      KERNEL_NAME_EVAL(cpu_avx, name), KERNEL_NAME_EVAL(cpu_avx2, name)
+#define REGISTER_KERNEL(name) name##_kernel = KernelFunctions(KERNEL_FUNCTIONS(name))
+
+ public:
+  RGBKernel()
+  {
+    REGISTER_KERNEL(path_trace);
+    REGISTER_KERNEL(convert_to_half_float);
+    REGISTER_KERNEL(convert_to_byte);
+    REGISTER_KERNEL(shader);
+    REGISTER_KERNEL(bake);
+  }
+#undef REGISTER_KERNEL
+#undef KERNEL_NAME
+};
+
+class SpectralKernel : public ICPUKernel {
+#define KERNEL_NAME _spectral
+#define KERNEL_FUNCTIONS(name) \
+  KERNEL_NAME_EVAL(cpu, name), KERNEL_NAME_EVAL(cpu_sse2, name), \
+      KERNEL_NAME_EVAL(cpu_sse3, name), KERNEL_NAME_EVAL(cpu_sse41, name), \
+      KERNEL_NAME_EVAL(cpu_avx, name), KERNEL_NAME_EVAL(cpu_avx2, name)
+#define REGISTER_KERNEL(name) name##_kernel = KernelFunctions(KERNEL_FUNCTIONS(name))
+
+ public:
+  SpectralKernel()
+  {
+    REGISTER_KERNEL(path_trace);
+    REGISTER_KERNEL(convert_to_half_float);
+    REGISTER_KERNEL(convert_to_byte);
+    REGISTER_KERNEL(shader);
+    REGISTER_KERNEL(bake);
+  }
+#undef REGISTER_KERNEL
+#undef KERNEL_NAME
+};
+
 class CPUDevice : public Device {
  public:
   TaskPool task_pool;
@@ -197,15 +260,6 @@ class CPUDevice : public Device {
   bool use_split_kernel;
 
   DeviceRequestedFeatures requested_features;
-
-  KernelFunctions<void (*)(KernelGlobals *, float *, int, int, int, int, int)> path_trace_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int)>
-      convert_to_half_float_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, uchar4 *, float *, float, int, int, int, int)>
-      convert_to_byte_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, uint4 *, float4 *, int, int, int, int, int)>
-      shader_kernel;
-  KernelFunctions<void (*)(KernelGlobals *, float *, int, int, int, int, int)> bake_kernel;
 
   KernelFunctions<void (*)(
       int, TileInfo *, int, int, float *, float *, float *, float *, float *, int *, int, int)>
@@ -275,6 +329,9 @@ class CPUDevice : public Device {
       data_init_kernel;
   unordered_map<string, KernelFunctions<void (*)(KernelGlobals *, KernelData *)>> split_kernels;
 
+  ICPUKernel kernel;
+
+#define KERNEL_NAME _rgb
 #define KERNEL_FUNCTIONS(name) \
   KERNEL_NAME_EVAL(cpu, name), KERNEL_NAME_EVAL(cpu_sse2, name), \
       KERNEL_NAME_EVAL(cpu_sse3, name), KERNEL_NAME_EVAL(cpu_sse41, name), \
@@ -284,11 +341,6 @@ class CPUDevice : public Device {
       : Device(info_, stats_, profiler_, background_),
         texture_info(this, "__texture_info", MEM_GLOBAL),
 #define REGISTER_KERNEL(name) name##_kernel(KERNEL_FUNCTIONS(name))
-        REGISTER_KERNEL(path_trace),
-        REGISTER_KERNEL(convert_to_half_float),
-        REGISTER_KERNEL(convert_to_byte),
-        REGISTER_KERNEL(shader),
-        REGISTER_KERNEL(bake),
         REGISTER_KERNEL(filter_divide_shadow),
         REGISTER_KERNEL(filter_get_feature),
         REGISTER_KERNEL(filter_write_feature),
@@ -304,6 +356,7 @@ class CPUDevice : public Device {
         REGISTER_KERNEL(filter_finalize),
         REGISTER_KERNEL(data_init)
 #undef REGISTER_KERNEL
+#undef KERNEL_NAME
   {
     if (info.cpu_threads == 0) {
       info.cpu_threads = TaskScheduler::num_threads();
@@ -321,6 +374,7 @@ class CPUDevice : public Device {
     }
     need_texture_info = false;
 
+#define KERNEL_NAME _rgb
 #define REGISTER_SPLIT_KERNEL(name) \
   split_kernels[#name] = KernelFunctions<void (*)(KernelGlobals *, KernelData *)>( \
       KERNEL_FUNCTIONS(name))
@@ -348,6 +402,7 @@ class CPUDevice : public Device {
     REGISTER_SPLIT_KERNEL(adaptive_adjust_samples);
 #undef REGISTER_SPLIT_KERNEL
 #undef KERNEL_FUNCTIONS
+#undef KERNEL_NAME
   }
 
   ~CPUDevice()
@@ -967,14 +1022,14 @@ class CPUDevice : public Device {
             if (use_coverage) {
               coverage.init_pixel(x, y);
             }
-            path_trace_kernel()(kg, render_buffer, sample, x, y, tile.offset, tile.stride);
+            kernel.path_trace_kernel()(kg, render_buffer, sample, x, y, tile.offset, tile.stride);
           }
         }
       }
       else {
         for (int y = tile.y; y < tile.y + tile.h; y++) {
           for (int x = tile.x; x < tile.x + tile.w; x++) {
-            bake_kernel()(kg, render_buffer, sample, x, y, tile.offset, tile.stride);
+            kernel.bake_kernel()(kg, render_buffer, sample, x, y, tile.offset, tile.stride);
           }
         }
       }
@@ -1378,26 +1433,26 @@ class CPUDevice : public Device {
     if (task.rgba_half) {
       for (int y = task.y; y < task.y + task.h; y++)
         for (int x = task.x; x < task.x + task.w; x++)
-          convert_to_half_float_kernel()(&kernel_globals,
-                                         (uchar4 *)task.rgba_half,
-                                         (float *)task.buffer,
-                                         sample_scale,
-                                         x,
-                                         y,
-                                         task.offset,
-                                         task.stride);
+          kernel.convert_to_half_float_kernel()(&kernel_globals,
+                                                (uchar4 *)task.rgba_half,
+                                                (float *)task.buffer,
+                                                sample_scale,
+                                                x,
+                                                y,
+                                                task.offset,
+                                                task.stride);
     }
     else {
       for (int y = task.y; y < task.y + task.h; y++)
         for (int x = task.x; x < task.x + task.w; x++)
-          convert_to_byte_kernel()(&kernel_globals,
-                                   (uchar4 *)task.rgba_byte,
-                                   (float *)task.buffer,
-                                   sample_scale,
-                                   x,
-                                   y,
-                                   task.offset,
-                                   task.stride);
+          kernel.convert_to_byte_kernel()(&kernel_globals,
+                                          (uchar4 *)task.rgba_byte,
+                                          (float *)task.buffer,
+                                          sample_scale,
+                                          x,
+                                          y,
+                                          task.offset,
+                                          task.stride);
     }
   }
 
@@ -1407,14 +1462,14 @@ class CPUDevice : public Device {
 
     for (int sample = 0; sample < task.num_samples; sample++) {
       for (int x = task.shader_x; x < task.shader_x + task.shader_w; x++)
-        shader_kernel()(kg,
-                        (uint4 *)task.shader_input,
-                        (float4 *)task.shader_output,
-                        task.shader_eval_type,
-                        task.shader_filter,
-                        x,
-                        task.offset,
-                        sample);
+        kernel.shader_kernel()(kg,
+                               (uint4 *)task.shader_input,
+                               (float4 *)task.shader_output,
+                               task.shader_eval_type,
+                               task.shader_filter,
+                               x,
+                               task.offset,
+                               sample);
 
       if (task.get_cancel() || TaskPool::canceled())
         break;
@@ -1513,6 +1568,15 @@ class CPUDevice : public Device {
 
   virtual bool load_kernels(const DeviceRequestedFeatures &requested_features_) override
   {
+    if (requested_features.use_spectral_rendering) {
+      fprintf(stderr, "Using spectral kernel.\n");
+      kernel = SpectralKernel();
+    }
+    else {
+      fprintf(stderr, "Using RGB kernel.\n");
+      kernel = RGBKernel();
+    }
+
     requested_features = requested_features_;
 
     return true;
