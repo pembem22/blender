@@ -1568,7 +1568,7 @@ class CPUDevice : public Device {
 
   virtual bool load_kernels(const DeviceRequestedFeatures &requested_features_) override
   {
-    if (requested_features.use_spectral_rendering) {
+    if (requested_features_.use_spectral_rendering) {
       fprintf(stderr, "Using spectral kernel.\n");
       kernel = SpectralKernel();
     }
