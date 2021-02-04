@@ -23,19 +23,20 @@
 
 CCL_NAMESPACE_BEGIN
 
+#define SPECTRAL_COLOR_DATA_TYPE float8
+#define CHANNELS_PER_RAY 8
+
 #ifdef __WITH_SPECTRAL_RENDERING__
-#  define SPECTRAL_COLOR_DATA_TYPE float8
-#  define CHANNELS_PER_RAY 8
+#  define SPECTRAL_COLOR_CURRENT_DATA_TYPE SPECTRAL_COLOR_DATA_TYPE
 #else
-#  define SPECTRAL_COLOR_DATA_TYPE float3
-#  define CHANNELS_PER_RAY 3
+#  define SPECTRAL_COLOR_CURRENT_DATA_TYPE float3
 #endif
 
-typedef SPECTRAL_COLOR_DATA_TYPE SpectralColor;
+typedef SPECTRAL_COLOR_CURRENT_DATA_TYPE SpectralColor;
 
-#define make_spectral_color(f) CONCAT(make_, SPECTRAL_COLOR_DATA_TYPE(f))
-#define load_spectral_color(f) CONCAT(load_, SPECTRAL_COLOR_DATA_TYPE(f))
-#define store_spectral_color(s, f) CONCAT(store_, SPECTRAL_COLOR_DATA_TYPE((s), (f)))
+#define make_spectral_color(f) CONCAT(make_, SPECTRAL_COLOR_CURRENT_DATA_TYPE(f))
+#define load_spectral_color(f) CONCAT(load_, SPECTRAL_COLOR_CURRENT_DATA_TYPE(f))
+#define store_spectral_color(s, f) CONCAT(store_, SPECTRAL_COLOR_CURRENT_DATA_TYPE((s), (f)))
 
 #define spectral_color_to_float3(f) CONCAT(SPECTRAL_COLOR_DATA_TYPE, _to_float3(f))
 #define float3_to_spectral_color(f) CONCAT(float3_to_, SPECTRAL_COLOR_DATA_TYPE(f))
