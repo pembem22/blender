@@ -537,7 +537,7 @@ if(WITH_CYCLES_CUDA_BINARIES)
     if(DEFINED cuda_nvcc_executable AND DEFINED cuda_toolkit_root_dir)
       # Compile regular kernel
       CYCLES_CUDA_KERNEL_ADD(${arch} ${prev_arch} filter "" "${cuda_filter_sources}" FALSE)
-      CYCLES_CUDA_KERNEL_ADD(${arch} ${prev_arch} kernel "" "${cuda_sources}" FALSE)
+      CYCLES_CUDA_KERNEL_ADD(${arch} ${prev_arch} kernel "-D__WITH_SPECTRAL_RENDERING__" "${cuda_sources}" FALSE)
 
       if(WITH_CYCLES_CUDA_SPLIT_KERNEL_BINARIES)
         # Compile split kernel
