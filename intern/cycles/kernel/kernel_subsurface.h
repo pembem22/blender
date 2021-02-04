@@ -113,12 +113,28 @@ ccl_device SpectralColor subsurface_color_pow(SpectralColor color, float exponen
 {
   color = max(color, make_spectral_color(0.0f));
 
-  // FOR_EACH_CHANNEL(i)
-  // {
-  //   color[i] = (exponent == 1.0f) ?
-  //                  color[i] :
-  //                  ((exponent == 0.5f) ? sqrtf(color[i]) : powf(color[i], exponent));
-  // }
+#ifdef __WITH_SPECTRAL_RENDERING__
+  FOR_EACH_CHANNEL(i)
+  {
+    color[i] = (exponent == 1.0f) ?
+                   color[i] :
+                   ((exponent == 0.5f) ? sqrtf(color[i]) : powf(color[i], exponent));
+  }
+#else
+  if (exponent == 1.0f) {
+    /* nothing to do */
+  }
+  else if (exponent == 0.5f) {
+    color.x = sqrtf(color.x);
+    color.y = sqrtf(color.y);
+    color.z = sqrtf(color.z);
+  }
+  else {
+    color.x = powf(color.x, exponent);
+    color.y = powf(color.y, exponent);
+    color.z = powf(color.z, exponent);
+  }
+#endif
 
   return color;
 }
@@ -355,10 +371,22 @@ ccl_device void subsurface_random_walk_coefficients(const ShaderClosure *sc,
   const SpectralColor A = bssrdf->albedo;
   const SpectralColor d = bssrdf->radius;
 
-  // FOR_EACH_CHANNEL(i)
-  // {
-  //   subsurface_random_walk_remap(A[i], d[i], &((*sigma_t)[i]), &((*sigma_s)[i]));
-  // }
+#ifdef __WITH_SPECTRAL_RENDERING__
+  FOR_EACH_CHANNEL(i)
+  {
+    subsurface_random_walk_remap(A[i], d[i], &((*sigma_t)[i]), &((*sigma_s)[i]));
+  }
+#else
+  float sigma_t_x, sigma_t_y, sigma_t_z;
+  float sigma_s_x, sigma_s_y, sigma_s_z;
+
+  subsurface_random_walk_remap(A.x, d.x, &sigma_t_x, &sigma_s_x);
+  subsurface_random_walk_remap(A.y, d.y, &sigma_t_y, &sigma_s_y);
+  subsurface_random_walk_remap(A.z, d.z, &sigma_t_z, &sigma_s_z);
+
+  *sigma_t = make_float3(sigma_t_x, sigma_t_y, sigma_t_z);
+  *sigma_s = make_float3(sigma_s_x, sigma_s_y, sigma_s_z);
+#endif
 
   /* Closure mixing and Fresnel weights separate from albedo. */
   *weight = safe_divide(bssrdf->weight, A);

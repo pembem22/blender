@@ -111,8 +111,11 @@ ccl_device SpectralColor volume_color_transmittance(SpectralColor sigma, float t
 
 ccl_device float kernel_volume_channel_get(SpectralColor value, int channel)
 {
-  return 0.0f;
-  // return value[channel];
+#ifdef __WITH_SPECTRAL_RENDERING__
+  return value[channel];
+#else
+  return (channel == 0) ? value.x : ((channel == 1) ? value.y : value.z);
+#endif
 }
 
 #ifdef __VOLUME__
@@ -403,7 +406,7 @@ ccl_device SpectralColor kernel_volume_distance_pdf(float max_t,
 ccl_device SpectralColor kernel_volume_emission_integrate(VolumeShaderCoefficients *coeff,
                                                           int closure_flag,
                                                           SpectralColor transmittance,
-                                                          float distance)
+                                                          float t)
 {
   /* integral E * exp(-sigma_t * t) from 0 to t = E * (1 - exp(-sigma_t * t))/sigma_t
    * this goes to E * t as sigma_t goes to zero
@@ -414,13 +417,19 @@ ccl_device SpectralColor kernel_volume_emission_integrate(VolumeShaderCoefficien
   if (closure_flag & SD_EXTINCTION) {
     SpectralColor sigma_t = coeff->sigma_t;
 
-    // FOR_EACH_CHANNEL(i)
-    // {
-    //   emission[i] *= (sigma_t[i] > 0.0f) ? (1.0f - transmittance[i]) / sigma_t[i] : distance;
-    // }
+#ifdef __WITH_SPECTRAL_RENDERING__
+    FOR_EACH_CHANNEL(i)
+    {
+      emission[i] *= (sigma_t[i] > 0.0f) ? (1.0f - transmittance[i]) / sigma_t[i] : t;
+    }
+#else
+    emission.x *= (sigma_t.x > 0.0f) ? (1.0f - transmittance.x) / sigma_t.x : t;
+    emission.y *= (sigma_t.y > 0.0f) ? (1.0f - transmittance.y) / sigma_t.y : t;
+    emission.z *= (sigma_t.z > 0.0f) ? (1.0f - transmittance.z) / sigma_t.z : t;
+#endif
   }
   else {
-    emission *= distance;
+    emission *= t;
   }
 
   return emission;
@@ -451,17 +460,29 @@ ccl_device int kernel_volume_sample_channel(SpectralColor albedo,
 
   *pdf = weights_pdf;
 
-  /* OpenCL does not support -> on float3, so don't use pdf->x. */
-  // float sum = 0.0f;
-  // FOR_EACH_CHANNEL(i)
-  // {
-  //   sum += weights_pdf[i];
-  //   if (rand < sum) {
-  //     return i;
-  //   }
-  // }
+#ifdef __WITH_SPECTRAL_RENDERING__
+  float sum = 0.0f;
+  FOR_EACH_CHANNEL(i)
+  {
+    sum += weights_pdf[i];
+    if (rand < sum) {
+      return i;
+    }
+  }
 
   return CHANNELS_PER_RAY - 1;
+#else
+  /* OpenCL does not support -> on float3, so don't use pdf->x. */
+  if (rand < weights_pdf.x) {
+    return 0;
+  }
+  else if (rand < weights_pdf.x + weights_pdf.y) {
+    return 1;
+  }
+  else {
+    return 2;
+  }
+#endif
 }
 
 #ifdef __VOLUME__

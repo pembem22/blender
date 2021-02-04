@@ -18,6 +18,15 @@ CCL_NAMESPACE_BEGIN
 
 /* Nishita sky texture */
 
+#ifndef __WITH_SPECTRAL_RENDERING__
+ccl_device void svm_node_tex_sky_nishita(KernelGlobals * /*kg*/,
+                                         PathState * /*state*/,
+                                         float * /*stack*/,
+                                         uint4 /*node*/,
+                                         int * /*offset*/)
+{
+}
+#else
 /* Constants */
 ccl_static_constant float rayleigh_scale = 8e3f;        // Rayleigh scale height (m)
 ccl_static_constant float mie_scale = 1.2e3f;           // Mie scale height (m)
@@ -32,10 +41,10 @@ ccl_static_constant int steps_light = 16;               // segments per sun conn
 /* Does not compile with CUDA. */
 // ccl_static_constant float sqr_G = mie_G * mie_G;        // squared aerosols anisotropy
 
-#define SKY_LUT_WAVELENGTH_MIN 380
-#define SKY_LUT_WAVELENGTH_MAX 780
-#define SKY_LUT_WAVELENGTH_NUM 21
-#define SKY_LUT_WAVELENGTH_STEP 19
+#  define SKY_LUT_WAVELENGTH_MIN 380
+#  define SKY_LUT_WAVELENGTH_MAX 780
+#  define SKY_LUT_WAVELENGTH_NUM 21
+#  define SKY_LUT_WAVELENGTH_STEP 19
 
 ccl_static_constant float step_lambda = (SKY_LUT_WAVELENGTH_MAX - SKY_LUT_WAVELENGTH_MIN) /
                                         (SKY_LUT_WAVELENGTH_NUM -
@@ -283,25 +292,25 @@ ccl_device SpectralColor sun_radiation(float3 cam_dir,
   SpectralColor radiation;
 
   // /* Compute final spectrum. */
-  // FOR_EACH_CHANNEL(i)
-  // {
-  //   float wavelength = wavelengths[i];
-  //   float current_irradiance = find_position_in_lookup_unit_step(irradiance,
-  //                                                                wavelength,
-  //                                                                SKY_LUT_WAVELENGTH_MIN,
-  //                                                                SKY_LUT_WAVELENGTH_MAX,
-  //                                                                SKY_LUT_WAVELENGTH_STEP);
-  //   float current_rayleigh_coeff = find_position_in_lookup_unit_step(rayleigh_coeff,
-  //                                                                    wavelength,
-  //                                                                    SKY_LUT_WAVELENGTH_MIN,
-  //                                                                    SKY_LUT_WAVELENGTH_MAX,
-  //                                                                    SKY_LUT_WAVELENGTH_STEP);
+  FOR_EACH_CHANNEL(i)
+  {
+    float wavelength = wavelengths[i];
+    float current_irradiance = find_position_in_lookup_unit_step(irradiance,
+                                                                 wavelength,
+                                                                 SKY_LUT_WAVELENGTH_MIN,
+                                                                 SKY_LUT_WAVELENGTH_MAX,
+                                                                 SKY_LUT_WAVELENGTH_STEP);
+    float current_rayleigh_coeff = find_position_in_lookup_unit_step(rayleigh_coeff,
+                                                                     wavelength,
+                                                                     SKY_LUT_WAVELENGTH_MIN,
+                                                                     SKY_LUT_WAVELENGTH_MAX,
+                                                                     SKY_LUT_WAVELENGTH_STEP);
 
-  //   /* Combine spectra and the optical depth into transmittance. */
-  //   float transmittance = current_rayleigh_coeff * optical_depth.x * air_density +
-  //                         1.11f * mie_coeff * optical_depth.y * dust_density;
-  //   radiation[i] = current_irradiance * expf(-transmittance) / solid_angle;
-  // }
+    /* Combine spectra and the optical depth into transmittance. */
+    float transmittance = current_rayleigh_coeff * optical_depth.x * air_density +
+                          1.11f * mie_coeff * optical_depth.y * dust_density;
+    radiation[i] = current_irradiance * expf(-transmittance) / solid_angle;
+  }
 
   return radiation;
 }
@@ -380,5 +389,6 @@ ccl_device void svm_node_tex_sky_nishita(
 
   stack_store_spectral(stack, spectrum_out, spectrum);
 }
+#endif
 
 CCL_NAMESPACE_END
