@@ -374,7 +374,7 @@ class ShaderGraph : public NodeOwner {
   void bump_from_displacement(bool use_object_space);
   void refine_bump_nodes();
   void expand();
-  void default_inputs(bool do_osl);
+  void default_inputs(bool do_osl, bool spectral_rendering);
   void transform_multi_closure(ShaderNode *node, ShaderOutput *weight_out, bool volume);
 
   /* Graph simplification routines. */

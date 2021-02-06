@@ -2220,7 +2220,13 @@ void ConvertNode::compile(SVMCompiler &compiler)
   if ((from == SocketType::COLOR || from == SocketType::VECTOR || from == SocketType::NORMAL ||
        from == SocketType::POINT) &&
       to == SocketType::SPECTRAL) {
-    compiler.add_node(NODE_RGB_TO_SPECTRUM, compiler.stack_assign(in), compiler.stack_assign(out));
+    if (compiler.scene->integrator->get_spectral_rendering()) {
+      compiler.add_node(
+          NODE_RGB_TO_SPECTRUM, compiler.stack_assign(in), compiler.stack_assign(out));
+    }
+    else {
+      compiler.stack_link(in, out);
+    }
     return;
   }
 

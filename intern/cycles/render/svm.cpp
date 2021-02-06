@@ -325,7 +325,8 @@ void SVMCompiler::stack_link(ShaderInput *input, ShaderOutput *output)
 {
   if (output->stack_offset == SVM_STACK_INVALID) {
     assert(input->link);
-    assert(stack_size(output->type()) == stack_size(input->link->type()));
+    assert(stack_size(output->type()) == stack_size(input->link->type()) ||
+           output->type() == SocketType::SPECTRAL);
 
     output->stack_offset = input->link->stack_offset;
 

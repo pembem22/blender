@@ -291,7 +291,7 @@ ccl_device SpectralColor sun_radiation(float3 cam_dir,
 
   SpectralColor radiation;
 
-  // /* Compute final spectrum. */
+  /* Compute final spectrum. */
   FOR_EACH_CHANNEL(i)
   {
     float wavelength = wavelengths[i];
