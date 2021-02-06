@@ -149,7 +149,7 @@ class Shader : public Node {
    * directly to the output.
    * If yes, it sets the content of emission to the constant value (color * strength), which is
    * then used for speeding up light evaluation. */
-  bool is_constant_emission(float3 *emission);
+  bool is_constant_emission(float3 *emission, Scene *scene);
 
   void set_graph(ShaderGraph *graph);
   void tag_update(Scene *scene);

@@ -229,7 +229,7 @@ Shader::~Shader()
   delete graph;
 }
 
-bool Shader::is_constant_emission(float3 *emission)
+bool Shader::is_constant_emission(float3 *emission, Scene *scene)
 {
   /* If the shader has AOVs or spectral inputs, they need to be evaluated, so we can't skip the
    * shader. */
@@ -238,9 +238,11 @@ bool Shader::is_constant_emission(float3 *emission)
       return false;
     }
 
-    foreach (ShaderInput *input, node->inputs) {
-      if (input->type() == SocketType::SPECTRAL) {
-        return false;
+    if (scene->integrator->get_spectral_rendering()) {
+      foreach (ShaderInput *input, node->inputs) {
+        if (input->type() == SocketType::SPECTRAL) {
+          return false;
+        }
       }
     }
   }
@@ -603,7 +605,7 @@ void ShaderManager::device_update_common(Device *device,
 
     /* constant emission check */
     float3 constant_emission = make_float3(0.0f, 0.0f, 0.0f);
-    if (shader->is_constant_emission(&constant_emission))
+    if (shader->is_constant_emission(&constant_emission, scene))
       flag |= SD_HAS_CONSTANT_EMISSION;
 
     uint32_t cryptomatte_id = util_murmur_hash3(shader->name.c_str(), shader->name.length(), 0);
