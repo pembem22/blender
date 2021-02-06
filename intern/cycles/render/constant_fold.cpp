@@ -16,6 +16,8 @@
 
 #include "render/constant_fold.h"
 #include "render/graph.h"
+#include "render/integrator.h"
+#include "scene.h"
 
 #include "util/util_foreach.h"
 #include "util/util_logging.h"
@@ -32,10 +34,12 @@ ConstantFolder::ConstantFolder(ShaderGraph *graph,
 
 bool ConstantFolder::all_inputs_constant() const
 {
-  /* Do not fold nodes with spectral output socket. */
-  foreach (ShaderOutput *output, node->outputs) {
-    if (output->type() == SocketType::SPECTRAL) {
-      return false;
+  if (scene->integrator->get_spectral_rendering()) {
+    /* Do not fold nodes with spectral output socket. */
+    foreach (ShaderOutput *output, node->outputs) {
+      if (output->type() == SocketType::SPECTRAL) {
+        return false;
+      }
     }
   }
 
