@@ -356,7 +356,7 @@ void ui_draw_but_IMAGE(ARegion *UNUSED(region),
   GPU_blend(GPU_BLEND_NONE);
 
 #  if 0
-  /* restore scissortest */
+  /* Restore scissor-test. */
   GPU_scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 #  endif
 
@@ -1411,7 +1411,7 @@ void ui_draw_but_UNITVEC(uiBut *but, const uiWidgetColors *wcol, const rcti *rec
   GPU_batch_uniform_3fv(sphere, "light", light);
   GPU_batch_draw(sphere);
 
-  /* restore */
+  /* Restore. */
   GPU_face_culling(GPU_CULL_NONE);
 
   /* AA circle */
@@ -1831,7 +1831,7 @@ void ui_draw_but_CURVE(
   immEnd();
   immUnbindProgram();
 
-  /* restore scissortest */
+  /* Restore scissor-test. */
   GPU_scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 
   /* outline */
@@ -2121,7 +2121,7 @@ void ui_draw_but_CURVEPROFILE(ARegion *region,
   }
   immUnbindProgram();
 
-  /* restore scissortest */
+  /* Restore scissor-test. */
   GPU_scissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 
   /* Outline */
