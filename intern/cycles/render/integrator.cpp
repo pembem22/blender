@@ -319,10 +319,6 @@ void Integrator::tag_update(Scene *scene, uint32_t flag)
     }
   }
 
-  if (spectral_rendering_is_modified()) {
-    scene->shader_manager->tag_update(scene, ShaderManager::UPDATE_ALL);
-  }
-
   if (motion_blur_is_modified()) {
     scene->object_manager->tag_update(scene, ObjectManager::MOTION_BLUR_MODIFIED);
     scene->camera->tag_modified();
