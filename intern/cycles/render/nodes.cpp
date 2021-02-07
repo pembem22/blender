@@ -2165,6 +2165,10 @@ void ConvertNode::constant_fold(const ConstantFolder &folder)
 
   /* TODO(DingTo): conversion from/to int is not supported yet, don't fold in that case */
 
+  if (to == SocketType::SPECTRAL && !folder.scene->integrator->get_spectral_rendering()) {
+    to = SocketType::COLOR;
+  }
+
   if (folder.all_inputs_constant()) {
     if (from == SocketType::FLOAT) {
       if (SocketType::is_float3(to)) {
@@ -2220,14 +2224,7 @@ void ConvertNode::compile(SVMCompiler &compiler)
   if ((from == SocketType::COLOR || from == SocketType::VECTOR || from == SocketType::NORMAL ||
        from == SocketType::POINT) &&
       to == SocketType::SPECTRAL) {
-    if (compiler.scene->integrator->get_spectral_rendering()) {
-      compiler.add_node(
-          NODE_RGB_TO_SPECTRUM, compiler.stack_assign(in), compiler.stack_assign(out));
-    }
-    else {
-      compiler.stack_link(in, out);
-    }
-    return;
+    compiler.add_node(NODE_RGB_TO_SPECTRUM, compiler.stack_assign(in), compiler.stack_assign(out));
   }
 
   if (from == SocketType::FLOAT && to == SocketType::SPECTRAL) {
