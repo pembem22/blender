@@ -370,7 +370,8 @@ void BlenderSync::sync_integrator()
     integrator->set_ao_bounces(0);
   }
 
-  integrator->set_spectral_rendering(r.use_spectral_rendering());
+  integrator->set_spectral_rendering(r.use_spectral_rendering() ||
+                                     get_enum(cscene, "device") != 0);
 
   /* UPDATE_NONE as we don't want to tag the integrator as modified, just tag dependent things */
   integrator->tag_update(scene, Integrator::UPDATE_NONE);

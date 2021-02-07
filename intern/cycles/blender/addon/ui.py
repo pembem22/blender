@@ -2286,6 +2286,9 @@ def draw_device(self, context):
             if cscene.shading_system:
                 col.label(text="OSL is currently not supported and will be disabled.", icon='ERROR')
 
+        if not use_cpu(context):
+            col.label(text="Only spectral rendering is currently supported on GPU.", icon='ERROR')
+
 
 def draw_pause(self, context):
     layout = self.layout
