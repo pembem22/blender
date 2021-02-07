@@ -757,12 +757,12 @@ SceneParams BlenderSync::get_scene_params(BL::Scene &b_scene, bool background)
   BL::RenderSettings r = b_scene.render();
   SceneParams params;
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
-  const bool shadingsystem = RNA_boolean_get(&cscene, "shading_system");
+  // const bool shadingsystem = RNA_boolean_get(&cscene, "shading_system");
 
-  if (shadingsystem == 0)
-    params.shadingsystem = SHADINGSYSTEM_SVM;
-  else if (shadingsystem == 1)
-    params.shadingsystem = SHADINGSYSTEM_OSL;
+  // if (shadingsystem == 0)
+  params.shadingsystem = SHADINGSYSTEM_SVM;
+  // else if (shadingsystem == 1)
+  //   params.shadingsystem = SHADINGSYSTEM_OSL;
 
   if (background || DebugFlags().viewport_static_bvh)
     params.bvh_type = SceneParams::BVH_STATIC;
@@ -937,12 +937,12 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine &b_engine,
     params.progressive = true;
 
   /* shading system - scene level needs full refresh */
-  const bool shadingsystem = RNA_boolean_get(&cscene, "shading_system");
+  // const bool shadingsystem = RNA_boolean_get(&cscene, "shading_system");
 
-  if (shadingsystem == 0)
-    params.shadingsystem = SHADINGSYSTEM_SVM;
-  else if (shadingsystem == 1)
-    params.shadingsystem = SHADINGSYSTEM_OSL;
+  // if (shadingsystem == 0)
+  params.shadingsystem = SHADINGSYSTEM_SVM;
+  // else if (shadingsystem == 1)
+  //   params.shadingsystem = SHADINGSYSTEM_OSL;
 
   /* Color management. */
   params.display_buffer_linear = b_engine.support_display_space_shader(b_scene);

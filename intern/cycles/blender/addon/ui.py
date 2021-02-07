@@ -2283,6 +2283,8 @@ def draw_device(self, context):
         from . import engine
         if engine.with_osl() and use_cpu(context):
             col.prop(cscene, "shading_system")
+            if cscene.shading_system:
+                col.label(text="OSL is currently not supported and will be disabled.", icon='ERROR')
 
 
 def draw_pause(self, context):
