@@ -160,18 +160,40 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg,
 
       // get the base color
       uint4 data_base_color = read_node(kg, offset);
+#  ifdef __WITH_SPECTRAL_RENDERING__
       SpectralColor base_color = stack_load_spectral(stack, data_base_color.x);
+#  else
+      float3 base_color = stack_valid(data_base_color.x) ?
+                              stack_load_float3(stack, data_base_color.x) :
+                              make_float3(__uint_as_float(data_base_color.y),
+                                          __uint_as_float(data_base_color.z),
+                                          __uint_as_float(data_base_color.w));
+#  endif
 
       // get the additional clearcoat normal and subsurface scattering radius
       uint4 data_cn_ssr = read_node(kg, offset);
       float3 clearcoat_normal = stack_valid(data_cn_ssr.x) ?
                                     stack_load_float3(stack, data_cn_ssr.x) :
                                     sd->N;
+#  ifdef __WITH_SPECTRAL_RENDERING__
       SpectralColor subsurface_radius = stack_load_spectral(stack, data_cn_ssr.y);
+#  else
+      float3 subsurface_radius = stack_valid(data_cn_ssr.y) ?
+                                     stack_load_float3(stack, data_cn_ssr.y) :
+                                     make_float3(1.0f, 1.0f, 1.0f);
+#  endif
 
       // get the subsurface color
       uint4 data_subsurface_color = read_node(kg, offset);
+#  ifdef __WITH_SPECTRAL_RENDERING__
       SpectralColor subsurface_color = stack_load_spectral(stack, data_subsurface_color.x);
+#  else
+      float3 subsurface_color = stack_valid(data_subsurface_color.x) ?
+                                    stack_load_float3(stack, data_subsurface_color.x) :
+                                    make_float3(__uint_as_float(data_subsurface_color.y),
+                                                __uint_as_float(data_subsurface_color.z),
+                                                __uint_as_float(data_subsurface_color.w));
+#  endif
 
       SpectralColor weight = sd->svm_closure_weight * mix_weight;
 

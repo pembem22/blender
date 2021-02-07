@@ -3014,29 +3014,24 @@ void PrincipledBsdfNode::compile(SVMCompiler &compiler,
                     subsurface_method,
                     SVM_STACK_INVALID);
 
-  //   float3 bc_default = get_float3(base_color_in->socket_type);
+  float3 bc_default = get_float3(base_color_in->socket_type);
 
-  compiler.add_node(compiler.stack_assign(base_color_in));
-
-  //   compiler.add_node(
-  //       ((base_color_in->link) ? compiler.stack_assign(base_color_in) : SVM_STACK_INVALID),
-  //       __float_as_int(bc_default.x),
-  //       __float_as_int(bc_default.y),
-  //       __float_as_int(bc_default.z));
+  compiler.add_node(
+      ((base_color_in->link) ? compiler.stack_assign(base_color_in) : SVM_STACK_INVALID),
+      __float_as_int(bc_default.x),
+      __float_as_int(bc_default.y),
+      __float_as_int(bc_default.z));
 
   compiler.add_node(
       clearcoat_normal_offset, subsurface_radius_offset, SVM_STACK_INVALID, SVM_STACK_INVALID);
 
-  //   float3 ss_default = get_float3(subsurface_color_in->socket_type);
+  float3 ss_default = get_float3(subsurface_color_in->socket_type);
 
-  compiler.add_node(compiler.stack_assign(subsurface_color_in));
-
-  //   compiler.add_node(((subsurface_color_in->link) ? compiler.stack_assign(subsurface_color_in)
-  //   :
-  //                                                    SVM_STACK_INVALID),
-  //                     __float_as_int(ss_default.x),
-  //                     __float_as_int(ss_default.y),
-  //                     __float_as_int(ss_default.z));
+  compiler.add_node(((subsurface_color_in->link) ? compiler.stack_assign(subsurface_color_in) :
+                                                   SVM_STACK_INVALID),
+                    __float_as_int(ss_default.x),
+                    __float_as_int(ss_default.y),
+                    __float_as_int(ss_default.z));
 }
 
 bool PrincipledBsdfNode::has_integrator_dependency()
