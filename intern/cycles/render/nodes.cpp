@@ -2225,6 +2225,7 @@ void ConvertNode::compile(SVMCompiler &compiler)
        from == SocketType::POINT) &&
       to == SocketType::SPECTRAL) {
     compiler.add_node(NODE_RGB_TO_SPECTRUM, compiler.stack_assign(in), compiler.stack_assign(out));
+    return;
   }
 
   if (from == SocketType::FLOAT && to == SocketType::SPECTRAL) {
