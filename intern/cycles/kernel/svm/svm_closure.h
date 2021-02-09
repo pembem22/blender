@@ -1151,9 +1151,12 @@ ccl_device_inline void svm_node_closure_store_weight(ShaderData *sd, SpectralCol
   sd->svm_closure_weight = weight;
 }
 
-ccl_device void svm_node_closure_set_weight(ShaderData *sd, uint f)
+ccl_device void svm_node_closure_set_weight(
+    KernelGlobals *kg, ShaderData *sd, PathState *state, uint r, uint g, uint b)
 {
-  svm_node_closure_store_weight(sd, make_spectral_color(__uint_as_float(f)));
+  float3 weight = make_float3(__uint_as_float(r), __uint_as_float(g), __uint_as_float(b));
+  svm_node_closure_store_weight(sd,
+                                linear_to_wavelength_intensities(kg, weight, state->wavelengths));
 }
 
 ccl_device void svm_node_closure_weight(ShaderData *sd, float *stack, uint weight_offset)
