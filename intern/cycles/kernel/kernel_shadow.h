@@ -41,6 +41,9 @@ ccl_addr_space
   if (dot(sd->Ng, ray->D) < 0.0f) {
     kernel_volume_stack_enter_exit(kg, sd, ps->volume_stack);
   }
+#  ifdef __WITH_SPECTRAL_RENDERING__
+  ps->wavelengths = state->wavelengths;
+#  endif
   return ps;
 }
 #endif /* __VOLUME__ */
