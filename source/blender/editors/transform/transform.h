@@ -285,6 +285,8 @@ enum {
 
   TFM_MODAL_AUTOCONSTRAINT = 28,
   TFM_MODAL_AUTOCONSTRAINTPLANE = 29,
+
+  TFM_MODAL_PRECISION = 30,
 };
 
 /** \} */
@@ -720,9 +722,6 @@ typedef enum {
 void initMouseInput(
     TransInfo *t, MouseInput *mi, const float center[2], const int mval[2], const bool precision);
 void initMouseInputMode(TransInfo *t, MouseInput *mi, MouseInputMode mode);
-eRedrawFlag handleMouseInput(struct TransInfo *t,
-                             struct MouseInput *mi,
-                             const struct wmEvent *event);
 void applyMouseInput(struct TransInfo *t,
                      struct MouseInput *mi,
                      const int mval[2],
@@ -738,10 +737,6 @@ void setInputPostFct(MouseInput *mi, void (*post)(struct TransInfo *t, float val
 /** \name Generics
  * \{ */
 
-void initTransDataContainers_FromObjectData(TransInfo *t,
-                                            struct Object *obact,
-                                            struct Object **objects,
-                                            uint objects_len);
 void initTransInfo(struct bContext *C,
                    TransInfo *t,
                    struct wmOperator *op,
@@ -776,6 +771,8 @@ bool calculateCenterActive(TransInfo *t, bool select_only, float r_center[3]);
 void calculatePropRatio(TransInfo *t);
 
 void transform_data_ext_rotate(TransData *td, float mat[3][3], bool use_drot);
+
+struct Object *transform_object_deform_pose_armature_get(const TransInfo *t, struct Object *ob);
 
 void freeCustomNormalArray(TransInfo *t, TransDataContainer *tc, TransCustomData *custom_data);
 

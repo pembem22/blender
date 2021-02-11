@@ -63,6 +63,9 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/build_files/cmake/platform")
 # avoid having empty buildtype
 if(NOT DEFINED CMAKE_BUILD_TYPE_INIT)
   set(CMAKE_BUILD_TYPE_INIT "Release")
+  # Internal logic caches this variable, avoid showing it by default
+  # since it's easy to accidentally set instead of the build type.
+  mark_as_advanced(CMAKE_BUILD_TYPE_INIT)
 endif()
 
 # Omit superfluous "Up-to-date" messages.
@@ -164,10 +167,6 @@ if(APPLE)
 endif()
 
 option(WITH_BUILDINFO     "Include extra build details (only disable for development & faster builds)" ON)
-if(${CMAKE_VERSION} VERSION_LESS 2.8.8)
-  # add_library OBJECT arg unsupported
-  set(WITH_BUILDINFO OFF)
-endif()
 set(BUILDINFO_OVERRIDE_DATE "" CACHE STRING "Use instead of the current date for reproducible builds (empty string disables this option)")
 set(BUILDINFO_OVERRIDE_TIME "" CACHE STRING "Use instead of the current time for reproducible builds (empty string disables this option)")
 set(CPACK_OVERRIDE_PACKAGENAME "" CACHE STRING "Use instead of the standard packagename (empty string disables this option)")
@@ -614,6 +613,7 @@ endif()
 if(UNIX)
   # See WITH_WINDOWS_SCCACHE for Windows.
   option(WITH_COMPILER_CCACHE "Use ccache to improve rebuild times (Works with Ninja, Makefiles and Xcode)" OFF)
+  mark_as_advanced(WITH_COMPILER_CCACHE)
 endif()
 
 # The following only works with the Ninja generator in CMake >= 3.0.
@@ -1021,6 +1021,9 @@ if(WITH_OPENVDB)
   if(WITH_OPENVDB_3_ABI_COMPATIBLE)
     list(APPEND OPENVDB_DEFINITIONS -DOPENVDB_3_ABI_COMPATIBLE)
   endif()
+
+  # OpenVDB headers use deprecated TBB headers, silence warning.
+  list(APPEND OPENVDB_DEFINITIONS -DTBB_SUPPRESS_DEPRECATED_MESSAGES=1)
 
   list(APPEND OPENVDB_INCLUDE_DIRS
     ${BOOST_INCLUDE_DIR}

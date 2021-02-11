@@ -515,7 +515,7 @@ CustomDataType cpp_type_to_custom_data_type(const blender::fn::CPPType &type)
  * "legacy" data structures. For example, some builtin attributes cannot be deleted. */
 class BuiltinAttributeProvider {
  public:
-  /* Some utility enums to avoid hard to read bools in function calls. */
+  /* Some utility enums to avoid hard to read booleans in function calls. */
   enum CreatableEnum {
     Creatable,
     NonCreatable,
@@ -731,7 +731,7 @@ class BuiltinCustomDataLayerProvider final : public BuiltinAttributeProvider {
     if (custom_data == nullptr) {
       return false;
     }
-    const void *data = CustomData_get_layer(custom_data, data_type_);
+    const void *data = CustomData_get_layer(custom_data, stored_type_);
     return data != nullptr;
   }
 };

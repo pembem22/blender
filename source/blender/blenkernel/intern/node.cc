@@ -573,6 +573,7 @@ static void direct_link_node_socket(BlendDataReader *reader, bNodeSocket *sock)
   sock->typeinfo = nullptr;
   BLO_read_data_address(reader, &sock->storage);
   BLO_read_data_address(reader, &sock->default_value);
+  sock->total_inputs = 0; /* Clear runtime data set before drawing. */
   sock->cache = nullptr;
 }
 
@@ -4759,12 +4760,14 @@ static void registerGeometryNodes()
 
   register_node_type_geo_align_rotation_to_vector();
   register_node_type_geo_attribute_color_ramp();
+  register_node_type_geo_attribute_combine_xyz();
   register_node_type_geo_attribute_compare();
   register_node_type_geo_attribute_fill();
   register_node_type_geo_attribute_math();
   register_node_type_geo_attribute_mix();
   register_node_type_geo_attribute_proximity();
   register_node_type_geo_attribute_randomize();
+  register_node_type_geo_attribute_separate_xyz();
   register_node_type_geo_attribute_vector_math();
   register_node_type_geo_boolean();
   register_node_type_geo_collection_info();
