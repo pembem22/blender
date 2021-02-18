@@ -72,8 +72,7 @@ class CyclesRender(bpy.types.RenderEngine):
         if not self.session:
             if self.is_preview:
                 cscene = bpy.context.scene.cycles
-                # use_osl = cscene.shading_system and cscene.device == 'CPU'
-                use_osl = False
+                use_osl = cscene.shading_system and cscene.device == 'CPU' and not context.scene.rendering.use_spectral_rendering
 
                 engine.create(self, data, preview_osl=use_osl)
             else:

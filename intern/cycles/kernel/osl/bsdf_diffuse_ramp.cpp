@@ -53,7 +53,7 @@ class DiffuseRampClosure : public CBSDFClosure {
   DiffuseRampBsdf params;
   Color3 colors[8];
 
-  void setup(ShaderData *sd, int /* path_flag */, SpectralColor weight)
+  void setup(ShaderData *sd, int /* path_flag */, float3 weight)
   {
     DiffuseRampBsdf *bsdf = (DiffuseRampBsdf *)bsdf_alloc_osl(
         sd, sizeof(DiffuseRampBsdf), weight, &params);

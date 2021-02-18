@@ -829,11 +829,22 @@ typedef struct AttributeDescriptor {
   float sample_weight; \
   float3 N
 
+#ifdef __WITH_SPECTRAL_RENDERING__
 typedef ccl_addr_space struct ccl_align(32) ShaderClosure
+#else
+typedef ccl_addr_space struct ccl_align(16) ShaderClosure
+#endif
 {
   SHADER_CLOSURE_BASE;
 
+#ifdef __WITH_SPECTRAL_RENDERING__
   float data[20];
+#else
+#  ifdef __KERNEL_CPU__
+  float pad[2];
+#  endif
+  float data[10];
+#endif
 }
 ShaderClosure;
 

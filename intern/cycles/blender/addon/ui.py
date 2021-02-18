@@ -2245,8 +2245,8 @@ def draw_device(self, context):
         from . import engine
         if engine.with_osl() and use_cpu(context):
             col.prop(cscene, "shading_system")
-            if cscene.shading_system:
-                col.label(text="OSL is currently not supported and will be disabled.", icon='ERROR')
+            if cscene.shading_system and context.scene.render.use_spectral_rendering:
+                col.label(text="OSL does not support spectral rendering and will be disabled.", icon='ERROR')
 
         if not use_cpu(context):
             col.label(text="Only spectral rendering is currently supported on GPU.", icon='ERROR')

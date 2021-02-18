@@ -69,7 +69,7 @@ class CBSSRDFClosure : public CClosurePrimitive {
     params.roughness = 0.0f;
   }
 
-  void setup(ShaderData *sd, int path_flag, SpectralColor weight)
+  void setup(ShaderData *sd, int path_flag, float3 weight)
   {
     if (method == u_cubic) {
       alloc(sd, path_flag, weight, CLOSURE_BSSRDF_CUBIC_ID);
@@ -91,7 +91,7 @@ class CBSSRDFClosure : public CClosurePrimitive {
     }
   }
 
-  void alloc(ShaderData *sd, int path_flag, SpectralColor weight, ClosureType type)
+  void alloc(ShaderData *sd, int path_flag, float3 weight, ClosureType type)
   {
     Bssrdf *bssrdf = bssrdf_alloc(sd, weight);
 

@@ -47,19 +47,20 @@ static_assert(sizeof(ShaderClosure) >= sizeof(DiffuseRampBsdf), "DiffuseRampBsdf
 
 ccl_device SpectralColor bsdf_diffuse_ramp_get_color(const float3 colors[8], float pos)
 {
-  /* TODO(Spectral Cycles): Fix me! */
+#  ifndef __WITH_SPECTRAL_RENDERING__
+  int MAXCOLORS = 8;
 
-  //   int MAXCOLORS = 8;
-
-  //   float npos = pos * (float)(MAXCOLORS - 1);
-  //   int ipos = float_to_int(npos);
-  //   if (ipos < 0)
-  //     return colors[0];
-  //   if (ipos >= (MAXCOLORS - 1))
-  //     return colors[MAXCOLORS - 1];
-  //   float offset = npos - (float)ipos;
-  //   return colors[ipos] * (1.0f - offset) + colors[ipos + 1] * offset;
+  float npos = pos * (float)(MAXCOLORS - 1);
+  int ipos = float_to_int(npos);
+  if (ipos < 0)
+    return colors[0];
+  if (ipos >= (MAXCOLORS - 1))
+    return colors[MAXCOLORS - 1];
+  float offset = npos - (float)ipos;
+  return colors[ipos] * (1.0f - offset) + colors[ipos + 1] * offset;
+#  else
   return zero_spectral_color();
+#  endif
 }
 
 ccl_device int bsdf_diffuse_ramp_setup(DiffuseRampBsdf *bsdf)

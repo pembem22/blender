@@ -164,7 +164,7 @@ static void flatten_surface_closure_tree(ShaderData *sd,
 #ifdef OSL_SUPPORTS_WEIGHTED_CLOSURE_COMPONENTS
         weight = weight * TO_FLOAT3(comp->w);
 #endif
-        // prim->setup(sd, path_flag, weight);
+        prim->setup(sd, path_flag, weight);
       }
       break;
     }
@@ -269,7 +269,7 @@ static void flatten_background_closure_tree(ShaderData *sd,
 #ifdef OSL_SUPPORTS_WEIGHTED_CLOSURE_COMPONENTS
         weight = weight * TO_FLOAT3(comp->w);
 #endif
-        // prim->setup(sd, 0, weight);
+        prim->setup(sd, 0, weight);
       }
       break;
     }
@@ -325,7 +325,7 @@ static void flatten_volume_closure_tree(ShaderData *sd,
 #ifdef OSL_SUPPORTS_WEIGHTED_CLOSURE_COMPONENTS
         weight = weight * TO_FLOAT3(comp->w);
 #endif
-        // prim->setup(sd, 0, weight);
+        prim->setup(sd, 0, weight);
       }
     }
   }
