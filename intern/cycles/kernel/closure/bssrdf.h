@@ -354,7 +354,7 @@ ccl_device int bssrdf_setup(ShaderData *sd, Bssrdf *bssrdf, ClosureType type)
 {
   int flag = 0;
   int bssrdf_channels = CHANNELS_PER_RAY;
-  SpectralColor diffuse_weight = make_spectral_color(0.0f);
+  SpectralColor diffuse_weight = zero_spectral_color();
 
 #ifdef __WITH_SPECTRAL_RENDERING__
   FOR_EACH_CHANNEL(i)

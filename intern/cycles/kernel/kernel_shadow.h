@@ -168,7 +168,7 @@ ccl_device bool shadow_blocked_transparent_all_loop(KernelGlobals *kg,
    * shade them.
    */
   if (!blocked && num_hits > 0) {
-    SpectralColor throughput = make_spectral_color(1.0f);
+    SpectralColor throughput = one_spectral_color();
     float3 Pend = ray->P + ray->D * ray->t;
     float last_t = 0.0f;
     int bounce = state->transparent_bounce;
@@ -308,7 +308,7 @@ ccl_device bool shadow_blocked_transparent_stepped_loop(KernelGlobals *kg,
 #      endif
 #    endif
   if (blocked && is_transparent_isect) {
-    SpectralColor throughput = make_spectral_color(1.0f);
+    SpectralColor throughput = one_spectral_color();
     float3 Pend = ray->P + ray->D * ray->t;
     int bounce = state->transparent_bounce;
 #    ifdef __VOLUME__
@@ -393,7 +393,7 @@ ccl_device_inline bool shadow_blocked(KernelGlobals *kg,
                                       Ray *ray,
                                       SpectralColor *shadow)
 {
-  *shadow = make_spectral_color(1.0f);
+  *shadow = one_spectral_color();
 #if !defined(__KERNEL_OPTIX__)
   /* Some common early checks.
    * Avoid conditional trace call in OptiX though, since those hurt performance there.

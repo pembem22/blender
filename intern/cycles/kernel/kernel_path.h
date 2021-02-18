@@ -267,7 +267,7 @@ ccl_device_forceinline bool kernel_path_shader_apply(KernelGlobals *kg,
     if (state->flag & PATH_RAY_TRANSPARENT_BACKGROUND) {
       state->flag |= (PATH_RAY_SHADOW_CATCHER | PATH_RAY_STORE_SHADOW_INFO);
 
-      SpectralColor bg = make_spectral_color(0.0f);
+      SpectralColor bg = zero_spectral_color();
       if (!kernel_data.background.transparent) {
         bg = indirect_background(kg, emission_sd, state, NULL, ray);
       }
@@ -288,7 +288,7 @@ ccl_device_forceinline bool kernel_path_shader_apply(KernelGlobals *kg,
     if (kernel_data.background.transparent) {
       L->transparent += average(holdout_weight * throughput);
     }
-    if (isequal(holdout_weight, make_spectral_color(1.0f))) {
+    if (isequal(holdout_weight, one_spectral_color())) {
       return false;
     }
   }
@@ -460,7 +460,7 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 #    ifdef __AO__
         /* ambient occlusion */
         if (kernel_data.integrator.use_ambient_occlusion) {
-          kernel_path_ao(kg, sd, emission_sd, L, state, throughput, make_spectral_color(0.0f));
+          kernel_path_ao(kg, sd, emission_sd, L, state, throughput, zero_spectral_color());
         }
 #    endif /* __AO__ */
 
@@ -674,7 +674,7 @@ ccl_device void kernel_path_trace(
   }
 
   /* Initialize state. */
-  SpectralColor throughput = make_spectral_color(1.0f);
+  SpectralColor throughput = one_spectral_color();
 
   PathRadiance L;
   path_radiance_init(kg, &L);

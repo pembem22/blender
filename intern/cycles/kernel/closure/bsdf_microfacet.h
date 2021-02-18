@@ -256,7 +256,7 @@ ccl_device_forceinline SpectralColor reflection_color(const MicrofacetBsdf *bsdf
                                                       float3 L,
                                                       float3 H)
 {
-  SpectralColor F = make_spectral_color(1.0f);
+  SpectralColor F = one_spectral_color();
   bool use_fresnel = (bsdf->type == CLOSURE_BSDF_MICROFACET_GGX_FRESNEL_ID ||
                       bsdf->type == CLOSURE_BSDF_MICROFACET_GGX_CLEARCOAT_ID);
   if (use_fresnel) {
@@ -401,7 +401,7 @@ ccl_device SpectralColor bsdf_microfacet_ggx_eval_reflect(const ShaderClosure *s
   float3 N = bsdf->N;
 
   if (m_refractive || alpha_x * alpha_y <= 1e-7f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float cosNO = dot(N, I);
@@ -490,17 +490,17 @@ ccl_device SpectralColor bsdf_microfacet_ggx_eval_reflect(const ShaderClosure *s
     SpectralColor out = F * G * common;
 
     /* eq. 2 in distribution of visible normals sampling
-     * pm = Dw = G1o * dot(m, I) * D / dot(N, I); */
+     * `pm = Dw = G1o * dot(m, I) * D / dot(N, I);` */
 
     /* eq. 38 - but see also:
      * eq. 17 in http://www.graphics.cornell.edu/~bjw/wardnotes.pdf
-     * pdf = pm * 0.25 / dot(m, I); */
+     * `pdf = pm * 0.25 / dot(m, I);` */
     *pdf = G1o * common;
 
     return out;
   }
 
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device SpectralColor bsdf_microfacet_ggx_eval_transmit(const ShaderClosure *sc,
@@ -516,14 +516,14 @@ ccl_device SpectralColor bsdf_microfacet_ggx_eval_transmit(const ShaderClosure *
   float3 N = bsdf->N;
 
   if (!m_refractive || alpha_x * alpha_y <= 1e-7f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float cosNO = dot(N, I);
   float cosNI = dot(N, omega_in);
 
   if (cosNO <= 0 || cosNI >= 0) {
-    return make_spectral_color(0.0f); /* vectors on same side -- not possible */
+    return zero_spectral_color(); /* vectors on same side -- not possible */
   }
 
   /* compute half-vector of the refraction (eq. 16) */
@@ -869,7 +869,7 @@ ccl_device SpectralColor bsdf_microfacet_beckmann_eval_reflect(const ShaderClosu
   float3 N = bsdf->N;
 
   if (m_refractive || alpha_x * alpha_y <= 1e-7f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float cosNO = dot(N, I);
@@ -934,7 +934,7 @@ ccl_device SpectralColor bsdf_microfacet_beckmann_eval_reflect(const ShaderClosu
     return make_spectral_color(out);
   }
 
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device SpectralColor bsdf_microfacet_beckmann_eval_transmit(const ShaderClosure *sc,
@@ -950,14 +950,14 @@ ccl_device SpectralColor bsdf_microfacet_beckmann_eval_transmit(const ShaderClos
   float3 N = bsdf->N;
 
   if (!m_refractive || alpha_x * alpha_y <= 1e-7f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float cosNO = dot(N, I);
   float cosNI = dot(N, omega_in);
 
   if (cosNO <= 0 || cosNI >= 0) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   /* compute half-vector of the refraction (eq. 16) */

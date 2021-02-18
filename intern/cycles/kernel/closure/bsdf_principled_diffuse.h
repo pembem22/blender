@@ -41,7 +41,7 @@ ccl_device SpectralColor calculate_principled_diffuse_brdf(
 
   if (NdotL < 0 || NdotV < 0) {
     *pdf = 0.0f;
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float LdotH = dot(L, H);
@@ -87,7 +87,7 @@ ccl_device SpectralColor bsdf_principled_diffuse_eval_reflect(const ShaderClosur
   }
   else {
     *pdf = 0.0f;
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 }
 
@@ -96,7 +96,7 @@ ccl_device SpectralColor bsdf_principled_diffuse_eval_transmit(const ShaderClosu
                                                                const float3 omega_in,
                                                                float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_principled_diffuse_sample(const ShaderClosure *sc,

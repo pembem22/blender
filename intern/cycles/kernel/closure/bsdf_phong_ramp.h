@@ -60,7 +60,7 @@ ccl_device SpectralColor bsdf_phong_ramp_get_color(const float3 colors[8], float
   //     return colors[MAXCOLORS - 1];
   //   float offset = npos - (float)ipos;
   //   return colors[ipos] * (1.0f - offset) + colors[ipos + 1] * offset;
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_phong_ramp_setup(PhongRampBsdf *bsdf)
@@ -93,7 +93,7 @@ ccl_device SpectralColor bsdf_phong_ramp_eval_reflect(const ShaderClosure *sc,
     }
   }
 
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device float3 bsdf_phong_ramp_eval_transmit(const ShaderClosure *sc,

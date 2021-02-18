@@ -100,7 +100,7 @@ class CBSSRDFClosure : public CClosurePrimitive {
        * adds considerably noise due to probabilities of continuing path
        * getting lower and lower */
       if (path_flag & PATH_RAY_DIFFUSE_ANCESTOR) {
-        params.radius = make_spectral_color(0.0f);
+        params.radius = zero_spectral_color();
       }
 
       /* create one closure per color channel */

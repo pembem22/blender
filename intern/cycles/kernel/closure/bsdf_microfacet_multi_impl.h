@@ -59,7 +59,7 @@ ccl_device_forceinline SpectralColor MF_FUNCTION_FULL_NAME(mf_eval)(float3 wi,
   }
 
   if (wi.z < 1e-5f || (wo.z < 1e-5f && wo_outside) || (wo.z > -1e-5f && !wo_outside)) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   const float2 alpha = make_float2(alpha_x, alpha_y);
@@ -69,7 +69,7 @@ ccl_device_forceinline SpectralColor MF_FUNCTION_FULL_NAME(mf_eval)(float3 wi,
 
   /* Analytically compute single scattering for lower noise. */
   SpectralColor eval;
-  SpectralColor throughput = make_spectral_color(1.0f);
+  SpectralColor throughput = one_spectral_color();
   const float3 wh = normalize(wi + wo);
 #ifdef MF_MULTI_GLASS
   eval = mf_eval_phase_glass(-wi, lambda_r, wo, wo_outside, alpha, eta);
@@ -199,7 +199,7 @@ ccl_device_forceinline SpectralColor
 {
   const float2 alpha = make_float2(alpha_x, alpha_y);
 
-  SpectralColor throughput = make_spectral_color(1.0f);
+  SpectralColor throughput = one_spectral_color();
   float3 wr = -wi;
   float lambda_r = mf_lambda(wr, alpha);
   float hr = 1.0f;
@@ -272,7 +272,7 @@ ccl_device_forceinline SpectralColor
     G1_r = mf_G1(wr, C1_r, lambda_r);
   }
   *wo = make_float3(0.0f, 0.0f, 1.0f);
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 #undef MF_MULTI_GLASS

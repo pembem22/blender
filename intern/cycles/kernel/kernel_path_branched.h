@@ -377,7 +377,7 @@ ccl_device void kernel_branched_path_integrate(KernelGlobals *kg,
                                                ShaderData *indirect_sd)
 {
   /* initialize */
-  SpectralColor throughput = make_spectral_color(1.0f);
+  SpectralColor throughput = one_spectral_color();
 
   path_radiance_init(kg, L);
 

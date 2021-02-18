@@ -58,7 +58,7 @@ ccl_device void kernel_path_init(KernelGlobals *kg)
     /* Initialize throughput, path radiance, Ray, PathState;
      * These rays proceed with path-iteration.
      */
-    kernel_split_state.throughput[ray_index] = make_spectral_color(1.0f);
+    kernel_split_state.throughput[ray_index] = one_spectral_color();
     path_radiance_init(kg, &kernel_split_state.path_radiance[ray_index]);
     path_state_init(kg,
                     AS_SHADER_DATA(&kernel_split_state.sd_DL_shadow[ray_index]),

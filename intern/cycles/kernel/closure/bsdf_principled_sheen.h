@@ -52,7 +52,7 @@ calculate_principled_sheen_brdf(float3 N, float3 V, float3 L, float3 H, float *p
 
   if (NdotL < 0 || NdotV < 0) {
     *pdf = 0.0f;
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float LdotH = dot(L, H);
@@ -88,7 +88,7 @@ ccl_device SpectralColor bsdf_principled_sheen_eval_reflect(const ShaderClosure 
   }
   else {
     *pdf = 0.0f;
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 }
 
@@ -97,7 +97,7 @@ ccl_device SpectralColor bsdf_principled_sheen_eval_transmit(const ShaderClosure
                                                              const float3 omega_in,
                                                              float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_principled_sheen_sample(const ShaderClosure *sc,

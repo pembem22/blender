@@ -67,7 +67,7 @@ ccl_device_forceinline SpectralColor bsdf_ashikhmin_shirley_eval_reflect(const S
   float out = 0.0f;
 
   if (fmaxf(bsdf->alpha_x, bsdf->alpha_y) <= 1e-4f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   if (NdotI > 0.0f && NdotO > 0.0f) {
@@ -126,7 +126,7 @@ ccl_device SpectralColor bsdf_ashikhmin_shirley_eval_transmit(const ShaderClosur
                                                               const float3 omega_in,
                                                               float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device_inline void bsdf_ashikhmin_shirley_sample_first_quadrant(

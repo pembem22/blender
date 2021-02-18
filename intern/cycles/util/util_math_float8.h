@@ -89,6 +89,20 @@ ccl_device_inline bool isequal(const float8 a, const float8 b);
  * Definition.
  */
 
+ccl_device_inline float8 zero_float8()
+{
+#ifdef __KERNEL_AVX2__
+  return float8(_mm256_setzero_ps());
+#else
+  return make_float8(0.0f);
+#endif
+}
+
+ccl_device_inline float8 one_float8()
+{
+  return make_float8(1.0f);
+}
+
 #ifndef __KERNEL_OPENCL__
 ccl_device_inline float8 operator+(const float8 &a, const float8 &b)
 {

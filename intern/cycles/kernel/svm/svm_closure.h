@@ -459,7 +459,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg,
             bsdf->alpha_x = clearcoat_roughness * clearcoat_roughness;
             bsdf->alpha_y = clearcoat_roughness * clearcoat_roughness;
 
-            bsdf->extra->color = make_spectral_color(0.0f);
+            bsdf->extra->color = zero_spectral_color();
             bsdf->extra->cspec0 = make_spectral_color(0.04f);
             bsdf->extra->clearcoat = clearcoat;
 
@@ -567,7 +567,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg,
         bsdf->extra = (MicrofacetExtra *)closure_alloc_extra(sd, sizeof(MicrofacetExtra));
         if (bsdf->extra) {
           bsdf->extra->color = stack_load_spectral(stack, data_node.w);
-          bsdf->extra->cspec0 = make_spectral_color(0.0f);
+          bsdf->extra->cspec0 = zero_spectral_color();
           bsdf->extra->clearcoat = 0.0f;
           sd->flag |= bsdf_microfacet_multi_ggx_setup(bsdf);
         }
@@ -702,7 +702,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg,
 
       kernel_assert(stack_valid(data_node.z));
       bsdf->extra->color = stack_load_spectral(stack, data_node.z);
-      bsdf->extra->cspec0 = make_spectral_color(0.0f);
+      bsdf->extra->cspec0 = zero_spectral_color();
       bsdf->extra->clearcoat = 0.0f;
 
       /* setup bsdf */
@@ -951,7 +951,7 @@ ccl_device void svm_node_closure_volume(
   SpectralColor weight = sd->svm_closure_weight;
 
   if (type == CLOSURE_VOLUME_ABSORPTION_ID) {
-    weight = make_spectral_color(1.0f) - weight;
+    weight = one_spectral_color() - weight;
   }
 
   weight *= density;
@@ -1038,8 +1038,8 @@ ccl_device void svm_node_principled_volume(KernelGlobals *kg,
     }
 
     /* Add extinction weight. */
-    SpectralColor zero = make_spectral_color(0.0f);
-    SpectralColor one = make_spectral_color(1.0f);
+    SpectralColor zero = zero_spectral_color();
+    SpectralColor one = one_spectral_color();
     SpectralColor absorption_color = max(sqrt(stack_load_spectral(stack, absorption_color_offset)),
                                          zero);
     SpectralColor absorption = max(one - color, zero) * max(one - absorption_color, zero);

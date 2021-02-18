@@ -183,7 +183,7 @@ ccl_device SpectralColor single_scattering(float3 ray_dir,
                                            float ozone_density,
                                            SpectralColor wavelengths)
 {
-  SpectralColor spectrum = make_spectral_color(0.0f);
+  SpectralColor spectrum = zero_spectral_color();
 
   /* This code computes single-inscattering along a ray through the atmosphere. */
   float3 ray_end = atmosphere_intersection(ray_origin, ray_dir);
@@ -370,7 +370,7 @@ ccl_device void svm_node_tex_sky_nishita(
   /* ground */
   else {
     if (cam_dir.z < -0.4f) {
-      spectrum = make_spectral_color(0.0f);
+      spectrum = zero_spectral_color();
     }
     else {
       /* black ground fade */

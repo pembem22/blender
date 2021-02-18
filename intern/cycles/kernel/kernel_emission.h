@@ -27,7 +27,7 @@ ccl_device_noinline_cpu SpectralColor direct_emissive_eval(KernelGlobals *kg,
                                                            float time)
 {
   /* setup shading at emitter */
-  SpectralColor eval = make_spectral_color(0.0f);
+  SpectralColor eval = zero_spectral_color();
 
   if (shader_constant_emission_eval(kg, ls->shader, &eval)) {
     if ((ls->prim != PRIM_NONE) && dot(ls->Ng, I) < 0.0f) {
@@ -150,13 +150,13 @@ ccl_device_noinline_cpu bool direct_emission(KernelGlobals *kg,
   /* use visibility flag to skip lights */
   if (ls->shader & SHADER_EXCLUDE_ANY) {
     if (ls->shader & SHADER_EXCLUDE_DIFFUSE)
-      eval->diffuse = make_spectral_color(0.0f);
+      eval->diffuse = zero_spectral_color();
     if (ls->shader & SHADER_EXCLUDE_GLOSSY)
-      eval->glossy = make_spectral_color(0.0f);
+      eval->glossy = zero_spectral_color();
     if (ls->shader & SHADER_EXCLUDE_TRANSMIT)
-      eval->transmission = make_spectral_color(0.0f);
+      eval->transmission = zero_spectral_color();
     if (ls->shader & SHADER_EXCLUDE_SCATTER)
-      eval->volume = make_spectral_color(0.0f);
+      eval->volume = zero_spectral_color();
   }
 #endif
 
@@ -270,7 +270,7 @@ ccl_device_noinline_cpu void indirect_lamp_emission(KernelGlobals *kg,
       /* shadow attenuation */
       Ray volume_ray = *ray;
       volume_ray.t = ls.t;
-      SpectralColor volume_tp = make_spectral_color(1.0f);
+      SpectralColor volume_tp = one_spectral_color();
       kernel_volume_shadow(kg, emission_sd, state, &volume_ray, &volume_tp);
       lamp_L *= volume_tp;
     }
@@ -307,11 +307,12 @@ ccl_device_noinline_cpu SpectralColor indirect_background(KernelGlobals *kg,
         ((shader & SHADER_EXCLUDE_TRANSMIT) && (state->flag & PATH_RAY_TRANSMIT)) ||
         ((shader & SHADER_EXCLUDE_CAMERA) && (state->flag & PATH_RAY_CAMERA)) ||
         ((shader & SHADER_EXCLUDE_SCATTER) && (state->flag & PATH_RAY_VOLUME_SCATTER)))
-      return make_spectral_color(0.0f);
+      return zero_spectral_color();
   }
 
   /* Evaluate background shader. */
-  SpectralColor L = make_spectral_color(0.0f);
+  SpectralColor L = zero_spectral_color();
+
   if (!shader_constant_emission_eval(kg, shader, &L)) {
 #  ifdef __SPLIT_KERNEL__
     Ray priv_ray = *ray;

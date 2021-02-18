@@ -32,11 +32,11 @@ ccl_device_inline void bsdf_eval_init(BsdfEval *eval,
   eval->use_light_pass = use_light_pass;
 
   if (eval->use_light_pass) {
-    eval->diffuse = make_spectral_color(0.0f);
-    eval->glossy = make_spectral_color(0.0f);
-    eval->transmission = make_spectral_color(0.0f);
-    eval->transparent = make_spectral_color(0.0f);
-    eval->volume = make_spectral_color(0.0f);
+    eval->diffuse = zero_spectral_color();
+    eval->glossy = zero_spectral_color();
+    eval->transmission = zero_spectral_color();
+    eval->transparent = zero_spectral_color();
+    eval->volume = zero_spectral_color();
 
     if (type == CLOSURE_BSDF_TRANSPARENT_ID)
       eval->transparent = value;
@@ -55,7 +55,7 @@ ccl_device_inline void bsdf_eval_init(BsdfEval *eval,
     eval->diffuse = value;
   }
 #ifdef __SHADOW_TRICKS__
-  eval->sum_no_mis = make_spectral_color(0.0f);
+  eval->sum_no_mis = zero_spectral_color();
 #endif
 }
 
@@ -174,55 +174,56 @@ ccl_device_inline void path_radiance_init(KernelGlobals *kg, PathRadiance *L)
   L->use_light_pass = kernel_data.film.use_light_pass;
 
   if (kernel_data.film.use_light_pass) {
-    L->indirect = make_spectral_color(0.0f);
-    L->direct_emission = make_spectral_color(0.0f);
+    L->indirect = zero_spectral_color();
+    L->direct_emission = zero_spectral_color();
 
-    L->color_diffuse = make_spectral_color(0.0f);
-    L->color_glossy = make_spectral_color(0.0f);
-    L->color_transmission = make_spectral_color(0.0f);
+    L->color_diffuse = zero_spectral_color();
+    L->color_glossy = zero_spectral_color();
+    L->color_transmission = zero_spectral_color();
 
-    L->direct_diffuse = make_spectral_color(0.0f);
-    L->direct_glossy = make_spectral_color(0.0f);
-    L->direct_transmission = make_spectral_color(0.0f);
-    L->direct_volume = make_spectral_color(0.0f);
+    L->direct_diffuse = zero_spectral_color();
+    L->direct_glossy = zero_spectral_color();
+    L->direct_transmission = zero_spectral_color();
+    L->direct_volume = zero_spectral_color();
 
-    L->indirect_diffuse = make_spectral_color(0.0f);
-    L->indirect_glossy = make_spectral_color(0.0f);
-    L->indirect_transmission = make_spectral_color(0.0f);
-    L->indirect_volume = make_spectral_color(0.0f);
+    L->indirect_diffuse = zero_spectral_color();
+    L->indirect_glossy = zero_spectral_color();
+    L->indirect_transmission = zero_spectral_color();
+    L->indirect_volume = zero_spectral_color();
 
     L->transparent = 0.0f;
-    L->emission = make_spectral_color(0.0f);
-    L->background = make_spectral_color(0.0f);
-    L->ao = make_spectral_color(0.0f);
-    L->shadow = make_spectral_color(0.0f);
+    L->emission = zero_spectral_color();
+    L->background = zero_spectral_color();
+    L->ao = zero_spectral_color();
+    L->shadow = zero_spectral_color();
     L->mist = 0.0f;
 
-    L->state.diffuse = make_spectral_color(0.0f);
-    L->state.glossy = make_spectral_color(0.0f);
-    L->state.transmission = make_spectral_color(0.0f);
-    L->state.volume = make_spectral_color(0.0f);
-    L->state.direct = make_spectral_color(0.0f);
+    L->state.diffuse = zero_spectral_color();
+    L->state.glossy = zero_spectral_color();
+    L->state.transmission = zero_spectral_color();
+    L->state.volume = zero_spectral_color();
+    L->state.direct = zero_spectral_color();
   }
   else
 #endif
   {
     L->transparent = 0.0f;
-    L->emission = make_spectral_color(0.0f);
+    L->emission = zero_spectral_color();
   }
 
 #ifdef __SHADOW_TRICKS__
-  L->path_total = make_spectral_color(0.0f);
-  L->path_total_shaded = make_spectral_color(0.0f);
-  L->shadow_background_color = make_spectral_color(0.0f);
+  L->path_total = zero_spectral_color();
+  L->path_total_shaded = zero_spectral_color();
+  L->shadow_background_color = zero_spectral_color();
+
   L->shadow_throughput = 0.0f;
   L->shadow_transparency = 1.0f;
   L->has_shadow_catcher = 0;
 #endif
 
 #ifdef __DENOISING_FEATURES__
-  L->denoising_normal = make_float3(0.0f, 0.0f, 0.0f);
-  L->denoising_albedo = make_spectral_color(0.0f);
+  L->denoising_normal = zero_float3();
+  L->denoising_albedo = zero_spectral_color();
   L->denoising_depth = 0.0f;
 #endif
 
@@ -561,13 +562,13 @@ ccl_device_inline void path_radiance_reset_indirect(PathRadiance *L)
 {
 #ifdef __PASSES__
   if (L->use_light_pass) {
-    L->state.diffuse = make_spectral_color(0.0f);
-    L->state.glossy = make_spectral_color(0.0f);
-    L->state.transmission = make_spectral_color(0.0f);
-    L->state.volume = make_spectral_color(0.0f);
+    L->state.diffuse = zero_spectral_color();
+    L->state.glossy = zero_spectral_color();
+    L->state.transmission = zero_spectral_color();
+    L->state.volume = zero_spectral_color();
 
-    L->direct_emission = make_spectral_color(0.0f);
-    L->indirect = make_spectral_color(0.0f);
+    L->direct_emission = zero_spectral_color();
+    L->indirect = zero_spectral_color();
   }
 #endif
 }
@@ -641,19 +642,19 @@ ccl_device_inline SpectralColor path_radiance_clamp_and_sum(KernelGlobals *kg,
     /* Reject invalid value */
     if (!isfinite_safe(L_sum)) {
       kernel_assert(!"Non-finite sum in path_radiance_clamp_and_sum!");
-      L_sum = make_spectral_color(0.0f);
+      L_sum = zero_spectral_color();
 
-      L->direct_diffuse = make_spectral_color(0.0f);
-      L->direct_glossy = make_spectral_color(0.0f);
-      L->direct_transmission = make_spectral_color(0.0f);
-      L->direct_volume = make_spectral_color(0.0f);
+      L->direct_diffuse = zero_spectral_color();
+      L->direct_glossy = zero_spectral_color();
+      L->direct_transmission = zero_spectral_color();
+      L->direct_volume = zero_spectral_color();
 
-      L->indirect_diffuse = make_spectral_color(0.0f);
-      L->indirect_glossy = make_spectral_color(0.0f);
-      L->indirect_transmission = make_spectral_color(0.0f);
-      L->indirect_volume = make_spectral_color(0.0f);
+      L->indirect_diffuse = zero_spectral_color();
+      L->indirect_glossy = zero_spectral_color();
+      L->indirect_transmission = zero_spectral_color();
+      L->indirect_volume = zero_spectral_color();
 
-      L->emission = make_spectral_color(0.0f);
+      L->emission = zero_spectral_color();
     }
   }
 
@@ -666,7 +667,8 @@ ccl_device_inline SpectralColor path_radiance_clamp_and_sum(KernelGlobals *kg,
     /* Reject invalid value */
     if (!isfinite_safe(L_sum)) {
       kernel_assert(!"Non-finite final sum in path_radiance_clamp_and_sum!");
-      L_sum = make_spectral_color(0.0f);
+
+      L_sum = zero_spectral_color();
     }
   }
 
@@ -709,7 +711,7 @@ ccl_device_inline void path_radiance_split_denoising(KernelGlobals *kg,
 #  undef ADD_COMPONENT
 #else
   *noisy = L->emission;
-  *clean = make_spectral_color(0.0f);
+  *clean = zero_spectral_color();
 #endif
 
 #ifdef __SHADOW_TRICKS__

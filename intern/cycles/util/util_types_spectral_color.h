@@ -40,6 +40,9 @@ typedef SPECTRAL_COLOR_CURRENT_DATA_TYPE SpectralColor;
 #define load_spectral_color(f) CONCAT(load_, SPECTRAL_COLOR_CURRENT_DATA_TYPE(f))
 #define store_spectral_color(s, f) CONCAT(store_, SPECTRAL_COLOR_CURRENT_DATA_TYPE((s), (f)))
 
+#define zero_spectral_color CONCAT(zero_, SPECTRAL_COLOR_CURRENT_DATA_TYPE)
+#define one_spectral_color CONCAT(one_, SPECTRAL_COLOR_CURRENT_DATA_TYPE)
+
 #define spectral_color_to_float3(f) CONCAT(SPECTRAL_COLOR_CURRENT_DATA_TYPE, _to_float3(f))
 #define float3_to_spectral_color(f) CONCAT(float3_to_, SPECTRAL_COLOR_CURRENT_DATA_TYPE(f))
 

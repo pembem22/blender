@@ -80,7 +80,7 @@ ccl_device SpectralColor bsdf_ashikhmin_velvet_eval_reflect(const ShaderClosure 
     float cosHO = fabsf(dot(I, H));
 
     if (!(fabsf(cosNH) < 1.0f - 1e-5f && cosHO > 1e-5f)) {
-      return make_spectral_color(0.0f);
+      return zero_spectral_color();
     }
 
     float cosNHdivHO = cosNH / cosHO;
@@ -102,7 +102,7 @@ ccl_device SpectralColor bsdf_ashikhmin_velvet_eval_reflect(const ShaderClosure 
     return make_spectral_color(out);
   }
 
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device SpectralColor bsdf_ashikhmin_velvet_eval_transmit(const ShaderClosure *sc,
@@ -110,7 +110,7 @@ ccl_device SpectralColor bsdf_ashikhmin_velvet_eval_transmit(const ShaderClosure
                                                              const float3 omega_in,
                                                              float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_ashikhmin_velvet_sample(const ShaderClosure *sc,

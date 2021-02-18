@@ -123,7 +123,7 @@ ccl_device SpectralColor bsdf_hair_transmission_eval_reflect(const ShaderClosure
                                                              const float3 omega_in,
                                                              float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device SpectralColor bsdf_hair_reflection_eval_transmit(const ShaderClosure *sc,
@@ -131,7 +131,7 @@ ccl_device SpectralColor bsdf_hair_reflection_eval_transmit(const ShaderClosure 
                                                             const float3 omega_in,
                                                             float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device SpectralColor bsdf_hair_transmission_eval_transmit(const ShaderClosure *sc,

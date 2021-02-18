@@ -99,6 +99,20 @@ ccl_device_inline bool isequal(const float3 a, const float3 b);
  * Definition.
  */
 
+ccl_device_inline float3 zero_float3()
+{
+#ifdef __KERNEL_SSE__
+  return float3(_mm_setzero_ps());
+#else
+  return make_float3(0.0f, 0.0f, 0.0f);
+#endif
+}
+
+ccl_device_inline float3 one_float3()
+{
+  return make_float3(1.0f, 1.0f, 1.0f);
+}
+
 #ifndef __KERNEL_OPENCL__
 ccl_device_inline float3 operator-(const float3 &a)
 {
@@ -298,8 +312,12 @@ ccl_device_inline float3 clamp(const float3 &a, const float3 &mn, const float3 &
 ccl_device_inline float3 fabs(const float3 &a)
 {
 #  ifdef __KERNEL_SSE__
+#    ifdef __KERNEL_NEON__
+  return float3(vabsq_f32(a.m128));
+#    else
   __m128 mask = _mm_castsi128_ps(_mm_set1_epi32(0x7fffffff));
   return float3(_mm_and_ps(a.m128, mask));
+#    endif
 #  else
   return make_float3(fabsf(a.x), fabsf(a.y), fabsf(a.z));
 #  endif
@@ -378,8 +396,7 @@ ccl_device_inline float3 reflect(const float3 incident, const float3 normal)
 ccl_device_inline float3 project(const float3 v, const float3 v_proj)
 {
   float len_squared = dot(v_proj, v_proj);
-  return (len_squared != 0.0f) ? (dot(v, v_proj) / len_squared) * v_proj :
-                                 make_float3(0.0f, 0.0f, 0.0f);
+  return (len_squared != 0.0f) ? (dot(v, v_proj) / len_squared) * v_proj : zero_float3();
 }
 
 ccl_device_inline float3 saturate(float3 a)
@@ -415,7 +432,7 @@ ccl_device_inline float3 safe_divide(const float3 a, const float3 b)
 
 ccl_device_inline float3 safe_divide(const float3 a, const float b)
 {
-  return (b != 0.0f) ? a / b : make_float3(0.0f, 0.0f, 0.0f);
+  return (b != 0.0f) ? a / b : zero_float3();
 }
 
 ccl_device_inline float3 safe_divide_even(const float3 a, const float3 b)
@@ -456,8 +473,13 @@ ccl_device_inline float3 reduce_max(const float3 a)
 
 ccl_device_inline float3 reduce_add(const float3 a)
 {
-  /* TODO: Optimize */
+#if defined(__KERNEL_SSE__) && defined(__KERNEL_NEON__)
+  __m128 t = a.m128;
+  t[3] = 0.0f;
+  return vaddvq_f32(t);
+#else
   return make_float3(a.x + a.y + a.z);
+#endif
 }
 
 ccl_device_inline float reduce_min_f(const float3 a)

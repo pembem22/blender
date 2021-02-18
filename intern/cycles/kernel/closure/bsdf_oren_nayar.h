@@ -81,7 +81,7 @@ ccl_device SpectralColor bsdf_oren_nayar_eval_reflect(const ShaderClosure *sc,
   }
   else {
     *pdf = 0.0f;
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 }
 
@@ -90,7 +90,7 @@ ccl_device SpectralColor bsdf_oren_nayar_eval_transmit(const ShaderClosure *sc,
                                                        const float3 omega_in,
                                                        float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_oren_nayar_sample(const ShaderClosure *sc,
@@ -120,7 +120,7 @@ ccl_device int bsdf_oren_nayar_sample(const ShaderClosure *sc,
   }
   else {
     *pdf = 0.0f;
-    *eval = make_spectral_color(0.0f);
+    *eval = zero_spectral_color();
   }
 
   return LABEL_REFLECT | LABEL_DIFFUSE;

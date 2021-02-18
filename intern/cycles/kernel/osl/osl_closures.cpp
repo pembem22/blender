@@ -300,7 +300,7 @@ class PrincipledClearcoatClosure : public CBSDFClosure {
     bsdf->ior = 1.5f;
     bsdf->alpha_x = clearcoat_roughness;
     bsdf->alpha_y = clearcoat_roughness;
-    bsdf->extra->color = make_spectral_color(0.0f);
+    bsdf->extra->color = zero_spectral_color();
     bsdf->extra->cspec0 = make_spectral_color(0.04f);
     bsdf->extra->clearcoat = clearcoat;
     return bsdf;
@@ -711,7 +711,7 @@ class MicrofacetMultiClosure : public CBSDFClosure {
 
     bsdf->extra = extra;
     bsdf->extra->color = color;
-    bsdf->extra->cspec0 = make_spectral_color(0.0f);
+    bsdf->extra->cspec0 = zero_spectral_color();
     bsdf->extra->clearcoat = 0.0f;
     return bsdf;
   }

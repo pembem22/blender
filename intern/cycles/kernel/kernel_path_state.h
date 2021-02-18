@@ -65,11 +65,11 @@ ccl_device_inline void path_state_init(KernelGlobals *kg,
   if (kernel_data.film.pass_denoising_data) {
     state->flag |= PATH_RAY_STORE_SHADOW_INFO;
     state->denoising_feature_weight = 1.0f;
-    state->denoising_feature_throughput = make_spectral_color(1.0f);
+    state->denoising_feature_throughput = one_spectral_color();
   }
   else {
     state->denoising_feature_weight = 0.0f;
-    state->denoising_feature_throughput = make_spectral_color(0.0f);
+    state->denoising_feature_throughput = zero_spectral_color();
   }
 #endif /* __DENOISING_FEATURES__ */
 

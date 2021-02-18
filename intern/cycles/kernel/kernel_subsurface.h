@@ -27,7 +27,7 @@ subsurface_scatter_eval(ShaderData *sd, const ShaderClosure *sc, float disk_r, f
 {
   /* this is the veach one-sample model with balance heuristic, some pdf
    * factors drop out when using balance heuristic weighting */
-  SpectralColor eval_sum = make_spectral_color(0.0f);
+  SpectralColor eval_sum = zero_spectral_color();
   float pdf_sum = 0.0f;
   float sample_weight_inv = 0.0f;
 
@@ -62,7 +62,7 @@ subsurface_scatter_eval(ShaderData *sd, const ShaderClosure *sc, float disk_r, f
     }
   }
 
-  return (pdf_sum > 0.0f) ? eval_sum / pdf_sum : make_spectral_color(0.0f);
+  return (pdf_sum > 0.0f) ? eval_sum / pdf_sum : zero_spectral_color();
 }
 
 /* replace closures with a single diffuse bsdf closure after scatter step */
@@ -111,7 +111,7 @@ ccl_device void subsurface_scatter_setup_diffuse_bsdf(KernelGlobals *kg,
 /* optionally do blurring of color and/or bump mapping, at the cost of a shader evaluation */
 ccl_device SpectralColor subsurface_color_pow(SpectralColor color, float exponent)
 {
-  color = max(color, make_spectral_color(0.0f));
+  color = max(color, zero_spectral_color());
 
 #ifdef __WITH_SPECTRAL_RENDERING__
   FOR_EACH_CHANNEL(i)
@@ -259,7 +259,7 @@ ccl_device_inline int subsurface_scatter_disk(KernelGlobals *kg,
     }
 #endif /* __OBJECT_MOTION__ */
     else {
-      ss_isect->weight[hit] = make_spectral_color(0.0f);
+      ss_isect->weight[hit] = zero_spectral_color();
       continue;
     }
 
@@ -352,19 +352,18 @@ ccl_device_noinline void subsurface_scatter_multi_setup(
 ccl_device void subsurface_random_walk_remap(const float A,
                                              const float d,
                                              float *sigma_t,
-                                             float *sigma_s)
+                                             float *alpha)
 {
   /* Compute attenuation and scattering coefficients from albedo. */
-  const float a = 1.0f - expf(A * (-5.09406f + A * (2.61188f - A * 4.31805f)));
+  *alpha = 1.0f - expf(A * (-5.09406f + A * (2.61188f - A * 4.31805f)));
   const float s = 1.9f - A + 3.5f * sqr(A - 0.8f);
 
   *sigma_t = 1.0f / fmaxf(d * s, 1e-16f);
-  *sigma_s = *sigma_t * a;
 }
 
 ccl_device void subsurface_random_walk_coefficients(const ShaderClosure *sc,
                                                     SpectralColor *sigma_t,
-                                                    SpectralColor *sigma_s,
+                                                    SpectralColor *alpha,
                                                     SpectralColor *weight)
 {
   const Bssrdf *bssrdf = (const Bssrdf *)sc;
@@ -374,22 +373,80 @@ ccl_device void subsurface_random_walk_coefficients(const ShaderClosure *sc,
 #ifdef __WITH_SPECTRAL_RENDERING__
   FOR_EACH_CHANNEL(i)
   {
-    subsurface_random_walk_remap(A[i], d[i], &((*sigma_t)[i]), &((*sigma_s)[i]));
+    subsurface_random_walk_remap(A[i], d[i], &((*sigma_t)[i]), &((*alpha)[i]));
   }
 #else
   float sigma_t_x, sigma_t_y, sigma_t_z;
-  float sigma_s_x, sigma_s_y, sigma_s_z;
+  float alpha_x, alpha_y, alpha_z;
 
-  subsurface_random_walk_remap(A.x, d.x, &sigma_t_x, &sigma_s_x);
-  subsurface_random_walk_remap(A.y, d.y, &sigma_t_y, &sigma_s_y);
-  subsurface_random_walk_remap(A.z, d.z, &sigma_t_z, &sigma_s_z);
+  subsurface_random_walk_remap(A.x, d.x, &sigma_t_x, &alpha_x);
+  subsurface_random_walk_remap(A.y, d.y, &sigma_t_y, &alpha_y);
+  subsurface_random_walk_remap(A.z, d.z, &sigma_t_z, &alpha_z);
 
   *sigma_t = make_float3(sigma_t_x, sigma_t_y, sigma_t_z);
-  *sigma_s = make_float3(sigma_s_x, sigma_s_y, sigma_s_z);
+  *alpha = make_float3(alpha_x, alpha_y, alpha_z);
 #endif
 
   /* Closure mixing and Fresnel weights separate from albedo. */
   *weight = safe_divide(bssrdf->weight, A);
+}
+
+/* References for Dwivedi sampling:
+ *
+ * [1] "A Zero-variance-based Sampling Scheme for Monte Carlo Subsurface Scattering"
+ * by Jaroslav Křivánek and Eugene d'Eon (SIGGRAPH 2014)
+ * https://cgg.mff.cuni.cz/~jaroslav/papers/2014-zerovar/
+ *
+ * [2] "Improving the Dwivedi Sampling Scheme"
+ * by Johannes Meng, Johannes Hanika, and Carsten Dachsbacher (EGSR 2016)
+ * https://cg.ivd.kit.edu/1951.php
+ *
+ * [3] "Zero-Variance Theory for Efficient Subsurface Scattering"
+ * by Eugene d'Eon and Jaroslav Křivánek (SIGGRAPH 2020)
+ * https://iliyan.com/publications/RenderingCourse2020
+ */
+
+ccl_device_forceinline float eval_phase_dwivedi(float v, float phase_log, float cos_theta)
+{
+  /* Eq. 9 from [2] using precomputed log((v + 1) / (v - 1))*/
+  return 1.0f / ((v - cos_theta) * phase_log);
+}
+
+ccl_device_forceinline float sample_phase_dwivedi(float v, float phase_log, float rand)
+{
+  /* Based on Eq. 10 from [2]: `v - (v + 1) * pow((v - 1) / (v + 1), rand)`
+   * Since we're already pre-computing `phase_log = log((v + 1) / (v - 1))` for the evaluation,
+   * we can implement the power function like this. */
+  return v - (v + 1) * expf(-rand * phase_log);
+}
+
+ccl_device_forceinline float diffusion_length_dwivedi(float alpha)
+{
+  /* Eq. 67 from [3] */
+  return 1.0f / sqrtf(1.0f - powf(alpha, 2.44294f - 0.0215813f * alpha + 0.578637f / alpha));
+}
+
+ccl_device_forceinline float3 direction_from_cosine(float3 D, float cos_theta, float randv)
+{
+  float sin_theta = safe_sqrtf(1.0f - cos_theta * cos_theta);
+  float phi = M_2PI_F * randv;
+  float3 dir = make_float3(sin_theta * cosf(phi), sin_theta * sinf(phi), cos_theta);
+
+  float3 T, B;
+  make_orthonormals(D, &T, &B);
+  return dir.x * T + dir.y * B + dir.z * D;
+}
+
+ccl_device_forceinline SpectralColor subsurface_random_walk_pdf(SpectralColor sigma_t,
+                                                                float t,
+                                                                bool hit,
+                                                                SpectralColor *transmittance)
+{
+  SpectralColor T = volume_color_transmittance(sigma_t, t);
+  if (transmittance) {
+    *transmittance = T;
+  }
+  return hit ? T : sigma_t * T;
 }
 
 #ifdef __KERNEL_OPTIX__
@@ -414,10 +471,24 @@ ccl_device_noinline
     return 0;
   }
 
-  /* Convert subsurface to volume coefficients. */
-  SpectralColor sigma_t, sigma_s;
-  SpectralColor throughput = make_spectral_color(1.0f);
-  subsurface_random_walk_coefficients(sc, &sigma_t, &sigma_s, &throughput);
+  /* Convert subsurface to volume coefficients.
+   * The single-scattering albedo is named alpha to avoid confusion with the surface albedo. */
+  SpectralColor sigma_t, alpha;
+  SpectralColor throughput = one_spectral_color();
+  subsurface_random_walk_coefficients(sc, &sigma_t, &alpha, &throughput);
+  SpectralColor sigma_s = sigma_t * alpha;
+
+  /* Theoretically it should be better to use the exact alpha for the channel we're sampling at
+   * each bounce, but in practice there doesn't seem to be a noticeable difference in exchange
+   * for making the code significantly more complex and slower (if direction sampling depends on
+   * the sampled channel, we need to compute its PDF per-channel and consider it for MIS later on).
+   *
+   * Since the strength of the guided sampling increases as alpha gets lower, using a value that
+   * is too low results in fireflies while one that's too high just gives a bit more noise.
+   * Therefore, the code here uses the highest of the three albedos to be safe. */
+  float diffusion_length = diffusion_length_dwivedi(reduce_max_f(alpha));
+  /* Precompute term for phase sampling. */
+  float phase_log = logf((diffusion_length + 1) / (diffusion_length - 1));
 
   /* Setup ray. */
 #ifdef __SPLIT_KERNEL__
@@ -438,68 +509,163 @@ ccl_device_noinline
 
   /* Random walk until we hit the surface again. */
   bool hit = false;
+  bool have_opposite_interface = false;
+  float opposite_distance = 0.0f;
+
+  /* Todo: Disable for alpha>0.999 or so? */
+  const float guided_fraction = 0.75f;
 
   for (int bounce = 0; bounce < BSSRDF_MAX_BOUNCES; bounce++) {
     /* Advance random number offset. */
     state->rng_offset += PRNG_BOUNCE_NUM;
 
-    if (bounce > 0) {
-      /* Sample scattering direction. */
-      const float anisotropy = 0.0f;
-      float scatter_u, scatter_v;
-      path_state_rng_2D(kg, state, PRNG_BSDF_U, &scatter_u, &scatter_v);
-      ray->D = henyey_greenstrein_sample(ray->D, anisotropy, scatter_u, scatter_v, NULL);
-    }
-
     /* Sample color channel, use MIS with balance heuristic. */
     float rphase = path_state_rng_1D(kg, state, PRNG_PHASE_CHANNEL);
-    SpectralColor albedo = safe_divide(sigma_s, sigma_t);
     SpectralColor channel_pdf;
-    int channel = kernel_volume_sample_channel(albedo, throughput, rphase, &channel_pdf);
-
-    /* Distance sampling. */
-    float rdist = path_state_rng_1D(kg, state, PRNG_SCATTER_DISTANCE);
+    int channel = kernel_volume_sample_channel(alpha, throughput, rphase, &channel_pdf);
     float sample_sigma_t = kernel_volume_channel_get(sigma_t, channel);
-    float t = -logf(1.0f - rdist) / sample_sigma_t;
+    float randt = path_state_rng_1D(kg, state, PRNG_SCATTER_DISTANCE);
 
-    ray->t = t;
+    /* We need the result of the raycast to compute the full guided PDF, so just remember the
+     * relevant terms to avoid recomputing them later. */
+    float backward_fraction = 0.0f;
+    float forward_pdf_factor = 0.0f;
+    float forward_stretching = 1.0f;
+    float backward_pdf_factor = 0.0f;
+    float backward_stretching = 1.0f;
+
+    /* For the initial ray, we already know the direction, so just do classic distance sampling. */
+    if (bounce > 0) {
+      /* Decide whether we should use guided or classic sampling. */
+      bool guided = (path_state_rng_1D(kg, state, PRNG_LIGHT_TERMINATE) < guided_fraction);
+
+      /* Determine if we want to sample away from the incoming interface.
+       * This only happens if we found a nearby opposite interface, and the probability for it
+       * depends on how close we are to it already.
+       * This probability term comes from the recorded presentation of [3]. */
+      bool guide_backward = false;
+      if (have_opposite_interface) {
+        /* Compute distance of the random walk between the tangent plane at the starting point
+         * and the assumed opposite interface (the parallel plane that contains the point we
+         * found in our ray query for the opposite side). */
+        float x = clamp(dot(ray->P - sd->P, -sd->N), 0.0f, opposite_distance);
+        backward_fraction = 1.0f / (1.0f + expf((opposite_distance - 2 * x) / diffusion_length));
+        guide_backward = path_state_rng_1D(kg, state, PRNG_TERMINATE) < backward_fraction;
+      }
+
+      /* Sample scattering direction. */
+      float scatter_u, scatter_v;
+      path_state_rng_2D(kg, state, PRNG_BSDF_U, &scatter_u, &scatter_v);
+      float cos_theta;
+      if (guided) {
+        cos_theta = sample_phase_dwivedi(diffusion_length, phase_log, scatter_u);
+        /* The backwards guiding distribution is just mirrored along sd->N, so swapping the
+         * sign here is enough to sample from that instead. */
+        if (guide_backward) {
+          cos_theta = -cos_theta;
+        }
+      }
+      else {
+        cos_theta = 2.0f * scatter_u - 1.0f;
+      }
+      ray->D = direction_from_cosine(sd->N, cos_theta, scatter_v);
+
+      /* Compute PDF factor caused by phase sampling (as the ratio of guided / classic).
+       * Since phase sampling is channel-independent, we can get away with applying a factor
+       * to the guided PDF, which implicitly means pulling out the classic PDF term and letting
+       * it cancel with an equivalent term in the numerator of the full estimator.
+       * For the backward PDF, we again reuse the same probability distribution with a sign swap.
+       */
+      forward_pdf_factor = 2.0f * eval_phase_dwivedi(diffusion_length, phase_log, cos_theta);
+      backward_pdf_factor = 2.0f * eval_phase_dwivedi(diffusion_length, phase_log, -cos_theta);
+
+      /* Prepare distance sampling.
+       * For the backwards case, this also needs the sign swapped since now directions against
+       * sd->N (and therefore with negative cos_theta) are preferred. */
+      forward_stretching = (1.0f - cos_theta / diffusion_length);
+      backward_stretching = (1.0f + cos_theta / diffusion_length);
+      if (guided) {
+        sample_sigma_t *= guide_backward ? backward_stretching : forward_stretching;
+      }
+    }
+
+    /* Sample direction along ray. */
+    float t = -logf(1.0f - randt) / sample_sigma_t;
+
+    /* On the first bounce, we use the raycast to check if the opposite side is nearby.
+     * If yes, we will later use backwards guided sampling in order to have a decent
+     * chance of connecting to it.
+     * Todo: Maybe use less than 10 times the mean free path? */
+    ray->t = (bounce == 0) ? max(t, 10.0f / (reduce_min_f(sigma_t))) : t;
     scene_intersect_local(kg, ray, ss_isect, sd->object, NULL, 1);
     hit = (ss_isect->num_hits > 0);
 
     if (hit) {
 #ifdef __KERNEL_OPTIX__
       /* t is always in world space with OptiX. */
-      t = ss_isect->hits[0].t;
+      ray->t = ss_isect->hits[0].t;
 #else
       /* Compute world space distance to surface hit. */
       float3 D = ray->D;
       object_inverse_dir_transform(kg, sd, &D);
       D = normalize(D) * ss_isect->hits[0].t;
       object_dir_transform(kg, sd, &D);
-      t = len(D);
+      ray->t = len(D);
 #endif
+    }
+
+    if (bounce == 0) {
+      /* Check if we hit the opposite side. */
+      if (hit) {
+        have_opposite_interface = true;
+        opposite_distance = dot(ray->P + ray->t * ray->D - sd->P, -sd->N);
+      }
+      /* Apart from the opposite side check, we were supposed to only trace up to distance t,
+       * so check if there would have been a hit in that case. */
+      hit = ray->t < t;
+    }
+
+    /* Use the distance to the exit point for the throughput update if we found one. */
+    if (hit) {
+      t = ray->t;
     }
 
     /* Advance to new scatter location. */
     ray->P += t * ray->D;
 
-    /* Update throughput. */
-    SpectralColor transmittance = volume_color_transmittance(sigma_t, t);
-    float pdf = dot(channel_pdf, (hit) ? transmittance : sigma_t * transmittance);
-    throughput *= ((hit) ? transmittance : sigma_s * transmittance) / pdf;
+    SpectralColor transmittance;
+    SpectralColor pdf = subsurface_random_walk_pdf(sigma_t, t, hit, &transmittance);
+    if (bounce > 0) {
+      /* Compute PDF just like we do for classic sampling, but with the stretched sigma_t. */
+      SpectralColor guided_pdf = subsurface_random_walk_pdf(
+          forward_stretching * sigma_t, t, hit, NULL);
+
+      if (have_opposite_interface) {
+        /* First step of MIS: Depending on geometry we might have two methods for guided
+         * sampling, so perform MIS between them. */
+        SpectralColor back_pdf = subsurface_random_walk_pdf(
+            backward_stretching * sigma_t, t, hit, NULL);
+        guided_pdf = lerp(
+            guided_pdf * forward_pdf_factor, back_pdf * backward_pdf_factor, backward_fraction);
+      }
+      else {
+        /* Just include phase sampling factor otherwise. */
+        guided_pdf *= forward_pdf_factor;
+      }
+
+      /* Now we apply the MIS balance heuristic between the classic and guided sampling. */
+      pdf = mix(pdf, guided_pdf, guided_fraction);
+    }
+
+    /* Finally, we're applying MIS again to combine the three color channels.
+     * Altogether, the MIS computation combines up to nine different estimators:
+     * {classic, guided, backward_guided} x {r, g, b} */
+    throughput *= (hit ? transmittance : sigma_s * transmittance) / dot(channel_pdf, pdf);
 
     if (hit) {
       /* If we hit the surface, we are done. */
       break;
     }
-
-    /* Russian roulette. */
-    float terminate = path_state_rng_1D(kg, state, PRNG_TERMINATE);
-    float probability = min(reduce_max_f(fabs(throughput)), 1.0f);
-    if (terminate >= probability) {
-      break;
-    }
-    throughput /= probability;
   }
 
   kernel_assert(isfinite_safe(throughput));

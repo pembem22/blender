@@ -80,11 +80,11 @@ ccl_device_inline bool volume_shader_sample(KernelGlobals *kg,
   if (!(sd->flag & (SD_EXTINCTION | SD_SCATTER | SD_EMISSION)))
     return false;
 
-  coeff->sigma_s = make_spectral_color(0.0f);
+  coeff->sigma_s = zero_spectral_color();
   coeff->sigma_t = (sd->flag & SD_EXTINCTION) ? sd->closure_transparent_extinction :
-                                                make_spectral_color(0.0f);
+                                                zero_spectral_color();
   coeff->emission = (sd->flag & SD_EMISSION) ? sd->closure_emission_background :
-                                               make_spectral_color(0.0f);
+                                               zero_spectral_color();
   if (sd->flag & SD_SCATTER) {
     for (int i = 0; i < sd->num_closure; i++) {
       const ShaderClosure *sc = &sd->closure[i];
@@ -217,7 +217,7 @@ ccl_device void kernel_volume_shadow_homogeneous(KernelGlobals *kg,
                                                  ShaderData *sd,
                                                  SpectralColor *throughput)
 {
-  SpectralColor sigma_t = make_spectral_color(0.0f);
+  SpectralColor sigma_t = zero_spectral_color();
 
   if (volume_shader_extinction_sample(kg, sd, state, ray->P, &sigma_t))
     *throughput *= volume_color_transmittance(sigma_t, ray->t);
@@ -243,7 +243,7 @@ ccl_device void kernel_volume_shadow_heterogeneous(KernelGlobals *kg,
   /* compute extinction at the start */
   float t = 0.0f;
 
-  SpectralColor sum = make_spectral_color(0.0f);
+  SpectralColor sum = zero_spectral_color();
 
   for (int i = 0; i < max_steps; i++) {
     /* advance to new position */
@@ -256,7 +256,7 @@ ccl_device void kernel_volume_shadow_heterogeneous(KernelGlobals *kg,
     }
 
     float3 new_P = ray->P + ray->D * (t + step_offset);
-    SpectralColor sigma_t = make_spectral_color(0.0f);
+    SpectralColor sigma_t = zero_spectral_color();
 
     /* compute attenuation over segment */
     if (volume_shader_extinction_sample(kg, sd, state, new_P, &sigma_t)) {
@@ -382,7 +382,7 @@ ccl_device float kernel_volume_distance_sample(float max_t,
   float sample_t = min(max_t, -logf(1.0f - xi * (1.0f - sample_transmittance)) / sample_sigma_t);
 
   *transmittance = volume_color_transmittance(sigma_t, sample_t);
-  *pdf = safe_divide(sigma_t * *transmittance, make_spectral_color(1.0f) - full_transmittance);
+  *pdf = safe_divide(sigma_t * *transmittance, one_spectral_color() - full_transmittance);
 
   /* todo: optimization: when taken together with hit/miss decision,
    * the full_transmittance cancels out drops out and xi does not
@@ -398,7 +398,7 @@ ccl_device SpectralColor kernel_volume_distance_pdf(float max_t,
   SpectralColor full_transmittance = volume_color_transmittance(sigma_t, max_t);
   SpectralColor transmittance = volume_color_transmittance(sigma_t, sample_t);
 
-  return safe_divide(sigma_t * transmittance, make_spectral_color(1.0f) - full_transmittance);
+  return safe_divide(sigma_t * transmittance, one_spectral_color() - full_transmittance);
 }
 
 /* Emission */
@@ -546,7 +546,7 @@ kernel_volume_integrate_homogeneous(KernelGlobals *kg,
 
       /* modify pdf for hit/miss decision */
       if (probalistic_scatter)
-        pdf *= make_spectral_color(1.0f) - volume_color_transmittance(coeff.sigma_t, t);
+        pdf *= one_spectral_color() - volume_color_transmittance(coeff.sigma_t, t);
 
       new_tp = *throughput * coeff.sigma_s * transmittance / dot(channel_pdf, pdf);
       t = sample_t;
@@ -616,7 +616,7 @@ kernel_volume_integrate_heterogeneous_distance(KernelGlobals *kg,
 
   /* compute coefficients at the start */
   float t = 0.0f;
-  SpectralColor accum_transmittance = make_spectral_color(1.0f);
+  SpectralColor accum_transmittance = one_spectral_color();
 
   /* pick random color channel, we use the Veach one-sample
    * model with balance heuristic for the channels */
@@ -692,7 +692,7 @@ kernel_volume_integrate_heterogeneous_distance(KernelGlobals *kg,
         new_tp = tp * transmittance;
       }
       else {
-        transmittance = make_spectral_color(0.0f);
+        transmittance = zero_spectral_color();
         new_tp = tp;
       }
 
@@ -709,7 +709,7 @@ kernel_volume_integrate_heterogeneous_distance(KernelGlobals *kg,
 
         /* stop if nearly all light blocked */
         if (reduce_max_f(tp) < tp_eps) {
-          tp = make_spectral_color(0.0f);
+          tp = zero_spectral_color();
           break;
         }
       }
@@ -849,10 +849,10 @@ ccl_device void kernel_volume_decoupled_record(KernelGlobals *kg,
   }
 
   /* init accumulation variables */
-  SpectralColor accum_emission = make_spectral_color(0.0f);
-  SpectralColor accum_transmittance = make_spectral_color(1.0f);
-  SpectralColor accum_albedo = make_spectral_color(0.0f);
-  SpectralColor cdf_distance = make_spectral_color(0.0f);
+  SpectralColor accum_emission = zero_spectral_color();
+  SpectralColor accum_transmittance = one_spectral_color();
+  SpectralColor accum_albedo = zero_spectral_color();
+  SpectralColor cdf_distance = zero_spectral_color();
   float t = 0.0f;
 
   segment->numsteps = 0;
@@ -918,8 +918,8 @@ ccl_device void kernel_volume_decoupled_record(KernelGlobals *kg,
       }
       else {
         /* store empty step */
-        step->sigma_t = make_spectral_color(0.0f);
-        step->sigma_s = make_spectral_color(0.0f);
+        step->sigma_t = zero_spectral_color();
+        step->sigma_s = zero_spectral_color();
         step->closure_flag = 0;
 
         segment->numsteps++;
@@ -1048,12 +1048,12 @@ ccl_device VolumeIntegrateResult kernel_volume_decoupled_scatter(KernelGlobals *
     step = segment->steps;
 
     float prev_t = 0.0f;
-    SpectralColor step_pdf_distance = make_spectral_color(1.0f);
+    SpectralColor step_pdf_distance = one_spectral_color();
 
     if (segment->numsteps > 1) {
       float prev_cdf = 0.0f;
       float step_cdf = 1.0f;
-      SpectralColor prev_cdf_distance = make_spectral_color(0.0f);
+      SpectralColor prev_cdf_distance = zero_spectral_color();
 
       for (int i = 0;; i++, step++) {
         /* todo: optimize using binary search */
@@ -1084,7 +1084,7 @@ ccl_device VolumeIntegrateResult kernel_volume_decoupled_scatter(KernelGlobals *
 
     /* modify pdf for hit/miss decision */
     if (probalistic_scatter)
-      distance_pdf *= make_spectral_color(1.0f) - segment->accum_transmittance;
+      distance_pdf *= one_spectral_color() - segment->accum_transmittance;
 
     pdf = dot(channel_pdf, distance_pdf * step_pdf_distance);
 
@@ -1103,10 +1103,10 @@ ccl_device VolumeIntegrateResult kernel_volume_decoupled_scatter(KernelGlobals *
     step = segment->steps;
 
     float prev_t = 0.0f;
-    SpectralColor step_pdf_distance = make_spectral_color(1.0f);
+    SpectralColor step_pdf_distance = one_spectral_color();
 
     if (segment->numsteps > 1) {
-      SpectralColor prev_cdf_distance = make_spectral_color(0.0f);
+      SpectralColor prev_cdf_distance = zero_spectral_color();
 
       int numsteps = segment->numsteps;
       int high = numsteps - 1;

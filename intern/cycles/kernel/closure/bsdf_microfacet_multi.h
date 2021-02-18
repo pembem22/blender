@@ -115,19 +115,19 @@ ccl_device_forceinline SpectralColor mf_eval_phase_glossy(const float3 w,
                                                           const float2 alpha)
 {
   if (w.z > 0.9999f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   const float3 wh = normalize(wo - w);
   if (wh.z < 0.0f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float pArea = (w.z < -0.9999f) ? 1.0f : lambda * w.z;
 
   const float dotW_WH = dot(-w, wh);
   if (dotW_WH < 0.0f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float phase = max(0.0f, dotW_WH) * 0.25f / max(pArea * dotW_WH, 1e-7f);
@@ -164,7 +164,7 @@ ccl_device_forceinline SpectralColor mf_eval_phase_glass(const float3 w,
                                                          const float eta)
 {
   if (w.z > 0.9999f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float pArea = (w.z < -0.9999f) ? 1.0f : lambda * w.z;
@@ -172,7 +172,7 @@ ccl_device_forceinline SpectralColor mf_eval_phase_glass(const float3 w,
   if (wo_outside) {
     const float3 wh = normalize(wo - w);
     if (wh.z < 0.0f) {
-      return make_spectral_color(0.0f);
+      return zero_spectral_color();
     }
 
     const float dotW_WH = dot(-w, wh);
@@ -185,7 +185,7 @@ ccl_device_forceinline SpectralColor mf_eval_phase_glass(const float3 w,
       wh = -wh;
     const float dotW_WH = dot(-w, wh), dotWO_WH = dot(wo, wh);
     if (dotW_WH < 0.0f) {
-      return make_spectral_color(0.0f);
+      return zero_spectral_color();
     }
 
     float temp = dotW_WH + eta * dotWO_WH;
@@ -428,7 +428,7 @@ ccl_device SpectralColor bsdf_microfacet_multi_ggx_eval_transmit(const ShaderClo
                                                                  ccl_addr_space uint *lcg_state)
 {
   *pdf = 0.0f;
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device SpectralColor bsdf_microfacet_multi_ggx_eval_reflect(const ShaderClosure *sc,
@@ -440,7 +440,7 @@ ccl_device SpectralColor bsdf_microfacet_multi_ggx_eval_reflect(const ShaderClos
   const MicrofacetBsdf *bsdf = (const MicrofacetBsdf *)sc;
 
   if (bsdf->alpha_x * bsdf->alpha_y < 1e-7f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   bool use_fresnel = (bsdf->type == CLOSURE_BSDF_MICROFACET_MULTI_GGX_FRESNEL_ID);
@@ -578,7 +578,7 @@ bsdf_microfacet_multi_ggx_glass_eval_transmit(const ShaderClosure *sc,
   const MicrofacetBsdf *bsdf = (const MicrofacetBsdf *)sc;
 
   if (bsdf->alpha_x * bsdf->alpha_y < 1e-7f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   float3 X, Y, Z;
@@ -611,7 +611,7 @@ bsdf_microfacet_multi_ggx_glass_eval_reflect(const ShaderClosure *sc,
   const MicrofacetBsdf *bsdf = (const MicrofacetBsdf *)sc;
 
   if (bsdf->alpha_x * bsdf->alpha_y < 1e-7f) {
-    return make_spectral_color(0.0f);
+    return zero_spectral_color();
   }
 
   bool use_fresnel = (bsdf->type == CLOSURE_BSDF_MICROFACET_MULTI_GGX_GLASS_FRESNEL_ID);

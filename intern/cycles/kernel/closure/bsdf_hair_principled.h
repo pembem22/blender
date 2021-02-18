@@ -245,7 +245,7 @@ ccl_device_inline void hair_attenuation(KernelGlobals *kg,
   Ap[2] = col;
 
   /* Residual component (TRRT+). */
-  col *= safe_divide(T * f, make_spectral_color(1.0f) - T * f);
+  col *= safe_divide(T * f, one_spectral_color() - T * f);
   Apf[3] = spectral_color_to_linear_rgb_to_gray(kg, col, wavelengths);
   Ap[3] = col;
 
@@ -330,7 +330,7 @@ ccl_device SpectralColor bsdf_principled_hair_eval(KernelGlobals *kg,
   float angles[6];
   hair_alpha_angles(sin_theta_i, cos_theta_i, bsdf->alpha, angles);
 
-  SpectralColor eval = make_spectral_color(0.0f);
+  SpectralColor eval = zero_spectral_color();
   float Mp, Np;
 
   *pdf = 0.0f;
@@ -455,7 +455,7 @@ ccl_device int bsdf_principled_hair_sample(KernelGlobals *kg,
 
   hair_alpha_angles(sin_theta_i, cos_theta_i, bsdf->alpha, angles);
 
-  SpectralColor F = make_spectral_color(0.0f);
+  SpectralColor F = zero_spectral_color();
   float Mp, Np;
 
   *pdf = 0.0f;

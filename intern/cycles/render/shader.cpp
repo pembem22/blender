@@ -573,7 +573,7 @@ void ShaderManager::device_update_common(Device *device,
       flag |= SD_HAS_DISPLACEMENT;
 
     /* constant emission check */
-    float3 constant_emission = make_float3(0.0f, 0.0f, 0.0f);
+    float3 constant_emission = zero_float3();
     if (shader->is_constant_emission(&constant_emission, scene))
       flag |= SD_HAS_CONSTANT_EMISSION;
 
@@ -881,6 +881,10 @@ void ShaderManager::init_xyz_transforms()
     if (!to_scene_linear_transform(config, "XYZ", xyz_to_rgb)) {
       return;
     }
+  }
+  else {
+    /* No reference role found to determine XYZ. */
+    return;
   }
 
   xyz_to_r = float4_to_float3(xyz_to_rgb.x);

@@ -106,7 +106,7 @@ ccl_device SpectralColor bsdf_diffuse_toon_eval_reflect(const ShaderClosure *sc,
     return *pdf * eval;
   }
 
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device SpectralColor bsdf_diffuse_toon_eval_transmit(const ShaderClosure *sc,
@@ -114,7 +114,7 @@ ccl_device SpectralColor bsdf_diffuse_toon_eval_transmit(const ShaderClosure *sc
                                                          const float3 omega_in,
                                                          float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_diffuse_toon_sample(const ShaderClosure *sc,
@@ -191,7 +191,7 @@ ccl_device SpectralColor bsdf_glossy_toon_eval_reflect(const ShaderClosure *sc,
     return *pdf * eval;
   }
 
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device SpectralColor bsdf_glossy_toon_eval_transmit(const ShaderClosure *sc,
@@ -199,7 +199,7 @@ ccl_device SpectralColor bsdf_glossy_toon_eval_transmit(const ShaderClosure *sc,
                                                         const float3 omega_in,
                                                         float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_glossy_toon_sample(const ShaderClosure *sc,

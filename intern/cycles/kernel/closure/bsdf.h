@@ -590,7 +590,7 @@ ccl_device_inline
         break;
 #endif
       default:
-        eval = make_spectral_color(0.0f);
+        eval = zero_spectral_color();
         break;
     }
     if (CLOSURE_IS_BSDF_DIFFUSE(sc->type)) {
@@ -683,7 +683,7 @@ ccl_device_inline
         break;
 #endif
       default:
-        eval = make_spectral_color(0.0f);
+        eval = zero_spectral_color();
         break;
     }
     if (CLOSURE_IS_BSDF_DIFFUSE(sc->type)) {

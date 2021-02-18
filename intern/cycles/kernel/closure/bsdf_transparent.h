@@ -87,7 +87,7 @@ ccl_device SpectralColor bsdf_transparent_eval_reflect(const ShaderClosure *sc,
                                                        const float3 omega_in,
                                                        float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device SpectralColor bsdf_transparent_eval_transmit(const ShaderClosure *sc,
@@ -95,7 +95,7 @@ ccl_device SpectralColor bsdf_transparent_eval_transmit(const ShaderClosure *sc,
                                                         const float3 omega_in,
                                                         float *pdf)
 {
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_transparent_sample(const ShaderClosure *sc,
@@ -118,7 +118,7 @@ ccl_device int bsdf_transparent_sample(const ShaderClosure *sc,
   *domega_in_dy = -dIdy;
 #endif
   *pdf = 1.0f;
-  *eval = make_spectral_color(1.0f);
+  *eval = one_spectral_color();
   return LABEL_TRANSMIT | LABEL_TRANSPARENT;
 }
 

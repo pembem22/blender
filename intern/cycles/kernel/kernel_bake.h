@@ -23,7 +23,7 @@ ccl_device_noinline void compute_light_pass(
 {
   kernel_assert(kernel_data.film.use_light_pass);
 
-  SpectralColor throughput = make_spectral_color(1.0f);
+  SpectralColor throughput = one_spectral_color();
 
   /* Emission and indirect shader data memory used by various functions. */
   ShaderDataTinyStorage emission_sd_storage;
@@ -179,7 +179,7 @@ ccl_device_inline SpectralColor kernel_bake_shader_bsdf(KernelGlobals *kg,
       return shader_bsdf_transmission(kg, sd);
     default:
       kernel_assert(!"Unknown bake type passed to BSDF evaluate");
-      return make_spectral_color(0.0f);
+      return zero_spectral_color();
   }
 }
 
@@ -195,12 +195,12 @@ ccl_device SpectralColor kernel_bake_evaluate_direct_indirect(KernelGlobals *kg,
   const bool is_color = (pass_filter & BAKE_FILTER_COLOR) != 0;
   const bool is_direct = (pass_filter & BAKE_FILTER_DIRECT) != 0;
   const bool is_indirect = (pass_filter & BAKE_FILTER_INDIRECT) != 0;
-  SpectralColor out = make_spectral_color(0.0f);
+  SpectralColor out = zero_spectral_color();
 
   if (is_color) {
     if (is_direct || is_indirect) {
       /* Leave direct and diffuse channel colored. */
-      color = make_spectral_color(1.0f);
+      color = one_spectral_color();
     }
     else {
       /* surface color of the pass only */
@@ -322,7 +322,7 @@ ccl_device void kernel_bake_evaluate(
   if (kernel_data.bake.pass_filter & ~BAKE_FILTER_COLOR)
     compute_light_pass(kg, &sd, &L, rng_hash, pass_filter, sample);
 
-  float3 out = make_float3(0.0f, 0.0f, 0.0f);
+  float3 out = zero_float3();
 
   ShaderEvalType type = (ShaderEvalType)kernel_data.bake.type;
   switch (type) {
@@ -426,7 +426,7 @@ ccl_device void kernel_bake_evaluate(
       /* setup ray */
       Ray ray;
 
-      ray.P = make_float3(0.0f, 0.0f, 0.0f);
+      ray.P = zero_float3();
       ray.D = normalize(P);
       ray.t = 0.0f;
 #  ifdef __CAMERA_MOTION__
@@ -506,7 +506,7 @@ ccl_device void kernel_background_evaluate(KernelGlobals *kg,
   float u = __uint_as_float(in.x);
   float v = __uint_as_float(in.y);
 
-  ray.P = make_float3(0.0f, 0.0f, 0.0f);
+  ray.P = zero_float3();
   ray.D = equirectangular_to_direction(u, v);
   ray.t = 0.0f;
 #ifdef __CAMERA_MOTION__

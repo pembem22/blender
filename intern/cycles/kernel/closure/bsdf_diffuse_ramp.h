@@ -59,7 +59,7 @@ ccl_device SpectralColor bsdf_diffuse_ramp_get_color(const float3 colors[8], flo
   //     return colors[MAXCOLORS - 1];
   //   float offset = npos - (float)ipos;
   //   return colors[ipos] * (1.0f - offset) + colors[ipos + 1] * offset;
-  return make_spectral_color(0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_diffuse_ramp_setup(DiffuseRampBsdf *bsdf)

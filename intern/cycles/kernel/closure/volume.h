@@ -188,7 +188,7 @@ ccl_device int volume_phase_sample(const ShaderData *sd,
                                               pdf);
       break;
     default:
-      *eval = make_spectral_color(0.0f);
+      *eval = zero_spectral_color();
       label = LABEL_NONE;
       break;
   }

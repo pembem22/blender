@@ -508,6 +508,96 @@ CustomDataType cpp_type_to_custom_data_type(const blender::fn::CPPType &type)
   return static_cast<CustomDataType>(-1);
 }
 
+static int attribute_data_type_complexity(const CustomDataType data_type)
+{
+  switch (data_type) {
+    case CD_PROP_BOOL:
+      return 0;
+    case CD_PROP_INT32:
+      return 1;
+    case CD_PROP_FLOAT:
+      return 2;
+    case CD_PROP_FLOAT2:
+      return 3;
+    case CD_PROP_FLOAT3:
+      return 4;
+    case CD_PROP_COLOR:
+      return 5;
+#if 0 /* These attribute types are not supported yet. */
+    case CD_MLOOPCOL:
+      return 3;
+    case CD_PROP_STRING:
+      return 6;
+#endif
+    default:
+      /* Only accept "generic" custom data types used by the attribute system. */
+      BLI_assert(false);
+      return 0;
+  }
+}
+
+CustomDataType attribute_data_type_highest_complexity(Span<CustomDataType> data_types)
+{
+  int highest_complexity = INT_MIN;
+  CustomDataType most_complex_type = CD_PROP_COLOR;
+
+  for (const CustomDataType data_type : data_types) {
+    const int complexity = attribute_data_type_complexity(data_type);
+    if (complexity > highest_complexity) {
+      highest_complexity = complexity;
+      most_complex_type = data_type;
+    }
+  }
+
+  return most_complex_type;
+}
+
+/**
+ * \note Generally the order should mirror the order of the domains
+ * established in each component's ComponentAttributeProviders.
+ */
+static int attribute_domain_priority(const AttributeDomain domain)
+{
+  switch (domain) {
+#if 0
+    case ATTR_DOMAIN_CURVE:
+      return 0;
+#endif
+    case ATTR_DOMAIN_POLYGON:
+      return 1;
+    case ATTR_DOMAIN_EDGE:
+      return 2;
+    case ATTR_DOMAIN_POINT:
+      return 3;
+    case ATTR_DOMAIN_CORNER:
+      return 4;
+    default:
+      /* Domain not supported in nodes yet. */
+      BLI_assert(false);
+      return 0;
+  }
+}
+
+/**
+ * Domains with a higher "information density" have a higher priority, in order
+ * to choose a domain that will not lose data through domain conversion.
+ */
+AttributeDomain attribute_domain_highest_priority(Span<AttributeDomain> domains)
+{
+  int highest_priority = INT_MIN;
+  AttributeDomain highest_priority_domain = ATTR_DOMAIN_CORNER;
+
+  for (const AttributeDomain domain : domains) {
+    const int priority = attribute_domain_priority(domain);
+    if (priority > highest_priority) {
+      highest_priority = priority;
+      highest_priority_domain = domain;
+    }
+  }
+
+  return highest_priority_domain;
+}
+
 /**
  * A #BuiltinAttributeProvider is responsible for exactly one attribute on a geometry component.
  * The attribute is identified by its name and has a fixed domain and type. Builtin attributes do
@@ -1202,6 +1292,29 @@ static void tag_normals_dirty_when_writing_position(GeometryComponent &component
   }
 }
 
+static int get_material_index(const MPoly &mpoly)
+{
+  return static_cast<int>(mpoly.mat_nr);
+}
+
+static void set_material_index(MPoly &mpoly, const int &index)
+{
+  mpoly.mat_nr = static_cast<short>(std::clamp(index, 0, SHRT_MAX));
+}
+
+static ReadAttributePtr make_material_index_read_attribute(const void *data, const int domain_size)
+{
+  return std::make_unique<DerivedArrayReadAttribute<MPoly, int, get_material_index>>(
+      ATTR_DOMAIN_POLYGON, Span<MPoly>((const MPoly *)data, domain_size));
+}
+
+static WriteAttributePtr make_material_index_write_attribute(void *data, const int domain_size)
+{
+  return std::make_unique<
+      DerivedArrayWriteAttribute<MPoly, int, get_material_index, set_material_index>>(
+      ATTR_DOMAIN_POLYGON, MutableSpan<MPoly>((MPoly *)data, domain_size));
+}
+
 template<typename T, AttributeDomain Domain>
 static ReadAttributePtr make_array_read_attribute(const void *data, const int domain_size)
 {
@@ -1265,6 +1378,19 @@ static ComponentAttributeProviders create_attribute_providers_for_mesh()
                                                  make_vertex_position_read_attribute,
                                                  make_vertex_position_write_attribute,
                                                  tag_normals_dirty_when_writing_position);
+
+  static BuiltinCustomDataLayerProvider material_index("material_index",
+                                                       ATTR_DOMAIN_POLYGON,
+                                                       CD_PROP_INT32,
+                                                       CD_MPOLY,
+                                                       BuiltinAttributeProvider::NonCreatable,
+                                                       BuiltinAttributeProvider::Writable,
+                                                       BuiltinAttributeProvider::NonDeletable,
+                                                       polygon_access,
+                                                       make_material_index_read_attribute,
+                                                       make_material_index_write_attribute,
+                                                       nullptr);
+
   static MeshUVsAttributeProvider uvs;
   static VertexGroupsAttributeProvider vertex_groups;
   static CustomDataAttributeProvider corner_custom_data(ATTR_DOMAIN_CORNER, corner_access);
@@ -1272,7 +1398,7 @@ static ComponentAttributeProviders create_attribute_providers_for_mesh()
   static CustomDataAttributeProvider edge_custom_data(ATTR_DOMAIN_EDGE, edge_access);
   static CustomDataAttributeProvider polygon_custom_data(ATTR_DOMAIN_POLYGON, polygon_access);
 
-  return ComponentAttributeProviders({&position},
+  return ComponentAttributeProviders({&position, &material_index},
                                      {&uvs,
                                       &corner_custom_data,
                                       &vertex_groups,
