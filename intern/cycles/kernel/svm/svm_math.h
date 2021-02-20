@@ -87,6 +87,33 @@ ccl_device void svm_node_spectrum_math(KernelGlobals *kg,
     case NODE_SPECTRUM_MATH_MAXIMUM:
       result = max(a, b);
       break;
+    case NODE_SPECTRUM_MATH_LESS_THAN:
+      FOR_EACH_CHANNEL(i)
+      {
+        result[i] = a[i] < b[i];
+      }
+      break;
+    case NODE_SPECTRUM_MATH_GREATER_THAN:
+      FOR_EACH_CHANNEL(i)
+      {
+        result[i] = a[i] > b[i];
+      }
+      break;
+    case NODE_SPECTRUM_MATH_SIGN:
+      FOR_EACH_CHANNEL(i)
+      {
+        result[i] = (a[i] > 0.0f ? 1.0f : (a[i] < 0.0f ? -1.0f : 0.0f));
+      }
+      break;
+    case NODE_SPECTRUM_MATH_SINE:
+      result = sin(a);
+      break;
+    case NODE_SPECTRUM_MATH_COSINE:
+      result = cos(a);
+      break;
+    case NODE_SPECTRUM_MATH_TANGENT:
+      result = tan(a);
+      break;
   }
 
   if (use_clamp) {

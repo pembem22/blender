@@ -186,6 +186,10 @@ void node_spectrum_math_update(bNodeTree *UNUSED(ntree), bNode *node)
   nodeSetSocketAvailability(sock2,
                             !ELEM(node->custom1,
                                   NODE_SPECTRUM_MATH_SQRT,
+                                  NODE_SPECTRUM_MATH_SIGN,
+                                  NODE_SPECTRUM_MATH_SINE,
+                                  NODE_SPECTRUM_MATH_COSINE,
+                                  NODE_SPECTRUM_MATH_TANGENT,
                                   NODE_SPECTRUM_MATH_ABSOLUTE,
                                   NODE_SPECTRUM_MATH_INV_SQRT,
                                   NODE_SPECTRUM_MATH_EXPONENT));
@@ -204,6 +208,10 @@ void node_spectrum_math_update(bNodeTree *UNUSED(ntree), bNode *node)
       break;
     case NODE_SPECTRUM_MATH_LOGARITHM:
       node_sock_label(sock2, "Base");
+      break;
+    case NODE_SPECTRUM_MATH_LESS_THAN:
+    case NODE_SPECTRUM_MATH_GREATER_THAN:
+      node_sock_label(sock2, "Threshold");
       break;
   }
 }

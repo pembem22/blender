@@ -6250,6 +6250,12 @@ NODE_DEFINE(SpectrumMathNode)
   spectrum_math_type_enum.insert("sqrt", NODE_SPECTRUM_MATH_SQRT);
   spectrum_math_type_enum.insert("inversesqrt", NODE_SPECTRUM_MATH_INV_SQRT);
   spectrum_math_type_enum.insert("exponent", NODE_SPECTRUM_MATH_EXPONENT);
+  spectrum_math_type_enum.insert("less_than", NODE_SPECTRUM_MATH_LESS_THAN);
+  spectrum_math_type_enum.insert("greater_than", NODE_SPECTRUM_MATH_GREATER_THAN);
+  spectrum_math_type_enum.insert("sign", NODE_SPECTRUM_MATH_SIGN);
+  spectrum_math_type_enum.insert("sine", NODE_SPECTRUM_MATH_SINE);
+  spectrum_math_type_enum.insert("cosine", NODE_SPECTRUM_MATH_COSINE);
+  spectrum_math_type_enum.insert("tangent", NODE_SPECTRUM_MATH_TANGENT);
   SOCKET_ENUM(spectrum_math_type, "Type", spectrum_math_type_enum, NODE_SPECTRUM_MATH_ADD);
 
   SOCKET_BOOLEAN(use_clamp, "Use Clamp", false);

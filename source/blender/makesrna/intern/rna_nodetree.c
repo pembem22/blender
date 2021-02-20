@@ -285,6 +285,13 @@ const EnumPropertyItem rna_enum_node_spectrum_math_items[] = {
     {0, "", 0, N_("Comparison"), ""},
     {NODE_SPECTRUM_MATH_MINIMUM, "MINIMUM", 0, "Minimum", "The minimum from A and B"},
     {NODE_SPECTRUM_MATH_MAXIMUM, "MAXIMUM", 0, "Maximum", "The maximum from A and B"},
+    {NODE_SPECTRUM_MATH_LESS_THAN, "LESS_THAN", 0, "Less Than", "1 if A < B else 0"},
+    {NODE_SPECTRUM_MATH_GREATER_THAN, "GREATER_THAN", 0, "Greater Than", "1 if A > B else 0"},
+    {NODE_SPECTRUM_MATH_SIGN, "SIGN", 0, "Sign", "Returns the sign of A"},
+    {0, "", 0, N_("Trigonometric"), ""},
+    {NODE_SPECTRUM_MATH_SINE, "SINE", 0, "Sine", "sin(A)"},
+    {NODE_SPECTRUM_MATH_COSINE, "COSINE", 0, "Cosine", "cos(A)"},
+    {NODE_SPECTRUM_MATH_TANGENT, "TANGENT", 0, "Tangent", "tan(A)"},
     {0, NULL, 0, NULL, NULL},
 };
 
