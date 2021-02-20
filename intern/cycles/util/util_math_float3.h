@@ -64,6 +64,10 @@ ccl_device_inline float3 safe_rcp(const float3 &a);
 ccl_device_inline float3 sqrt(const float3 &a);
 ccl_device_inline float3 floor(const float3 &a);
 ccl_device_inline float3 ceil(const float3 &a);
+
+ccl_device_inline float8 sin(const float8 &a);
+ccl_device_inline float8 cos(const float8 &a);
+ccl_device_inline float8 tan(const float8 &a);
 #endif /* !__KERNEL_OPENCL__ */
 
 ccl_device_inline float len(const float3 a);
@@ -562,6 +566,21 @@ ccl_device_inline float3 ensure_finite(float3 v)
   if (!isfinite_safe(v.z))
     v.z = 0.0f;
   return v;
+}
+
+ccl_device_inline float3 sin(const float3 &a)
+{
+  return make_float3(sinf(a.x), sinf(a.y), sinf(a.z));
+}
+
+ccl_device_inline float3 cos(const float3 &a)
+{
+  return make_float3(cosf(a.x), cosf(a.y), cosf(a.z));
+}
+
+ccl_device_inline float3 tan(const float3 &a)
+{
+  return make_float3(tanf(a.x), tanf(a.y), tanf(a.z));
 }
 
 CCL_NAMESPACE_END

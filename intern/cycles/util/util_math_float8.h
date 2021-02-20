@@ -68,6 +68,10 @@ ccl_device_inline float8 clamp(const float8 &a, const float8 &mn, const float8 &
 ccl_device_inline float8 fabs(const float8 &a);
 ccl_device_inline float8 floor(const float8 &a);
 ccl_device_inline float8 mix(const float8 &a, const float8 &b, float t);
+
+ccl_device_inline float8 sin(const float8 &a);
+ccl_device_inline float8 cos(const float8 &a);
+ccl_device_inline float8 tan(const float8 &a);
 #endif /* !__KERNEL_OPENCL__*/
 
 ccl_device_inline float8 safe_divide(const float8 a, const float b);
@@ -346,6 +350,24 @@ ccl_device_inline float8 fabs(const float8 &a)
 ccl_device_inline float8 mix(const float8 &a, const float8 &b, float t)
 {
   return a + t * (b - a);
+}
+
+ccl_device_inline float8 sin(const float8 &a)
+{
+  return make_float8(
+      sinf(a.a), sinf(a.b), sinf(a.c), sinf(a.d), sinf(a.e), sinf(a.f), sinf(a.g), sinf(a.h));
+}
+
+ccl_device_inline float8 cos(const float8 &a)
+{
+  return make_float8(
+      cosf(a.a), cosf(a.b), cosf(a.c), cosf(a.d), cosf(a.e), cosf(a.f), cosf(a.g), cosf(a.h));
+}
+
+ccl_device_inline float8 tan(const float8 &a)
+{
+  return make_float8(
+      tanf(a.a), tanf(a.b), tanf(a.c), tanf(a.d), tanf(a.e), tanf(a.f), tanf(a.g), tanf(a.h));
 }
 
 #endif /* !__KERNEL_OPENCL__*/
