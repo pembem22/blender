@@ -320,7 +320,7 @@ ccl_device void svm_node_closure_bsdf(KernelGlobals *kg,
             SpectralColor m_ctint = m_cdlum > 0.0f ?
                                         base_color / m_cdlum :
                                         make_spectral_color(
-                                            0.0f);  // normalize lum. to isolate hue+sat
+                                            1.0f);  // normalize lum. to isolate hue+sat
             SpectralColor tmp_col = make_spectral_color(1.0f - specular_tint) +
                                     m_ctint * specular_tint;
 
