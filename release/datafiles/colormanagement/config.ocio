@@ -24,8 +24,7 @@ roles:
   # Non-color data
   data: Non-Color
 
-  # For interop between configs, and to determine XYZ for rendering
-  aces_interchange: Linear ACES
+  xyz: Linear XYZ IE
 
   color_timing: sRGB
   compositing_log: sRGB
