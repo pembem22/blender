@@ -6004,6 +6004,58 @@ void MapRangeNode::compile(OSLCompiler &compiler)
   compiler.add(this, "node_map_range");
 }
 
+/* Map Range Spectrum Node */
+
+NODE_DEFINE(MapRangeSpectrumNode)
+{
+  NodeType *type = NodeType::add("map_range_spectrum", create, NodeType::SHADER);
+
+  SOCKET_IN_SPECTRAL(value, "Value", one_float3());
+  SOCKET_IN_SPECTRAL(from_min, "From Min", zero_float3());
+  SOCKET_IN_SPECTRAL(from_max, "From Max", one_float3());
+  SOCKET_IN_SPECTRAL(to_min, "To Min", zero_float3());
+  SOCKET_IN_SPECTRAL(to_max, "To Max", one_float3());
+  SOCKET_IN_BOOLEAN(clamp, "Clamp", false);
+
+  SOCKET_OUT_SPECTRAL(result, "Result");
+
+  return type;
+}
+
+MapRangeSpectrumNode::MapRangeSpectrumNode() : ShaderNode(node_type)
+{
+}
+
+void MapRangeSpectrumNode::compile(SVMCompiler &compiler)
+{
+  ShaderInput *value_in = input("Value");
+  ShaderInput *from_min_in = input("From Min");
+  ShaderInput *from_max_in = input("From Max");
+  ShaderInput *to_min_in = input("To Min");
+  ShaderInput *to_max_in = input("To Max");
+  ShaderOutput *result_out = output("Result");
+
+  int value_stack_offset = compiler.stack_assign(value_in);
+  int from_min_stack_offset = compiler.stack_assign_if_linked(from_min_in);
+  int from_max_stack_offset = compiler.stack_assign_if_linked(from_max_in);
+  int to_min_stack_offset = compiler.stack_assign_if_linked(to_min_in);
+  int to_max_stack_offset = compiler.stack_assign_if_linked(to_max_in);
+  int result_stack_offset = compiler.stack_assign(result_out);
+
+  compiler.add_node(
+      NODE_MAP_RANGE_SPECTRUM,
+      value_stack_offset,
+      compiler.encode_uchar4(
+          from_min_stack_offset, from_max_stack_offset, to_min_stack_offset, to_max_stack_offset),
+      compiler.encode_uchar4(result_stack_offset, clamp, 0, 0));
+}
+
+void MapRangeSpectrumNode::compile(OSLCompiler &compiler)
+{
+  // compiler.parameter(this, "range_type");
+  // compiler.add(this, "node_map_range");
+}
+
 /* Clamp Node */
 
 NODE_DEFINE(ClampNode)

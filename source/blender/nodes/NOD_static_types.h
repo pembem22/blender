@@ -52,6 +52,7 @@ DefNode(ShaderNode,     SH_NODE_CURVE_RGB,       def_rgb_curve,          "CURVE_
 DefNode(ShaderNode,     SH_NODE_CURVE_SPECTRUM,  def_spectrum_curve,     "CURVE_SPECTRUM", SpectrumCurve,    "Spectrum Curves",   ""              )
 DefNode(ShaderNode,     SH_NODE_CAMERA,          0,                      "CAMERA",         CameraData,       "Camera Data",       ""              )
 DefNode(ShaderNode,     SH_NODE_MAP_RANGE,       def_map_range,          "MAP_RANGE",      MapRange,         "Map Range",         ""              )
+DefNode(ShaderNode,     SH_NODE_MAP_RANGE_SPECTRUM, def_map_range_spectrum, "MAP_RANGE_SPECTRUM", MapRangeSpectrum, "Map Range Spectrum",  ""    )
 DefNode(ShaderNode,     SH_NODE_CLAMP,           def_clamp,              "CLAMP",          Clamp,            "Clamp",             ""              )
 DefNode(ShaderNode,     SH_NODE_MATH,            def_math,               "MATH",           Math,             "Math",              ""              )
 DefNode(ShaderNode,     SH_NODE_SPECTRUM_MATH,   def_spectrum_math,      "SPECTRUM_MATH",  SpectrumMath,     "Spectrum Math",     ""              )

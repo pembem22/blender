@@ -219,6 +219,7 @@ set(SRC
   shader/nodes/node_shader_light_falloff.c
   shader/nodes/node_shader_light_path.c
   shader/nodes/node_shader_map_range.cc
+  shader/nodes/node_shader_map_range_spectrum.cc
   shader/nodes/node_shader_mapping.c
   shader/nodes/node_shader_math.cc
   shader/nodes/node_shader_spectrum_math.c

@@ -202,6 +202,7 @@ CCL_NAMESPACE_END
 #include "kernel/svm/svm_light_path.h"
 #include "kernel/svm/svm_magic.h"
 #include "kernel/svm/svm_map_range.h"
+#include "kernel/svm/svm_map_range_spectrum.h"
 #include "kernel/svm/svm_mapping.h"
 #include "kernel/svm/svm_math.h"
 #include "kernel/svm/svm_mix.h"
@@ -565,6 +566,9 @@ ccl_device_noinline void svm_eval_nodes(
         break;
       case NODE_MAP_RANGE:
         svm_node_map_range(kg, sd, stack, node.y, node.z, node.w, &offset);
+        break;
+      case NODE_MAP_RANGE_SPECTRUM:
+        svm_node_map_range_spectrum(kg, sd, stack, node.y, node.z, node.w, &offset);
         break;
       case NODE_CLAMP:
         svm_node_clamp(kg, sd, stack, node.y, node.z, node.w, &offset);

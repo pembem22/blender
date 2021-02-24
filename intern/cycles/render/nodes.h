@@ -1482,6 +1482,22 @@ class MapRangeNode : public ShaderNode {
   NODE_SOCKET_API(bool, clamp)
 };
 
+class MapRangeSpectrumNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(MapRangeSpectrumNode)
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_3;
+  }
+
+  NODE_SOCKET_API(float3, value)
+  NODE_SOCKET_API(float3, from_min)
+  NODE_SOCKET_API(float3, from_max)
+  NODE_SOCKET_API(float3, to_min)
+  NODE_SOCKET_API(float3, to_max)
+  NODE_SOCKET_API(bool, clamp)
+};
+
 class ClampNode : public ShaderNode {
  public:
   SHADER_NODE_CLASS(ClampNode)

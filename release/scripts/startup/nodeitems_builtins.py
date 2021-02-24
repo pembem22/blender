@@ -293,6 +293,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeBlackbodySpectral"),
         NodeItem("ShaderNodeGaussianSpectrum"),
         NodeItem("ShaderNodeTexSkySpectral"),
+        NodeItem("ShaderNodeMapRangeSpectrum"),
     ]),
     ShaderNodeCategory("SH_NEW_SCRIPT", "Script", items=[
         NodeItem("ShaderNodeScript"),

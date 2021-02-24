@@ -226,6 +226,7 @@ set(SRC_SVM_HEADERS
   svm/svm_light_path.h
   svm/svm_magic.h
   svm/svm_map_range.h
+  svm/svm_map_range_spectrum.h
   svm/svm_mapping.h
   svm/svm_mapping_util.h
   svm/svm_math.h

@@ -4654,6 +4654,7 @@ static void registerShaderNodes()
   register_node_type_sh_curve_rgb();
   register_node_type_sh_curve_spectrum();
   register_node_type_sh_map_range();
+  register_node_type_sh_map_range_spectrum();
   register_node_type_sh_clamp();
   register_node_type_sh_math();
   register_node_type_sh_spectrum_math();

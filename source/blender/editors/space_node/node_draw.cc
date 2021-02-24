@@ -811,7 +811,8 @@ static bool is_socket_spectral(bNodeSocket *sock, bNode *node)
                                                                SH_NODE_CURVE_SPECTRUM,
                                                                SH_NODE_TEX_SKY_SPECTRAL,
                                                                SH_NODE_BLACKBODY_SPECTRAL,
-                                                               SH_NODE_GAUSSIAN_SPECTRUM)) &&
+                                                               SH_NODE_GAUSSIAN_SPECTRUM,
+                                                               SH_NODE_MAP_RANGE_SPECTRUM)) &&
           sock->type == SOCK_RGBA) ||
          (sock->type == SOCK_VECTOR && STREQ(sock->name, "Subsurface Radius"));
 }

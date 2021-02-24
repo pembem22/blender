@@ -189,7 +189,8 @@ static bool is_spectral_socket(BL::NodeSocket b_socket)
           (b_node.is_a(&RNA_ShaderNodeSpectrumCurve) || b_node.is_a(&RNA_ShaderNodeSpectrumMath) ||
            b_node.is_a(&RNA_ShaderNodeTexSkySpectral) ||
            b_node.is_a(&RNA_ShaderNodeBlackbodySpectral) ||
-           b_node.is_a(&RNA_ShaderNodeGaussianSpectrum)));
+           b_node.is_a(&RNA_ShaderNodeGaussianSpectrum) ||
+           b_node.is_a(&RNA_ShaderNodeMapRangeSpectrum)));
 }
 
 static SocketType::Type convert_socket_type(BL::NodeSocket &b_socket)
@@ -403,6 +404,12 @@ static ShaderNode *add_node(Scene *scene,
     map_range_node->set_clamp(b_map_range_node.clamp());
     map_range_node->set_range_type((NodeMapRangeType)b_map_range_node.interpolation_type());
     node = map_range_node;
+  }
+  else if (b_node.is_a(&RNA_ShaderNodeMapRangeSpectrum)) {
+    BL::ShaderNodeMapRangeSpectrum b_map_range_node_spectrum(b_node);
+    MapRangeSpectrumNode *map_range_spectrum_node = graph->create_node<MapRangeSpectrumNode>();
+    map_range_spectrum_node->set_clamp(b_map_range_node_spectrum.clamp());
+    node = map_range_spectrum_node;
   }
   else if (b_node.is_a(&RNA_ShaderNodeClamp)) {
     BL::ShaderNodeClamp b_clamp_node(b_node);
