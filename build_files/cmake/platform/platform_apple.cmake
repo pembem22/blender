@@ -333,6 +333,13 @@ if(WITH_LLVM)
   if(NOT LLVM_FOUND)
     message(FATAL_ERROR "LLVM not found.")
   endif()
+  if(WITH_CLANG)
+    find_package(Clang)
+    if(NOT CLANG_FOUND)
+       message(FATAL_ERROR "Clang not found.")
+    endif()
+  endif()
+
 endif()
 
 if(WITH_CYCLES_OSL)
@@ -345,7 +352,7 @@ if(WITH_CYCLES_OSL)
   list(APPEND OSL_LIBRARIES ${OSL_LIB_COMP} -force_load ${OSL_LIB_EXEC} ${OSL_LIB_QUERY})
   find_path(OSL_INCLUDE_DIR OSL/oslclosure.h PATHS ${CYCLES_OSL}/include)
   find_program(OSL_COMPILER NAMES oslc PATHS ${CYCLES_OSL}/bin)
-  find_path(OSL_SHADER_DIR NAMES stdosl.h PATHS ${CYCLES_OSL}/shaders)
+  find_path(OSL_SHADER_DIR NAMES stdosl.h PATHS ${CYCLES_OSL}/share/OSL/shaders)
 
   if(OSL_INCLUDE_DIR AND OSL_LIBRARIES AND OSL_COMPILER AND OSL_SHADER_DIR)
     set(OSL_FOUND TRUE)
@@ -403,7 +410,7 @@ if(WITH_OPENMP)
     set(OPENMP_FOUND ON)
     set(OpenMP_C_FLAGS "-Xclang -fopenmp -I'${LIBDIR}/openmp/include'")
     set(OpenMP_CXX_FLAGS "-Xclang -fopenmp -I'${LIBDIR}/openmp/include'")
-    string(APPEND CMAKE_EXE_LINKER_FLAGS " -L'${LIBDIR}/openmp/lib' -lomp")
+    set(OpenMP_LINKER_FLAGS "-L'${LIBDIR}/openmp/lib' -lomp")
 
     # Copy libomp.dylib to allow executables like datatoc and tests to work.
     # `@executable_path/../Resources/lib/` is a default dylib search path.
