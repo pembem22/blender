@@ -805,16 +805,31 @@ static void node_socket_outline_color_get(bool selected, float r_outline_color[4
 
 static bool is_socket_spectral(bNodeSocket *sock, bNode *node)
 {
+  if (node->typeinfo->nclass == NODE_CLASS_SHADER && sock->type == SOCK_RGBA) {
+    return true;
+  }
+
   /* Add new spectral nodes here. */
-  return ((node->typeinfo->nclass == NODE_CLASS_SHADER || ELEM(node->typeinfo->type,
-                                                               SH_NODE_SPECTRUM_MATH,
-                                                               SH_NODE_CURVE_SPECTRUM,
-                                                               SH_NODE_TEX_SKY_SPECTRAL,
-                                                               SH_NODE_BLACKBODY_SPECTRAL,
-                                                               SH_NODE_GAUSSIAN_SPECTRUM,
-                                                               SH_NODE_MAP_RANGE_SPECTRUM)) &&
-          sock->type == SOCK_RGBA) ||
-         (sock->type == SOCK_VECTOR && STREQ(sock->name, "Subsurface Radius"));
+  if (ELEM(node->typeinfo->type,
+           SH_NODE_SPECTRUM_MATH,
+           SH_NODE_CURVE_SPECTRUM,
+           SH_NODE_TEX_SKY_SPECTRAL,
+           SH_NODE_BLACKBODY_SPECTRAL,
+           SH_NODE_GAUSSIAN_SPECTRUM,
+           SH_NODE_MAP_RANGE_SPECTRUM) &&
+      sock->type == SOCK_RGBA) {
+    return true;
+  }
+
+  if (sock->type == SOCK_VECTOR && STREQ(sock->name, "Subsurface Radius")) {
+    return true;
+  }
+
+  if (sock->type == SOCK_RGBA && STREQ(sock->name, "Ray Wavelength")) {
+    return true;
+  }
+
+  return false;
 }
 
 /* Usual convention here would be node_socket_get_color(), but that's already used (for setting a

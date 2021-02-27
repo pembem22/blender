@@ -25,6 +25,11 @@ ccl_device void svm_node_light_path(ShaderData *sd,
                                     uint out_offset,
                                     int path_flag)
 {
+  if (type == NODE_LP_ray_wavelength) {
+    stack_store_spectral(stack, out_offset, state->wavelengths);
+    return;
+  }
+
   float info = 0.0f;
 
   switch (type) {
