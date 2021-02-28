@@ -507,32 +507,34 @@ ccl_device_inline bool isequal(const float4 a, const float4 b)
 #  endif
 }
 
+#endif /* !__KERNEL_GPU__ */
+
 ccl_device_inline float4 reduce_min(const float4 &a)
 {
-#  if defined(__KERNEL_SSE__)
-#    if defined(__KERNEL_NEON__)
+#if defined(__KERNEL_SSE__)
+#  if defined(__KERNEL_NEON__)
   return float4(vdupq_n_f32(vminvq_f32(a)));
-#    else
+#  else
   float4 h = min(shuffle<1, 0, 3, 2>(a), a);
   return min(shuffle<2, 3, 0, 1>(h), h);
-#    endif
-#  else
-  return make_float4(min(min(a.x, a.y), min(a.z, a.w)));
 #  endif
+#else
+  return make_float4(min(min(a.x, a.y), min(a.z, a.w)));
+#endif
 }
 
 ccl_device_inline float4 reduce_max(const float4 &a)
 {
-#  if defined(__KERNEL_SSE__)
-#    if defined(__KERNEL_NEON__)
+#if defined(__KERNEL_SSE__)
+#  if defined(__KERNEL_NEON__)
   return float4(vdupq_n_f32(vmaxvq_f32(a)));
-#    else
+#  else
   float4 h = max(shuffle<1, 0, 3, 2>(a), a);
   return max(shuffle<2, 3, 0, 1>(h), h);
-#    endif
-#  else
-  return make_float4(max(max(a.x, a.y), max(a.z, a.w)));
 #  endif
+#else
+  return make_float4(max(max(a.x, a.y), max(a.z, a.w)));
+#endif
 }
 
 ccl_device_inline float reduce_min_f(const float4 &a)
@@ -552,11 +554,11 @@ ccl_device_inline float reduce_add_f(const float4 &a)
 
 ccl_device_inline float4 load_float4(const float *v)
 {
-#  ifdef __KERNEL_SSE__
+#ifdef __KERNEL_SSE__
   return float4(_mm_loadu_ps(v));
-#  else
+#else
   return make_float4(v[0], v[1], v[2], v[3]);
-#  endif
+#endif
 }
 
 ccl_device_inline float4 safe_divide(const float4 a, const float b)
@@ -597,5 +599,4 @@ ccl_device_inline float4 ensure_finite4(float4 v)
 
 CCL_NAMESPACE_END
 
-#endif
 #endif /* __UTIL_MATH_FLOAT4_H__ */
