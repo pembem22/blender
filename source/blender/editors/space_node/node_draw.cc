@@ -802,8 +802,137 @@ static void node_socket_outline_color_get(const bool selected,
   }
 }
 
-static bool is_socket_spectral(bNodeSocket *sock, bNode *node)
+static bool is_socket_spectral(bNodeSocket *sock, bNode *node, bNodeTree *ntree)
 {
+  if (node->type == NODE_REROUTE) {
+    while (node->type == NODE_REROUTE) {
+      if (((bNodeSocket *)node->inputs.first)->link == nullptr) {
+        break;
+      }
+
+      sock = ((bNodeSocket *)node->inputs.first)->link->fromsock;
+      node = ((bNodeSocket *)node->inputs.first)->link->fromnode;
+    }
+
+    /* Avoid infinite recursion. */
+    if (node->type == NODE_GROUP_INPUT) {
+      return false;
+    }
+  }
+
+  if (node->type == NODE_GROUP_OUTPUT) {
+    if (!sock->link) {
+      return false;
+    }
+
+    node = sock->link->fromnode;
+    sock = sock->link->fromsock;
+
+    while (node->type == NODE_REROUTE) {
+      if (((bNodeSocket *)node->inputs.first)->link == nullptr) {
+        return false;
+      }
+
+      sock = ((bNodeSocket *)node->inputs.first)->link->fromsock;
+      node = ((bNodeSocket *)node->inputs.first)->link->fromnode;
+    }
+
+    /* Avoid infinite recursion. */
+    if (node->type == NODE_GROUP_INPUT) {
+      return false;
+    }
+
+    return is_socket_spectral(sock, node, ntree);
+  }
+
+  if (node->type == NODE_GROUP_INPUT) {
+    /* Group input sockets do not have `link` set, so it's impossible to do the check directly.
+     * Instead iterate over the nodes and check from there. */
+    LISTBASE_FOREACH (bNode *, group_node, &ntree->nodes) {
+      if (group_node->type == NODE_GROUP_INPUT) {
+        continue;
+      }
+
+      LISTBASE_FOREACH (bNodeSocket *, socket, &group_node->inputs) {
+        if (!socket->link || !is_socket_spectral(socket, group_node, ntree)) {
+          continue;
+        }
+
+        bNode *it_node = socket->link->fromnode;
+        bNodeSocket *it_sock = socket->link->fromsock;
+
+        bool found = true;
+        while (it_node->type == NODE_REROUTE) {
+          if (((bNodeSocket *)it_node->inputs.first)->link == nullptr) {
+            found = false;
+            continue;
+          }
+
+          it_sock = ((bNodeSocket *)it_node->inputs.first)->link->fromsock;
+          it_node = ((bNodeSocket *)it_node->inputs.first)->link->fromnode;
+        }
+
+        if (!found) {
+          continue;
+        }
+
+        if (it_node == node && it_sock == sock) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  if (node->typeinfo->nclass == NODE_CLASS_GROUP) {
+    bNodeTree *group = (bNodeTree *)node->id;
+
+    /* Check whenether the socket is an input or an output of the group node. */
+    bool is_input_socket = false;
+    int index = -1;
+
+    int i;
+    LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, &node->inputs, i) {
+      if (socket == sock) {
+        is_input_socket = true;
+        index = i;
+        break;
+      }
+    }
+    LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, &node->outputs, i) {
+      if (socket == sock) {
+        assert(!is_input_socket);
+        index = i;
+        break;
+      }
+    }
+    assert(index != -1);
+
+    /* Find the required I/O node inside the group node tree. */
+    int node_type = is_input_socket ? NODE_GROUP_INPUT : NODE_GROUP_OUTPUT;
+    bNode *io_node = nullptr;
+    LISTBASE_FOREACH (bNode *, group_node, &group->nodes) {
+      if (group_node->type == node_type) {
+        io_node = group_node;
+        break;
+      }
+    }
+    assert(io_node);
+
+    /* Find the corresponding socket inside the node group. */
+    bNodeSocket *inside_socket = nullptr;
+    LISTBASE_FOREACH_INDEX (
+        bNodeSocket *, socket, &(is_input_socket ? io_node->outputs : io_node->inputs), i) {
+      if (index == i) {
+        inside_socket = socket;
+        break;
+      }
+    }
+    assert(inside_socket);
+
+    return is_socket_spectral(inside_socket, io_node, group);
+  }
+
   if (node->typeinfo->nclass == NODE_CLASS_SHADER && sock->type == SOCK_RGBA) {
     return true;
   }
@@ -842,18 +971,8 @@ void node_socket_color_get(
 
   bNode *node = (bNode *)node_ptr->data;
 
-  /* Hack to show correct socket type of reroute node. */
-  while (node->typeinfo->type == NODE_REROUTE) {
-    if (((bNodeSocket *)node->inputs.first)->link == NULL) {
-      break;
-    }
-
-    sock = ((bNodeSocket *)node->inputs.first)->link->fromsock;
-    node = ((bNodeSocket *)node->inputs.first)->link->fromnode;
-  }
-
   /* Hack to use different color for spectral sockets without adding them to Blender. */
-  if (is_socket_spectral(sock, node)) {
+  if (is_socket_spectral(sock, node, ntree)) {
     r_color[0] = 0.78f;
     r_color[1] = 0.16f;
     r_color[2] = 0.16f;
@@ -901,8 +1020,8 @@ static void node_socket_draw_nested(const bContext *C,
 
 /**
  * Draw a single node socket at default size.
- * \note this is only called from external code, internally #node_socket_draw_nested() is used for
- *       optimized drawing of multiple/all sockets of a node.
+ * \note this is only called from external code, internally #node_socket_draw_nested() is used
+ * for optimized drawing of multiple/all sockets of a node.
  */
 void ED_node_socket_draw(bNodeSocket *sock, const rcti *rect, const float color[4], float scale)
 {
