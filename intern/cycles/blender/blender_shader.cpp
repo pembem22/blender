@@ -190,7 +190,7 @@ static bool is_spectral_socket(BL::NodeSocket b_socket)
            b_node.is_a(&RNA_ShaderNodeTexSkySpectral) ||
            b_node.is_a(&RNA_ShaderNodeBlackbodySpectral) ||
            b_node.is_a(&RNA_ShaderNodeGaussianSpectrum) ||
-           b_node.is_a(&RNA_ShaderNodeMapRangeSpectrum)));
+           b_node.is_a(&RNA_ShaderNodeMapRangeSpectrum) || b_node.is_a(&RNA_ShaderNodeLightPath)));
 }
 
 static SocketType::Type convert_socket_type(BL::NodeSocket &b_socket)
