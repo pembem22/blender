@@ -145,6 +145,11 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
      "Properties",
      "Edit properties of active object and related data-blocks"},
     {SPACE_FILE, "FILE_BROWSER", ICON_FILEBROWSER, "File Browser", "Browse for files and assets"},
+    {SPACE_SPREADSHEET,
+     "SPREADSHEET",
+     ICON_SPREADSHEET,
+     "Spreadsheet",
+     "Explore geometry data in a table"},
     {SPACE_USERPREF,
      "PREFERENCES",
      ICON_PREFERENCES,
@@ -571,6 +576,8 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
       return &RNA_SpacePreferences;
     case SPACE_CLIP:
       return &RNA_SpaceClipEditor;
+    case SPACE_SPREADSHEET:
+      return &RNA_SpaceSpreadsheet;
 
       /* Currently no type info. */
     case SPACE_SCRIPT:
@@ -2974,6 +2981,14 @@ static void rna_SpaceFileBrowser_browse_mode_update(Main *UNUSED(bmain),
 {
   ScrArea *area = rna_area_from_space(ptr);
   ED_area_tag_refresh(area);
+}
+
+static void rna_SpaceSpreadsheet_pinned_id_set(PointerRNA *ptr,
+                                               PointerRNA value,
+                                               struct ReportList *UNUSED(reports))
+{
+  SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)ptr->data;
+  sspreadsheet->pinned_id = value.data;
 }
 
 #else
@@ -5674,6 +5689,11 @@ static void rna_def_space_graph(BlenderRNA *brna)
       "If any exists, show markers in a separate row at the bottom of the editor");
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_GRAPH, NULL);
 
+  prop = RNA_def_property(srna, "show_extrapolation", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SIPO_NO_DRAW_EXTRAPOLATION);
+  RNA_def_property_ui_text(prop, "Show Extrapolation", "");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_GRAPH, NULL);
+
   /* editing */
   prop = RNA_def_property(srna, "use_auto_merge_keyframes", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SIPO_NOTRANSKEYCULL);
@@ -6569,6 +6589,8 @@ static void rna_def_space_filebrowser(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
   RNA_def_property_update(
       prop, NC_SPACE | ND_SPACE_FILE_PARAMS, "rna_FileBrowser_FSMenu_active_update");
+
+  RNA_api_space_filebrowser(srna);
 }
 
 static void rna_def_space_info(BlenderRNA *brna)
@@ -7169,6 +7191,27 @@ static void rna_def_space_clip(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_CLIP, NULL);
 }
 
+static void rna_def_space_spreadsheet(BlenderRNA *brna)
+{
+  PropertyRNA *prop;
+  StructRNA *srna;
+
+  srna = RNA_def_struct(brna, "SpaceSpreadsheet", "Space");
+  RNA_def_struct_ui_text(srna, "Space Spreadsheet", "Spreadsheet space data");
+
+  prop = RNA_def_property(srna, "pinned_id", PROP_POINTER, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_EDITABLE);
+  RNA_def_property_pointer_funcs(prop, NULL, "rna_SpaceSpreadsheet_pinned_id_set", NULL, NULL);
+  RNA_def_property_ui_text(prop, "Pinned ID", "Data-block whose values are displayed");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
+
+  prop = RNA_def_property(srna, "show_only_selected", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "filter_flag", SPREADSHEET_FILTER_SELECTED_ONLY);
+  RNA_def_property_ui_text(
+      prop, "Show Only Selected", "Only include rows that correspond to selected elements");
+  RNA_def_property_update(prop, NC_SPACE | ND_SPACE_SPREADSHEET, NULL);
+}
+
 void RNA_def_space(BlenderRNA *brna)
 {
   rna_def_space(brna);
@@ -7194,6 +7237,7 @@ void RNA_def_space(BlenderRNA *brna)
   rna_def_node_tree_path(brna);
   rna_def_space_node(brna);
   rna_def_space_clip(brna);
+  rna_def_space_spreadsheet(brna);
 }
 
 #endif
