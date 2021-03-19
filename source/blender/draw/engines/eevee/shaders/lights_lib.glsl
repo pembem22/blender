@@ -268,8 +268,7 @@ float light_shadowing(LightData ld, vec3 P, float vis)
 }
 
 #ifndef VOLUMETRICS
-float light_contact_shadows(
-    LightData ld, vec3 P, vec3 vP, float tracing_depth, vec3 vNg, float rand_x, float vis)
+float light_contact_shadows(LightData ld, vec3 P, vec3 vP, vec3 vNg, float rand_x, float vis)
 {
   if (ld.l_shadowid >= 0.0 && vis > 0.001) {
     ShadowData sd = shadows_data[int(ld.l_shadowid)];
@@ -298,7 +297,7 @@ float light_contact_shadows(
 
       vec3 hit_position_unused;
 
-      if (raytrace(ray, params, false, hit_position_unused)) {
+      if (raytrace(ray, params, false, false, hit_position_unused)) {
         return 0.0;
       }
     }
