@@ -666,6 +666,10 @@ ccl_device_noinline
       /* If we hit the surface, we are done. */
       break;
     }
+    else if (reduce_max_f(throughput) < VOLUME_THROUGHPUT_EPSILON) {
+      /* Avoid unnecessary work and precision issue when throughput gets really small. */
+      break;
+    }
   }
 
   kernel_assert(isfinite_safe(throughput));

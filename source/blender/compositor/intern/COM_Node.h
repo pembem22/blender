@@ -29,7 +29,8 @@
 #include "COM_CompositorContext.h"
 #include "COM_NodeConverter.h"
 
-class Node;
+namespace blender::compositor {
+
 class NodeOperation;
 class NodeConverter;
 
@@ -281,9 +282,9 @@ class NodeInput {
     return m_link;
   }
 
-  float getEditorValueFloat();
-  void getEditorValueColor(float *value);
-  void getEditorValueVector(float *value);
+  float getEditorValueFloat() const;
+  void getEditorValueColor(float *value) const;
+  void getEditorValueVector(float *value) const;
 };
 
 /**
@@ -317,3 +318,5 @@ class NodeOutput {
   void getEditorValueColor(float *value);
   void getEditorValueVector(float *value);
 };
+
+}  // namespace blender::compositor

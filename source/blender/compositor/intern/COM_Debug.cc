@@ -18,6 +18,8 @@
 
 #include "COM_Debug.h"
 
+namespace blender::compositor {
+
 #ifdef COM_DEBUG
 
 #  include <map>
@@ -133,13 +135,13 @@ int DebugInfo::graphviz_operation(const ExecutionSystem *system,
   else if (operation->isOutputOperation(system->getContext().isRendering())) {
     fillcolor = "dodgerblue1";
   }
-  else if (operation->isSetOperation()) {
+  else if (operation->get_flags().is_set_operation()) {
     fillcolor = "khaki1";
   }
-  else if (operation->isReadBufferOperation()) {
+  else if (operation->get_flags().is_read_buffer_operation) {
     fillcolor = "darkolivegreen3";
   }
-  else if (operation->isWriteBufferOperation()) {
+  else if (operation->get_flags().is_write_buffer_operation) {
     fillcolor = "darkorange";
   }
 
@@ -165,13 +167,13 @@ int DebugInfo::graphviz_operation(const ExecutionSystem *system,
       }
       len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "<IN_%p>", socket);
       switch (socket->getDataType()) {
-        case COM_DT_VALUE:
+        case DataType::Value:
           len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "Value");
           break;
-        case COM_DT_VECTOR:
+        case DataType::Vector:
           len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "Vector");
           break;
-        case COM_DT_COLOR:
+        case DataType::Color:
           len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "Color");
           break;
       }
@@ -203,13 +205,13 @@ int DebugInfo::graphviz_operation(const ExecutionSystem *system,
       }
       len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "<OUT_%p>", socket);
       switch (socket->getDataType()) {
-        case COM_DT_VALUE:
+        case DataType::Value:
           len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "Value");
           break;
-        case COM_DT_VECTOR:
+        case DataType::Vector:
           len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "Vector");
           break;
-        case COM_DT_COLOR:
+        case DataType::Color:
           len += snprintf(str + len, maxlen > len ? maxlen - len : 0, "Color");
           break;
       }
@@ -360,7 +362,7 @@ bool DebugInfo::graphviz_system(const ExecutionSystem *system, char *str, int ma
   }
 
   for (NodeOperation *operation : system->m_operations) {
-    if (operation->isReadBufferOperation()) {
+    if (operation->get_flags().is_read_buffer_operation) {
       ReadBufferOperation *read = (ReadBufferOperation *)operation;
       WriteBufferOperation *write = read->getMemoryProxy()->getWriteBufferOperation();
       std::vector<std::string> &read_groups = op_groups[read];
@@ -390,13 +392,13 @@ bool DebugInfo::graphviz_system(const ExecutionSystem *system, char *str, int ma
 
       std::string color;
       switch (from->getDataType()) {
-        case COM_DT_VALUE:
+        case DataType::Value:
           color = "gray";
           break;
-        case COM_DT_VECTOR:
+        case DataType::Vector:
           color = "blue";
           break;
-        case COM_DT_COLOR:
+        case DataType::Color:
           color = "orange";
           break;
       }
@@ -495,3 +497,5 @@ void DebugInfo::graphviz(const ExecutionSystem * /*system*/)
 }
 
 #endif
+
+}  // namespace blender::compositor

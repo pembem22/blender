@@ -31,6 +31,8 @@
 #include <iterator>
 #include <string>
 
+namespace blender::compositor {
+
 /** \name Cryptomatte base
  * \{ */
 
@@ -125,7 +127,7 @@ void CryptomatteNode::input_operations_from_render_source(
         const std::string combined_name = combined_layer_pass_name(render_layer, render_pass);
         if (blender::StringRef(combined_name).startswith(prefix)) {
           RenderLayersProg *op = new RenderLayersProg(
-              render_pass->name, COM_DT_COLOR, render_pass->channels);
+              render_pass->name, DataType::Color, render_pass->channels);
           op->setScene(scene);
           op->setLayerId(cryptomatte_layer_id);
           op->setRenderData(context.getRenderData());
@@ -261,3 +263,5 @@ CryptomatteOperation *CryptomatteLegacyNode::create_cryptomatte_operation(
 }
 
 /* \} */
+
+}  // namespace blender::compositor
