@@ -29,8 +29,8 @@
 
 static bNodeSocketTemplate geo_node_mesh_primitive_grid_in[] = {
     {SOCK_FLOAT, N_("Size"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_INT, N_("Vertices X"), 10, 0.0f, 0.0f, 0.0f, 2, 1000},
-    {SOCK_INT, N_("Vertices Y"), 10, 0.0f, 0.0f, 0.0f, 2, 1000},
+    {SOCK_INT, N_("Vertices X"), 3, 0.0f, 0.0f, 0.0f, 2, 1000},
+    {SOCK_INT, N_("Vertices Y"), 3, 0.0f, 0.0f, 0.0f, 2, 1000},
     {-1, ""},
 };
 
@@ -104,6 +104,7 @@ static Mesh *create_grid_mesh(const int verts_x, const int verts_y, const float 
       MEdge &edge = edges[edge_index++];
       edge.v1 = vert_index;
       edge.v2 = vert_index + 1;
+      edge.flag = ME_EDGEDRAW | ME_EDGERENDER;
     }
   }
 
@@ -115,6 +116,7 @@ static Mesh *create_grid_mesh(const int verts_x, const int verts_y, const float 
       MEdge &edge = edges[edge_index++];
       edge.v1 = vert_index;
       edge.v2 = vert_index + verts_y;
+      edge.flag = ME_EDGEDRAW | ME_EDGERENDER;
     }
   }
 
