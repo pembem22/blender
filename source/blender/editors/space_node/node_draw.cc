@@ -903,12 +903,12 @@ static bool is_socket_spectral(bNodeSocket *sock, bNode *node, bNodeTree *ntree)
     }
     LISTBASE_FOREACH_INDEX (bNodeSocket *, socket, &node->outputs, i) {
       if (socket == sock) {
-        assert(!is_input_socket);
+        BLI_assert(!is_input_socket);
         index = i;
         break;
       }
     }
-    assert(index != -1);
+    BLI_assert(index != -1);
 
     /* Find the required I/O node inside the group node tree. */
     int node_type = is_input_socket ? NODE_GROUP_INPUT : NODE_GROUP_OUTPUT;
@@ -919,7 +919,7 @@ static bool is_socket_spectral(bNodeSocket *sock, bNode *node, bNodeTree *ntree)
         break;
       }
     }
-    assert(io_node);
+    BLI_assert(io_node);
 
     /* Find the corresponding socket inside the node group. */
     bNodeSocket *inside_socket = nullptr;
@@ -930,7 +930,7 @@ static bool is_socket_spectral(bNodeSocket *sock, bNode *node, bNodeTree *ntree)
         break;
       }
     }
-    assert(inside_socket);
+    BLI_assert(inside_socket);
 
     return is_socket_spectral(inside_socket, io_node, group);
   }
