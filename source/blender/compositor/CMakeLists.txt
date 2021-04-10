@@ -59,6 +59,7 @@ set(SRC
   intern/COM_CompositorContext.h
   intern/COM_Converter.cc
   intern/COM_Converter.h
+  intern/COM_Enums.cc
   intern/COM_Debug.cc
   intern/COM_Debug.h
   intern/COM_Device.cc
@@ -606,5 +607,9 @@ if(WITH_OPENIMAGEDENOISE)
 endif()
 
 blender_add_lib(bf_compositor "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
+  target_compile_options(bf_compositor PRIVATE "-Wsuggest-override")
+endif()
 
 add_dependencies(bf_compositor smaa_areatex_header)

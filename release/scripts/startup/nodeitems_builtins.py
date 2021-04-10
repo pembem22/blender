@@ -513,6 +513,7 @@ geometry_node_categories = [
         NodeItem("ShaderNodeCombineRGB"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
+        NodeItem("GeometryNodeBoundBox"),
         NodeItem("GeometryNodeTransform"),
         NodeItem("GeometryNodeJoinGeometry"),
     ]),

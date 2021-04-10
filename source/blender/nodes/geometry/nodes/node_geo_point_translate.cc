@@ -14,12 +14,10 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#include "node_geometry_util.hh"
-
-#include "BKE_colorband.h"
-
 #include "UI_interface.h"
 #include "UI_resources.h"
+
+#include "node_geometry_util.hh"
 
 static bNodeSocketTemplate geo_node_point_translate_in[] = {
     {SOCK_GEOMETRY, N_("Geometry")},
@@ -85,7 +83,7 @@ static void geo_node_point_translate_init(bNodeTree *UNUSED(tree), bNode *node)
   NodeGeometryPointTranslate *data = (NodeGeometryPointTranslate *)MEM_callocN(
       sizeof(NodeGeometryPointTranslate), __func__);
 
-  data->input_type = GEO_NODE_ATTRIBUTE_INPUT_ATTRIBUTE;
+  data->input_type = GEO_NODE_ATTRIBUTE_INPUT_VECTOR;
   node->storage = data;
 }
 

@@ -39,10 +39,6 @@ namespace blender::compositor {
  **** NodeGraph ****
  *******************/
 
-NodeGraph::NodeGraph()
-{
-}
-
 NodeGraph::~NodeGraph()
 {
   while (m_nodes.size()) {
@@ -156,7 +152,7 @@ void NodeGraph::add_bNode(const CompositorContext &context,
 
 NodeOutput *NodeGraph::find_output(const NodeRange &node_range, bNodeSocket *b_socket)
 {
-  for (blender::Vector<Node *>::iterator it = node_range.first; it != node_range.second; ++it) {
+  for (Vector<Node *>::iterator it = node_range.first; it != node_range.second; ++it) {
     Node *node = *it;
     for (NodeOutput *output : node->getOutputSockets()) {
       if (output->getbNodeSocket() == b_socket) {
@@ -187,7 +183,7 @@ void NodeGraph::add_bNodeLink(const NodeRange &node_range, bNodeLink *b_nodelink
     return;
   }
 
-  for (blender::Vector<Node *>::iterator it = node_range.first; it != node_range.second; ++it) {
+  for (Vector<Node *>::iterator it = node_range.first; it != node_range.second; ++it) {
     Node *node = *it;
     for (NodeInput *input : node->getInputSockets()) {
       if (input->getbNodeSocket() == b_nodelink->tosock && !input->isLinked()) {

@@ -68,14 +68,14 @@ class NodeOperationBuilder {
   const CompositorContext *m_context;
   NodeGraph m_graph;
 
-  blender::Vector<NodeOperation *> m_operations;
-  blender::Vector<Link> m_links;
-  blender::Vector<ExecutionGroup *> m_groups;
+  Vector<NodeOperation *> m_operations;
+  Vector<Link> m_links;
+  Vector<ExecutionGroup *> m_groups;
 
   /** Maps operation inputs to node inputs */
-  blender::Map<NodeOperationInput *, NodeInput *> m_input_map;
+  Map<NodeOperationInput *, NodeInput *> m_input_map;
   /** Maps node outputs to operation outputs */
-  blender::Map<NodeOutput *, NodeOperationOutput *> m_output_map;
+  Map<NodeOutput *, NodeOperationOutput *> m_output_map;
 
   Node *m_current_node;
 
@@ -87,7 +87,6 @@ class NodeOperationBuilder {
 
  public:
   NodeOperationBuilder(const CompositorContext *context, bNodeTree *b_nodetree);
-  ~NodeOperationBuilder();
 
   const CompositorContext &context() const
   {
@@ -119,6 +118,16 @@ class NodeOperationBuilder {
     return m_active_viewer;
   }
 
+  const Vector<NodeOperation *> &get_operations() const
+  {
+    return m_operations;
+  }
+
+  const Vector<Link> &get_links() const
+  {
+    return m_links;
+  }
+
  protected:
   /** Add datatype conversion where needed */
   void add_datatype_conversions();
@@ -134,7 +143,7 @@ class NodeOperationBuilder {
   void determineResolutions();
 
   /** Helper function to store connected inputs for replacement */
-  blender::Vector<NodeOperationInput *> cache_output_links(NodeOperationOutput *output) const;
+  Vector<NodeOperationInput *> cache_output_links(NodeOperationOutput *output) const;
   /** Find a connected write buffer operation to an OpOutput */
   WriteBufferOperation *find_attached_write_buffer_operation(NodeOperationOutput *output) const;
   /** Add read/write buffer operations around complex operations */
@@ -159,5 +168,8 @@ class NodeOperationBuilder {
   MEM_CXX_CLASS_ALLOC_FUNCS("COM:NodeCompilerImpl")
 #endif
 };
+
+std::ostream &operator<<(std::ostream &os, const NodeOperationBuilder &builder);
+std::ostream &operator<<(std::ostream &os, const NodeOperationBuilder::Link &link);
 
 }  // namespace blender::compositor
