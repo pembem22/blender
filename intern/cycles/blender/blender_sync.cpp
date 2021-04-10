@@ -766,7 +766,7 @@ SceneParams BlenderSync::get_scene_params(BL::Scene &b_scene, bool background)
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
   const bool shadingsystem = RNA_boolean_get(&cscene, "shading_system");
 
-  if (shadingsystem == 1 && !r.use_spectral_rendering()) {
+  if (shadingsystem == 1 && !b_scene.render().use_spectral_rendering()) {
     params.shadingsystem = SHADINGSYSTEM_OSL;
   }
   else {
