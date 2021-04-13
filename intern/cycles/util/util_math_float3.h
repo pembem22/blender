@@ -65,9 +65,9 @@ ccl_device_inline float3 sqrt(const float3 &a);
 ccl_device_inline float3 floor(const float3 &a);
 ccl_device_inline float3 ceil(const float3 &a);
 
-ccl_device_inline float8 sin(const float8 &a);
-ccl_device_inline float8 cos(const float8 &a);
-ccl_device_inline float8 tan(const float8 &a);
+ccl_device_inline float3 sin(const float3 &a);
+ccl_device_inline float3 cos(const float3 &a);
+ccl_device_inline float3 tan(const float3 &a);
 #endif /* !__KERNEL_OPENCL__ */
 
 ccl_device_inline float len(const float3 a);
