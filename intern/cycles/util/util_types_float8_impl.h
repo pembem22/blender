@@ -131,20 +131,6 @@ ccl_device_inline void store_float8(const float8 &a, float *v)
   v[7] = a.h;
 }
 
-ccl_device_inline float3 float8_to_float3(const float8 &f)
-{
-  return make_float3(f[0], f[1], f[2]);
-}
-
-ccl_device_inline float8 float3_to_float8(const float3 &f)
-{
-  float8 res;
-  res[0] = f.x;
-  res[1] = f.y;
-  res[2] = f.z;
-  return res;
-}
-
 CCL_NAMESPACE_END
 
 #endif /* __UTIL_TYPES_FLOAT8_IMPL_H__ */
