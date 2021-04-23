@@ -570,7 +570,7 @@ class USERPREF_PT_system_sound(SystemPanel, CenterAlignMixIn, Panel):
         layout.prop(system, "audio_device", expand=False)
 
         sub = layout.grid_flow(row_major=False, columns=0, even_columns=False, even_rows=False, align=False)
-        sub.active = system.audio_device not in {'NONE', 'Null'}
+        sub.active = system.audio_device not in {'NONE', 'None'}
         sub.prop(system, "audio_channels", text="Channels")
         sub.prop(system, "audio_mixing_buffer", text="Mixing Buffer")
         sub.prop(system, "audio_sample_rate", text="Sample Rate")
@@ -2241,7 +2241,6 @@ class USERPREF_PT_experimental_new_features(ExperimentalPanel, Panel):
         self._draw_items(
             context, (
                 ({"property": "use_sculpt_vertex_colors"}, "T71947"),
-                ({"property": "use_switch_object_operator"}, "T80402"),
                 ({"property": "use_sculpt_tools_tilt"}, "T82877"),
                 ({"property": "use_asset_browser"}, ("project/profile/124/", "Milestone 1")),
                 ({"property": "use_override_templates"}, ("T73318", "Milestone 4")),
