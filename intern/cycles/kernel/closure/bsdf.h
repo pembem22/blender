@@ -111,12 +111,12 @@ ccl_device_inline float shift_cos_in(float cos_in, const float frequency_multipl
   return val;
 }
 
-ccl_device_inline int bsdf_sample(const KernelGlobals *kg,
+ccl_device_inline int bsdf_sample(INTEGRATOR_STATE_CONST_ARGS,
                                   ShaderData *sd,
                                   const ShaderClosure *sc,
                                   float randu,
                                   float randv,
-                                  float3 *eval,
+                                  SpectralColor *eval,
                                   float3 *omega_in,
                                   differential3 *domega_in,
                                   float *pdf)
@@ -396,8 +396,16 @@ ccl_device_inline int bsdf_sample(const KernelGlobals *kg,
                                             pdf);
       break;
     case CLOSURE_BSDF_HAIR_PRINCIPLED_ID:
-      label = bsdf_principled_hair_sample(
-          kg, sc, sd, randu, randv, eval, omega_in, &domega_in->dx, &domega_in->dy, pdf);
+      label = bsdf_principled_hair_sample(INTEGRATOR_STATE_PASS,
+                                          sc,
+                                          sd,
+                                          randu,
+                                          randv,
+                                          eval,
+                                          omega_in,
+                                          &domega_in->dx,
+                                          &domega_in->dy,
+                                          pdf);
       break;
 #  ifdef __PRINCIPLED__
     case CLOSURE_BSDF_PRINCIPLED_DIFFUSE_ID:
@@ -469,7 +477,7 @@ ccl_device_inline int bsdf_sample(const KernelGlobals *kg,
       *eval *= shift_cos_in(dot(*omega_in, sc->N), frequency_multiplier);
     }
     if (label & LABEL_DIFFUSE) {
-      if (!isequal_float3(sc->N, sd->N)) {
+      if (!is_equal(sc->N, sd->N)) {
         *eval *= bump_shadowing_term((label & LABEL_TRANSMIT) ? -sd->N : sd->N, sc->N, *omega_in);
       }
     }
@@ -483,15 +491,15 @@ ccl_device
 #else
 ccl_device_inline
 #endif
-    float3
-    bsdf_eval(const KernelGlobals *kg,
+    SpectralColor
+    bsdf_eval(INTEGRATOR_STATE_CONST_ARGS,
               ShaderData *sd,
               const ShaderClosure *sc,
               const float3 omega_in,
               const bool is_transmission,
               float *pdf)
 {
-  float3 eval = zero_float3();
+  SpectralColor eval = zero_spectral_color();
 
   if (!is_transmission) {
     switch (sc->type) {
@@ -555,7 +563,7 @@ ccl_device_inline
         eval = bsdf_glossy_toon_eval_reflect(sc, sd->I, omega_in, pdf);
         break;
       case CLOSURE_BSDF_HAIR_PRINCIPLED_ID:
-        eval = bsdf_principled_hair_eval(kg, sd, sc, omega_in, pdf);
+        eval = bsdf_principled_hair_eval(INTEGRATOR_STATE_PASS, sd, sc, omega_in, pdf);
         break;
       case CLOSURE_BSDF_HAIR_REFLECTION_ID:
         eval = bsdf_hair_reflection_eval_reflect(sc, sd->I, omega_in, pdf);
@@ -582,7 +590,7 @@ ccl_device_inline
         break;
     }
     if (CLOSURE_IS_BSDF_DIFFUSE(sc->type)) {
-      if (!isequal_float3(sc->N, sd->N)) {
+      if (!is_equal(sc->N, sd->N)) {
         eval *= bump_shadowing_term(sd->N, sc->N, omega_in);
       }
     }
@@ -647,7 +655,7 @@ ccl_device_inline
         eval = bsdf_glossy_toon_eval_transmit(sc, sd->I, omega_in, pdf);
         break;
       case CLOSURE_BSDF_HAIR_PRINCIPLED_ID:
-        eval = bsdf_principled_hair_eval(kg, sd, sc, omega_in, pdf);
+        eval = bsdf_principled_hair_eval(INTEGRATOR_STATE_PASS, sd, sc, omega_in, pdf);
         break;
       case CLOSURE_BSDF_HAIR_REFLECTION_ID:
         eval = bsdf_hair_reflection_eval_transmit(sc, sd->I, omega_in, pdf);
@@ -674,7 +682,7 @@ ccl_device_inline
         break;
     }
     if (CLOSURE_IS_BSDF_DIFFUSE(sc->type)) {
-      if (!isequal_float3(sc->N, sd->N)) {
+      if (!is_equal(sc->N, sd->N)) {
         eval *= bump_shadowing_term(-sd->N, sc->N, omega_in);
       }
     }

@@ -50,8 +50,8 @@ ccl_device_inline void kernel_write_denoising_features(
   }
 
   float3 normal = zero_float3();
-  float3 diffuse_albedo = zero_float3();
-  float3 specular_albedo = zero_float3();
+  SpectralColor diffuse_albedo = zero_spectral_color();
+  SpectralColor specular_albedo = zero_spectral_color();
   float sum_weight = 0.0f, sum_nonspecular_weight = 0.0f;
 
   for (int i = 0; i < sd->num_closure; i++) {
@@ -65,7 +65,7 @@ ccl_device_inline void kernel_write_denoising_features(
     normal += sc->N * sc->sample_weight;
     sum_weight += sc->sample_weight;
 
-    float3 closure_albedo = sc->weight;
+    SpectralColor closure_albedo = sc->weight;
     /* Closures that include a Fresnel term typically have weights close to 1 even though their
      * actual contribution is significantly lower.
      * To account for this, we scale their weight by the average fresnel factor (the same is also
@@ -102,18 +102,19 @@ ccl_device_inline void kernel_write_denoising_features(
       const Transform worldtocamera = kernel_data.cam.worldtocamera;
       normal = transform_direction(&worldtocamera, normal);
 
-      const float3 denoising_normal = ensure_finite3(normal);
+      const float3 denoising_normal = ensure_finite(normal);
       kernel_write_pass_float3_unaligned(buffer + kernel_data.film.pass_denoising_normal,
                                          denoising_normal);
     }
 
     if (kernel_data.film.pass_denoising_albedo != PASS_UNUSED) {
-      const float3 denoising_feature_throughput = INTEGRATOR_STATE(path,
-                                                                   denoising_feature_throughput);
-      const float3 denoising_albedo = ensure_finite3(denoising_feature_throughput *
-                                                     diffuse_albedo);
-      kernel_write_pass_float3_unaligned(buffer + kernel_data.film.pass_denoising_albedo,
-                                         denoising_albedo);
+      const SpectralColor denoising_feature_throughput = INTEGRATOR_STATE(
+          path, denoising_feature_throughput);
+      const SpectralColor denoising_albedo = ensure_finite(denoising_feature_throughput *
+                                                           diffuse_albedo);
+      kernel_write_pass_spectral_color_unaligned(INTEGRATOR_STATE_PASS,
+                                                 buffer + kernel_data.film.pass_denoising_albedo,
+                                                 denoising_albedo);
     }
 
     INTEGRATOR_STATE_WRITE(path, flag) &= ~PATH_RAY_DENOISING_FEATURES;
@@ -230,7 +231,7 @@ ccl_device_inline void kernel_write_data_passes(INTEGRATOR_STATE_ARGS,
   }
 
   if (kernel_data.film.cryptomatte_passes) {
-    const float3 throughput = INTEGRATOR_STATE(path, throughput);
+    const SpectralColor throughput = INTEGRATOR_STATE(path, throughput);
     const float matte_weight = average(throughput) *
                                (1.0f - average(shader_bsdf_transparency(kg, sd)));
     if (matte_weight > 0.0f) {
@@ -254,19 +255,22 @@ ccl_device_inline void kernel_write_data_passes(INTEGRATOR_STATE_ARGS,
   }
 
   if (flag & PASSMASK(DIFFUSE_COLOR)) {
-    const float3 throughput = INTEGRATOR_STATE(path, throughput);
-    kernel_write_pass_float3(buffer + kernel_data.film.pass_diffuse_color,
-                             shader_bsdf_diffuse(kg, sd) * throughput);
+    const SpectralColor throughput = INTEGRATOR_STATE(path, throughput);
+    kernel_write_pass_spectral_color(INTEGRATOR_STATE_PASS,
+                                     buffer + kernel_data.film.pass_diffuse_color,
+                                     shader_bsdf_diffuse(kg, sd) * throughput);
   }
   if (flag & PASSMASK(GLOSSY_COLOR)) {
-    const float3 throughput = INTEGRATOR_STATE(path, throughput);
-    kernel_write_pass_float3(buffer + kernel_data.film.pass_glossy_color,
-                             shader_bsdf_glossy(kg, sd) * throughput);
+    const SpectralColor throughput = INTEGRATOR_STATE(path, throughput);
+    kernel_write_pass_spectral_color(INTEGRATOR_STATE_PASS,
+                                     buffer + kernel_data.film.pass_glossy_color,
+                                     shader_bsdf_glossy(kg, sd) * throughput);
   }
   if (flag & PASSMASK(TRANSMISSION_COLOR)) {
-    const float3 throughput = INTEGRATOR_STATE(path, throughput);
-    kernel_write_pass_float3(buffer + kernel_data.film.pass_transmission_color,
-                             shader_bsdf_transmission(kg, sd) * throughput);
+    const SpectralColor throughput = INTEGRATOR_STATE(path, throughput);
+    kernel_write_pass_spectral_color(INTEGRATOR_STATE_PASS,
+                                     buffer + kernel_data.film.pass_transmission_color,
+                                     shader_bsdf_transmission(kg, sd) * throughput);
   }
   if (flag & PASSMASK(MIST)) {
     /* Bring depth into 0..1 range. */
@@ -289,8 +293,8 @@ ccl_device_inline void kernel_write_data_passes(INTEGRATOR_STATE_ARGS,
       mist = powf(mist, mist_falloff);
 
     /* Modulate by transparency */
-    const float3 throughput = INTEGRATOR_STATE(path, throughput);
-    const float3 alpha = shader_bsdf_alpha(kg, sd);
+    const SpectralColor throughput = INTEGRATOR_STATE(path, throughput);
+    const SpectralColor alpha = shader_bsdf_alpha(kg, sd);
     const float mist_output = (1.0f - mist) * average(throughput * alpha);
 
     /* Note that the final value in the render buffer we want is 1 - mist_output,

@@ -19,8 +19,8 @@
 CCL_NAMESPACE_BEGIN
 
 #ifdef __TRANSPARENT_SHADOWS__
-ccl_device_inline float3 integrate_transparent_shadow_shader_eval(INTEGRATOR_STATE_ARGS,
-                                                                  const int hit)
+ccl_device_inline SpectralColor integrate_transparent_shadow_shader_eval(INTEGRATOR_STATE_ARGS,
+                                                                         const int hit)
 {
   /* TODO: does aliasing like this break automatic SoA in CUDA?
    * Should we instead store closures separate from ShaderData?
@@ -54,8 +54,9 @@ ccl_device_inline bool integrate_transparent_shadow(INTEGRATOR_STATE_ARGS, const
   const int num_recorded_hits = min(num_hits, INTEGRATOR_SHADOW_ISECT_SIZE);
 
   for (int hit = 0; hit < num_recorded_hits; hit++) {
-    const float3 shadow = integrate_transparent_shadow_shader_eval(INTEGRATOR_STATE_PASS, hit);
-    const float3 throughput = INTEGRATOR_STATE(shadow_path, throughput) * shadow;
+    const SpectralColor shadow = integrate_transparent_shadow_shader_eval(INTEGRATOR_STATE_PASS,
+                                                                          hit);
+    const SpectralColor throughput = INTEGRATOR_STATE(shadow_path, throughput) * shadow;
     if (is_zero(throughput)) {
       return true;
     }

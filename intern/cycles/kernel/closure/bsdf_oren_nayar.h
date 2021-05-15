@@ -28,10 +28,10 @@ typedef ccl_addr_space struct OrenNayarBsdf {
 
 static_assert(sizeof(ShaderClosure) >= sizeof(OrenNayarBsdf), "OrenNayarBsdf is too large!");
 
-ccl_device float3 bsdf_oren_nayar_get_intensity(const ShaderClosure *sc,
-                                                float3 n,
-                                                float3 v,
-                                                float3 l)
+ccl_device SpectralColor bsdf_oren_nayar_get_intensity(const ShaderClosure *sc,
+                                                       float3 n,
+                                                       float3 v,
+                                                       float3 l)
 {
   const OrenNayarBsdf *bsdf = (const OrenNayarBsdf *)sc;
   float nl = max(dot(n, l), 0.0f);
@@ -41,7 +41,7 @@ ccl_device float3 bsdf_oren_nayar_get_intensity(const ShaderClosure *sc,
   if (t > 0.0f)
     t /= max(nl, nv) + FLT_MIN;
   float is = nl * (bsdf->a + bsdf->b * t);
-  return make_float3(is, is, is);
+  return make_spectral_color(is);
 }
 
 ccl_device int bsdf_oren_nayar_setup(OrenNayarBsdf *bsdf)
@@ -65,13 +65,13 @@ ccl_device bool bsdf_oren_nayar_merge(const ShaderClosure *a, const ShaderClosur
   const OrenNayarBsdf *bsdf_a = (const OrenNayarBsdf *)a;
   const OrenNayarBsdf *bsdf_b = (const OrenNayarBsdf *)b;
 
-  return (isequal_float3(bsdf_a->N, bsdf_b->N)) && (bsdf_a->roughness == bsdf_b->roughness);
+  return (is_equal(bsdf_a->N, bsdf_b->N)) && (bsdf_a->roughness == bsdf_b->roughness);
 }
 
-ccl_device float3 bsdf_oren_nayar_eval_reflect(const ShaderClosure *sc,
-                                               const float3 I,
-                                               const float3 omega_in,
-                                               float *pdf)
+ccl_device SpectralColor bsdf_oren_nayar_eval_reflect(const ShaderClosure *sc,
+                                                      const float3 I,
+                                                      const float3 omega_in,
+                                                      float *pdf)
 {
   const OrenNayarBsdf *bsdf = (const OrenNayarBsdf *)sc;
   if (dot(bsdf->N, omega_in) > 0.0f) {
@@ -80,16 +80,16 @@ ccl_device float3 bsdf_oren_nayar_eval_reflect(const ShaderClosure *sc,
   }
   else {
     *pdf = 0.0f;
-    return make_float3(0.0f, 0.0f, 0.0f);
+    return zero_spectral_color();
   }
 }
 
-ccl_device float3 bsdf_oren_nayar_eval_transmit(const ShaderClosure *sc,
-                                                const float3 I,
-                                                const float3 omega_in,
-                                                float *pdf)
+ccl_device SpectralColor bsdf_oren_nayar_eval_transmit(const ShaderClosure *sc,
+                                                       const float3 I,
+                                                       const float3 omega_in,
+                                                       float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_oren_nayar_sample(const ShaderClosure *sc,
@@ -99,7 +99,7 @@ ccl_device int bsdf_oren_nayar_sample(const ShaderClosure *sc,
                                       float3 dIdy,
                                       float randu,
                                       float randv,
-                                      float3 *eval,
+                                      SpectralColor *eval,
                                       float3 *omega_in,
                                       float3 *domega_in_dx,
                                       float3 *domega_in_dy,
@@ -119,7 +119,7 @@ ccl_device int bsdf_oren_nayar_sample(const ShaderClosure *sc,
   }
   else {
     *pdf = 0.0f;
-    *eval = make_float3(0.0f, 0.0f, 0.0f);
+    *eval = zero_spectral_color();
   }
 
   return LABEL_REFLECT | LABEL_DIFFUSE;

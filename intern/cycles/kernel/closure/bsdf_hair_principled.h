@@ -33,7 +33,7 @@ typedef ccl_addr_space struct PrincipledHairBSDF {
   SHADER_CLOSURE_BASE;
 
   /* Absorption coefficient. */
-  float3 sigma;
+  SpectralColor sigma;
   /* Variance of the underlying logistic distribution. */
   float v;
   /* Scale factor of the underlying logistic distribution. */
@@ -180,9 +180,13 @@ ccl_device_inline float longitudinal_scattering(
 }
 
 /* Combine the three values using their luminances. */
-ccl_device_inline float4 combine_with_energy(const KernelGlobals *kg, float3 c)
+ccl_device_inline void combine_with_energy(INTEGRATOR_STATE_CONST_ARGS,
+                                           SpectralColor c,
+                                           SpectralColor &Ap,
+                                           float &Ap_energy)
 {
-  return make_float4(c.x, c.y, c.z, linear_rgb_to_gray(kg, c));
+  Ap = c;
+  Ap_energy = spectrum_to_gray(INTEGRATOR_STATE_PASS, c);
 }
 
 #ifdef __HAIR__
@@ -217,8 +221,8 @@ ccl_device int bsdf_principled_hair_setup(ShaderData *sd, PrincipledHairBSDF *bs
                 dot(cross(sd->Ng, X), Z);
 
   kernel_assert(fabsf(h) < 1.0f + 1e-4f);
-  kernel_assert(isfinite3_safe(Y));
-  kernel_assert(isfinite_safe(h));
+  kernel_assert(is_finite(Y));
+  kernel_assert(is_finite(h));
 
   bsdf->extra->geom = make_float4(Y.x, Y.y, Y.z, h);
 
@@ -228,31 +232,32 @@ ccl_device int bsdf_principled_hair_setup(ShaderData *sd, PrincipledHairBSDF *bs
 #endif /* __HAIR__ */
 
 /* Given the Fresnel term and transmittance, generate the attenuation terms for each bounce. */
-ccl_device_inline void hair_attenuation(const KernelGlobals *kg, float f, float3 T, float4 *Ap)
+ccl_device_inline void hair_attenuation(
+    INTEGRATOR_STATE_CONST_ARGS, float f, SpectralColor T, SpectralColor *Ap, float *Ap_energy)
 {
   /* Primary specular (R). */
   Ap[0] = make_float4(f, f, f, f);
 
   /* Transmission (TT). */
-  float3 col = sqr(1.0f - f) * T;
-  Ap[1] = combine_with_energy(kg, col);
+  SpectralColor col = sqr(1.0f - f) * T;
+  combine_with_energy(INTEGRATOR_STATE_PASS, col, Ap[1], Ap_energy[1]);
 
   /* Secondary specular (TRT). */
   col *= T * f;
-  Ap[2] = combine_with_energy(kg, col);
+  combine_with_energy(INTEGRATOR_STATE_PASS, col, Ap[2], Ap_energy[2]);
 
   /* Residual component (TRRT+). */
-  col *= safe_divide_color(T * f, make_float3(1.0f, 1.0f, 1.0f) - T * f);
-  Ap[3] = combine_with_energy(kg, col);
+  col *= safe_divide(T * f, one_spectral_color() - T * f);
+  combine_with_energy(INTEGRATOR_STATE_PASS, col, Ap[3], Ap_energy[3]);
 
   /* Normalize sampling weights. */
-  float totweight = Ap[0].w + Ap[1].w + Ap[2].w + Ap[3].w;
+  float totweight = Ap_energy[0] + Ap_energy[1] + Ap_energy[2] + Ap_energy[3];
   float fac = safe_divide(1.0f, totweight);
 
-  Ap[0].w *= fac;
-  Ap[1].w *= fac;
-  Ap[2].w *= fac;
-  Ap[3].w *= fac;
+  Ap_energy[0] *= fac;
+  Ap_energy[1] *= fac;
+  Ap_energy[2] *= fac;
+  Ap_energy[3] *= fac;
 }
 
 /* Given the tilt angle, generate the rotated theta_i for the different bounces. */
@@ -277,13 +282,13 @@ ccl_device_inline void hair_alpha_angles(float sin_theta_i,
 }
 
 /* Evaluation function for our shader. */
-ccl_device float3 bsdf_principled_hair_eval(const KernelGlobals *kg,
-                                            const ShaderData *sd,
-                                            const ShaderClosure *sc,
-                                            const float3 omega_in,
-                                            float *pdf)
+ccl_device SpectralColor bsdf_principled_hair_eval(INTEGRATOR_STATE_CONST_ARGS,
+                                                   const ShaderData *sd,
+                                                   const ShaderClosure *sc,
+                                                   const float3 omega_in,
+                                                   float *pdf)
 {
-  kernel_assert(isfinite3_safe(sd->P) && isfinite_safe(sd->ray_length));
+  kernel_assert(is_finite(sd->P) && is_finite(sd->ray_length));
 
   const PrincipledHairBSDF *bsdf = (const PrincipledHairBSDF *)sc;
   float3 Y = float4_to_float3(bsdf->extra->geom);
@@ -310,9 +315,14 @@ ccl_device float3 bsdf_principled_hair_eval(const KernelGlobals *kg,
   float cos_gamma_t = cos_from_sin(sin_gamma_t);
   float gamma_t = safe_asinf(sin_gamma_t);
 
-  float3 T = exp3(-bsdf->sigma * (2.0f * cos_gamma_t / cos_theta_t));
-  float4 Ap[4];
-  hair_attenuation(kg, fresnel_dielectric_cos(cos_theta_o * cos_gamma_o, bsdf->eta), T, Ap);
+  SpectralColor T = exp(-bsdf->sigma * (2.0f * cos_gamma_t / cos_theta_t));
+  SpectralColor Ap[4];
+  float Ap_energy[4];
+  hair_attenuation(INTEGRATOR_STATE_PASS,
+                   fresnel_dielectric_cos(cos_theta_o * cos_gamma_o, bsdf->eta),
+                   T,
+                   Ap,
+                   Ap_energy);
 
   float sin_theta_i = wi.x;
   float cos_theta_i = cos_from_sin(sin_theta_i);
@@ -323,44 +333,49 @@ ccl_device float3 bsdf_principled_hair_eval(const KernelGlobals *kg,
   float angles[6];
   hair_alpha_angles(sin_theta_i, cos_theta_i, bsdf->alpha, angles);
 
-  float4 F;
+  SpectralColor F;
+  float F_energy;
   float Mp, Np;
 
   /* Primary specular (R). */
   Mp = longitudinal_scattering(angles[0], angles[1], sin_theta_o, cos_theta_o, bsdf->m0_roughness);
   Np = azimuthal_scattering(phi, 0, bsdf->s, gamma_o, gamma_t);
   F = Ap[0] * Mp * Np;
-  kernel_assert(isfinite3_safe(float4_to_float3(F)));
+  F_energy = Ap_energy[0] * Mp * Np;
+  kernel_assert(is_finite(float4_to_float3(F)));
 
   /* Transmission (TT). */
   Mp = longitudinal_scattering(angles[2], angles[3], sin_theta_o, cos_theta_o, 0.25f * bsdf->v);
   Np = azimuthal_scattering(phi, 1, bsdf->s, gamma_o, gamma_t);
   F += Ap[1] * Mp * Np;
-  kernel_assert(isfinite3_safe(float4_to_float3(F)));
+  F_energy += Ap_energy[1] * Mp * Np;
+  kernel_assert(is_finite(float4_to_float3(F)));
 
   /* Secondary specular (TRT). */
   Mp = longitudinal_scattering(angles[4], angles[5], sin_theta_o, cos_theta_o, 4.0f * bsdf->v);
   Np = azimuthal_scattering(phi, 2, bsdf->s, gamma_o, gamma_t);
   F += Ap[2] * Mp * Np;
-  kernel_assert(isfinite3_safe(float4_to_float3(F)));
+  F_energy += Ap_energy[2] * Mp * Np;
+  kernel_assert(is_finite(float4_to_float3(F)));
 
   /* Residual component (TRRT+). */
   Mp = longitudinal_scattering(sin_theta_i, cos_theta_i, sin_theta_o, cos_theta_o, 4.0f * bsdf->v);
   Np = M_1_2PI_F;
   F += Ap[3] * Mp * Np;
-  kernel_assert(isfinite3_safe(float4_to_float3(F)));
+  F_energy += Ap_energy[3] * Mp * Np;
+  kernel_assert(is_finite(float4_to_float3(F)));
 
-  *pdf = F.w;
-  return float4_to_float3(F);
+  *pdf = F_energy;
+  return F;
 }
 
 /* Sampling function for the hair shader. */
-ccl_device int bsdf_principled_hair_sample(const KernelGlobals *kg,
+ccl_device int bsdf_principled_hair_sample(INTEGRATOR_STATE_CONST_ARGS,
                                            const ShaderClosure *sc,
                                            ShaderData *sd,
                                            float randu,
                                            float randv,
-                                           float3 *eval,
+                                           SpectralColor *eval,
                                            float3 *omega_in,
                                            float3 *domega_in_dx,
                                            float3 *domega_in_dy,
@@ -396,16 +411,21 @@ ccl_device int bsdf_principled_hair_sample(const KernelGlobals *kg,
   float cos_gamma_t = cos_from_sin(sin_gamma_t);
   float gamma_t = safe_asinf(sin_gamma_t);
 
-  float3 T = exp3(-bsdf->sigma * (2.0f * cos_gamma_t / cos_theta_t));
-  float4 Ap[4];
-  hair_attenuation(kg, fresnel_dielectric_cos(cos_theta_o * cos_gamma_o, bsdf->eta), T, Ap);
+  SpectralColor T = exp(-bsdf->sigma * (2.0f * cos_gamma_t / cos_theta_t));
+  SpectralColor Ap[4];
+  float Ap_energy[4];
+  hair_attenuation(INTEGRATOR_STATE_PASS,
+                   fresnel_dielectric_cos(cos_theta_o * cos_gamma_o, bsdf->eta),
+                   T,
+                   Ap,
+                   Ap_energy);
 
   int p = 0;
   for (; p < 3; p++) {
-    if (u[0].x < Ap[p].w) {
+    if (u[0].x < Ap_energy[p]) {
       break;
     }
-    u[0].x -= Ap[p].w;
+    u[0].x -= Ap_energy[p];
   }
 
   float v = bsdf->v;
@@ -440,35 +460,40 @@ ccl_device int bsdf_principled_hair_sample(const KernelGlobals *kg,
 
   hair_alpha_angles(sin_theta_i, cos_theta_i, bsdf->alpha, angles);
 
-  float4 F;
+  SpectralColor F;
+  float F_energy;
   float Mp, Np;
 
   /* Primary specular (R). */
   Mp = longitudinal_scattering(angles[0], angles[1], sin_theta_o, cos_theta_o, bsdf->m0_roughness);
   Np = azimuthal_scattering(phi, 0, bsdf->s, gamma_o, gamma_t);
   F = Ap[0] * Mp * Np;
-  kernel_assert(isfinite3_safe(float4_to_float3(F)));
+  F_energy = Ap_energy[0] * Mp * Np;
+  kernel_assert(is_finite(float4_to_float3(F)));
 
   /* Transmission (TT). */
   Mp = longitudinal_scattering(angles[2], angles[3], sin_theta_o, cos_theta_o, 0.25f * bsdf->v);
   Np = azimuthal_scattering(phi, 1, bsdf->s, gamma_o, gamma_t);
   F += Ap[1] * Mp * Np;
-  kernel_assert(isfinite3_safe(float4_to_float3(F)));
+  F_energy += Ap_energy[1] * Mp * Np;
+  kernel_assert(is_finite(float4_to_float3(F)));
 
   /* Secondary specular (TRT). */
   Mp = longitudinal_scattering(angles[4], angles[5], sin_theta_o, cos_theta_o, 4.0f * bsdf->v);
   Np = azimuthal_scattering(phi, 2, bsdf->s, gamma_o, gamma_t);
   F += Ap[2] * Mp * Np;
-  kernel_assert(isfinite3_safe(float4_to_float3(F)));
+  F_energy += Ap_energy[2] * Mp * Np;
+  kernel_assert(is_finite(float4_to_float3(F)));
 
   /* Residual component (TRRT+). */
   Mp = longitudinal_scattering(sin_theta_i, cos_theta_i, sin_theta_o, cos_theta_o, 4.0f * bsdf->v);
   Np = M_1_2PI_F;
   F += Ap[3] * Mp * Np;
-  kernel_assert(isfinite3_safe(float4_to_float3(F)));
+  F_energy += Ap_energy[3] * Mp * Np;
+  kernel_assert(is_finite(float4_to_float3(F)));
 
-  *eval = float4_to_float3(F);
-  *pdf = F.w;
+  *eval = F;
+  *pdf = F_energy;
 
   *omega_in = X * sin_theta_i + Y * cos_theta_i * cosf(phi_i) + Z * cos_theta_i * sinf(phi_i);
 
@@ -500,25 +525,28 @@ ccl_device_inline float bsdf_principled_hair_albedo_roughness_scale(
   return (((((0.245f * x) + 5.574f) * x - 10.73f) * x + 2.532f) * x - 0.215f) * x + 5.969f;
 }
 
-ccl_device float3 bsdf_principled_hair_albedo(const ShaderClosure *sc)
+ccl_device SpectralColor bsdf_principled_hair_albedo(const ShaderClosure *sc)
 {
   PrincipledHairBSDF *bsdf = (PrincipledHairBSDF *)sc;
-  return exp3(-sqrt(bsdf->sigma) * bsdf_principled_hair_albedo_roughness_scale(bsdf->v));
+  return exp(-sqrt(bsdf->sigma) * bsdf_principled_hair_albedo_roughness_scale(bsdf->v));
 }
 
-ccl_device_inline float3
-bsdf_principled_hair_sigma_from_reflectance(const float3 color, const float azimuthal_roughness)
+ccl_device_inline SpectralColor bsdf_principled_hair_sigma_from_reflectance(
+    const SpectralColor color, const float azimuthal_roughness)
 {
-  const float3 sigma = log3(color) /
-                       bsdf_principled_hair_albedo_roughness_scale(azimuthal_roughness);
+  const SpectralColor sigma = log(color) /
+                              bsdf_principled_hair_albedo_roughness_scale(azimuthal_roughness);
   return sigma * sigma;
 }
 
-ccl_device_inline float3 bsdf_principled_hair_sigma_from_concentration(const float eumelanin,
-                                                                       const float pheomelanin)
+ccl_device_inline SpectralColor bsdf_principled_hair_sigma_from_concentration(
+    INTEGRATOR_STATE_CONST_ARGS, const float eumelanin, const float pheomelanin)
 {
-  return eumelanin * make_float3(0.506f, 0.841f, 1.653f) +
-         pheomelanin * make_float3(0.343f, 0.733f, 1.924f);
+  const float3 eumelanin_color = make_float3(0.506f, 0.841f, 1.653f);
+  const float3 pheomelanin_color = make_float3(0.343f, 0.733f, 1.924f);
+
+  return eumelanin * rgb_to_spectrum(INTEGRATOR_STATE_PASS, eumelanin_color) +
+         pheomelanin * rgb_to_spectrum(INTEGRATOR_STATE_PASS, pheomelanin_color);
 }
 
 CCL_NAMESPACE_END

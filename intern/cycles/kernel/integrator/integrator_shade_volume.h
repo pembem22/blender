@@ -22,7 +22,7 @@ ccl_device void integrator_shade_volume(INTEGRATOR_STATE_ARGS,
                                         ccl_global float *ccl_restrict render_buffer)
 {
 #ifdef __VOLUME__
-  const float3 throughput = INTEGRATOR_STATE(path, throughput);
+  const SpectralColor throughput = INTEGRATOR_STATE(path, throughput);
 
   /* Direct lighting. */
   const bool direct_lighting = false;

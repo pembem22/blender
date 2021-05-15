@@ -53,11 +53,11 @@ KERNEL_STRUCT_MEMBER(float, mis_ray_t)
 /* Filter glossy. */
 KERNEL_STRUCT_MEMBER(float, min_ray_pdf)
 /* Throughput. */
-KERNEL_STRUCT_MEMBER(float3, throughput)
+KERNEL_STRUCT_MEMBER(SpectralColor, throughput)
 /* Ratio of throughput to distinguish diffuse and glossy render passes. */
-KERNEL_STRUCT_MEMBER(float3, diffuse_glossy_ratio)
+KERNEL_STRUCT_MEMBER(SpectralColor, diffuse_glossy_ratio)
 /* Denoising. */
-KERNEL_STRUCT_MEMBER(float3, denoising_feature_throughput)
+KERNEL_STRUCT_MEMBER(SpectralColor, denoising_feature_throughput)
 KERNEL_STRUCT_END(path)
 
 /************************************** Ray ***********************************/
@@ -69,6 +69,11 @@ KERNEL_STRUCT_MEMBER(float, t)
 KERNEL_STRUCT_MEMBER(float, time)
 KERNEL_STRUCT_MEMBER(float, dP)
 KERNEL_STRUCT_MEMBER(float, dD)
+
+#ifdef __SPECTRAL_RENDERING__
+KERNEL_STRUCT_MEMBER(SpectralColor, wavelengths)
+#endif
+
 KERNEL_STRUCT_END(ray)
 
 /*************************** Intersection result ******************************/
@@ -88,8 +93,8 @@ KERNEL_STRUCT_END(isect)
 /*************** Subsurface closure state for subsurface kernel ***************/
 
 KERNEL_STRUCT_BEGIN(subsurface)
-KERNEL_STRUCT_MEMBER(float3, albedo)
-KERNEL_STRUCT_MEMBER(float3, radius)
+KERNEL_STRUCT_MEMBER(SpectralColor, albedo)
+KERNEL_STRUCT_MEMBER(SpectralColor, radius)
 KERNEL_STRUCT_MEMBER(float, roughness)
 KERNEL_STRUCT_END(subsurface)
 
@@ -113,9 +118,9 @@ KERNEL_STRUCT_MEMBER(uint32_t, queued_kernel)
 /* enum PathRayFlag */
 KERNEL_STRUCT_MEMBER(uint32_t, flag)
 /* Throughput. */
-KERNEL_STRUCT_MEMBER(float3, throughput)
+KERNEL_STRUCT_MEMBER(SpectralColor, throughput)
 /* Ratio of throughput to distinguish diffuse and glossy render passes. */
-KERNEL_STRUCT_MEMBER(float3, diffuse_glossy_ratio)
+KERNEL_STRUCT_MEMBER(SpectralColor, diffuse_glossy_ratio)
 /* Number of intersections found by ray-tracing. */
 KERNEL_STRUCT_MEMBER(uint16_t, num_hits)
 KERNEL_STRUCT_END(shadow_path)

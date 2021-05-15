@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "kernel_color.h"
+
 #if defined(__SPLIT_KERNEL__) || defined(__KERNEL_CUDA__)
 #  define __ATOMIC_PASS_WRITE__
 #endif
@@ -68,6 +70,13 @@ ccl_device_inline void kernel_write_pass_float4(ccl_global float *ccl_restrict b
 #endif
 }
 
+ccl_device_inline void kernel_write_pass_spectral_color(INTEGRATOR_STATE_CONST_ARGS,
+                                                        ccl_global float *ccl_restrict buffer,
+                                                        SpectralColor value)
+{
+  kernel_write_pass_float3(buffer, spectrum_to_rgb(INTEGRATOR_STATE_PASS, value));
+}
+
 #ifdef __DENOISING_FEATURES__
 ccl_device_inline void kernel_write_pass_float_variance(ccl_global float *ccl_restrict buffer,
                                                         float value)
@@ -88,6 +97,16 @@ ccl_device_inline void kernel_write_pass_float3_unaligned(ccl_global float *ccl_
   buffer[0] += value.x;
   buffer[1] += value.y;
   buffer[2] += value.z;
+}
+#  endif
+
+#  ifdef __ATOMIC_PASS_WRITE__
+#    define kernel_write_pass_spectral_color_unaligned kernel_write_pass_spectral_color
+#  else
+ccl_device_inline void kernel_write_pass_spectral_color_unaligned(
+    INTEGRATOR_STATE_CONST_ARGS, ccl_global float *ccl_restrict buffer, SpectralColor value)
+{
+  kernel_write_pass_float3_unaligned(buffer, spectrum_to_rgb(INTEGRATOR_STATE_PASS, value));
 }
 #  endif
 

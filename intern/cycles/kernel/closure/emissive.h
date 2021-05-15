@@ -36,7 +36,7 @@ CCL_NAMESPACE_BEGIN
 
 /* BACKGROUND CLOSURE */
 
-ccl_device void background_setup(ShaderData *sd, const float3 weight)
+ccl_device void background_setup(ShaderData *sd, const SpectralColor weight)
 {
   if (sd->flag & SD_EMISSION) {
     sd->closure_emission_background += weight;
@@ -49,7 +49,7 @@ ccl_device void background_setup(ShaderData *sd, const float3 weight)
 
 /* EMISSION CLOSURE */
 
-ccl_device void emission_setup(ShaderData *sd, const float3 weight)
+ccl_device void emission_setup(ShaderData *sd, const SpectralColor weight)
 {
   if (sd->flag & SD_EMISSION) {
     sd->closure_emission_background += weight;
@@ -75,11 +75,11 @@ ccl_device void emissive_sample(
   /* todo: not implemented and used yet */
 }
 
-ccl_device float3 emissive_simple_eval(const float3 Ng, const float3 I)
+ccl_device SpectralColor emissive_simple_eval(const float3 Ng, const float3 I)
 {
   float res = emissive_pdf(Ng, I);
 
-  return make_float3(res, res, res);
+  return make_spectral_color(res);
 }
 
 CCL_NAMESPACE_END

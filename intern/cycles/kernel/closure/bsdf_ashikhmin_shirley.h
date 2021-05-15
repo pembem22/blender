@@ -52,10 +52,10 @@ ccl_device_inline float bsdf_ashikhmin_shirley_roughness_to_exponent(float rough
   return 2.0f / (roughness * roughness) - 2.0f;
 }
 
-ccl_device_forceinline float3 bsdf_ashikhmin_shirley_eval_reflect(const ShaderClosure *sc,
-                                                                  const float3 I,
-                                                                  const float3 omega_in,
-                                                                  float *pdf)
+ccl_device_forceinline SpectralColor bsdf_ashikhmin_shirley_eval_reflect(const ShaderClosure *sc,
+                                                                         const float3 I,
+                                                                         const float3 omega_in,
+                                                                         float *pdf)
 {
   const MicrofacetBsdf *bsdf = (const MicrofacetBsdf *)sc;
   float3 N = bsdf->N;
@@ -65,8 +65,9 @@ ccl_device_forceinline float3 bsdf_ashikhmin_shirley_eval_reflect(const ShaderCl
 
   float out = 0.0f;
 
-  if (fmaxf(bsdf->alpha_x, bsdf->alpha_y) <= 1e-4f)
-    return make_float3(0.0f, 0.0f, 0.0f);
+  if (fmaxf(bsdf->alpha_x, bsdf->alpha_y) <= 1e-4f) {
+    return zero_spectral_color();
+  }
 
   if (NdotI > 0.0f && NdotO > 0.0f) {
     NdotI = fmaxf(NdotI, 1e-6f);
@@ -116,15 +117,15 @@ ccl_device_forceinline float3 bsdf_ashikhmin_shirley_eval_reflect(const ShaderCl
     }
   }
 
-  return make_float3(out, out, out);
+  return make_spectral_color(out);
 }
 
-ccl_device float3 bsdf_ashikhmin_shirley_eval_transmit(const ShaderClosure *sc,
-                                                       const float3 I,
-                                                       const float3 omega_in,
-                                                       float *pdf)
+ccl_device SpectralColor bsdf_ashikhmin_shirley_eval_transmit(const ShaderClosure *sc,
+                                                              const float3 I,
+                                                              const float3 omega_in,
+                                                              float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device_inline void bsdf_ashikhmin_shirley_sample_first_quadrant(
@@ -143,7 +144,7 @@ ccl_device int bsdf_ashikhmin_shirley_sample(const ShaderClosure *sc,
                                              float3 dIdy,
                                              float randu,
                                              float randv,
-                                             float3 *eval,
+                                             SpectralColor *eval,
                                              float3 *omega_in,
                                              float3 *domega_in_dx,
                                              float3 *domega_in_dy,
@@ -220,7 +221,7 @@ ccl_device int bsdf_ashikhmin_shirley_sample(const ShaderClosure *sc,
     if (fmaxf(bsdf->alpha_x, bsdf->alpha_y) <= 1e-4f) {
       /* Some high number for MIS. */
       *pdf = 1e6f;
-      *eval = make_float3(1e6f, 1e6f, 1e6f);
+      *eval = make_spectral_color(1e6f);
       label = LABEL_REFLECT | LABEL_SINGULAR;
     }
     else {

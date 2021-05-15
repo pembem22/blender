@@ -18,7 +18,10 @@
 
 CCL_NAMESPACE_BEGIN
 
-ccl_device ShaderClosure *closure_alloc(ShaderData *sd, int size, ClosureType type, float3 weight)
+ccl_device ShaderClosure *closure_alloc(ShaderData *sd,
+                                        int size,
+                                        ClosureType type,
+                                        SpectralColor weight)
 {
   kernel_assert(size <= sizeof(ShaderClosure));
 
@@ -57,7 +60,7 @@ ccl_device ccl_addr_space void *closure_alloc_extra(ShaderData *sd, int size)
   return (ccl_addr_space void *)(sd->closure + sd->num_closure + sd->num_closure_left);
 }
 
-ccl_device_inline ShaderClosure *bsdf_alloc(ShaderData *sd, int size, float3 weight)
+ccl_device_inline ShaderClosure *bsdf_alloc(ShaderData *sd, int size, SpectralColor weight)
 {
   ShaderClosure *sc = closure_alloc(sd, size, CLOSURE_NONE_ID, weight);
 
@@ -72,7 +75,7 @@ ccl_device_inline ShaderClosure *bsdf_alloc(ShaderData *sd, int size, float3 wei
 #ifdef __OSL__
 ccl_device_inline ShaderClosure *bsdf_alloc_osl(ShaderData *sd,
                                                 int size,
-                                                float3 weight,
+                                                float4 weight,
                                                 void *data)
 {
   ShaderClosure *sc = closure_alloc(sd, size, CLOSURE_NONE_ID, weight);

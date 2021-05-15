@@ -65,27 +65,33 @@ ccl_device_inline float3 floor(const float3 &a);
 ccl_device_inline float3 ceil(const float3 &a);
 #endif /* !__KERNEL_OPENCL__ */
 
-ccl_device_inline float min3(float3 a);
-ccl_device_inline float max3(float3 a);
 ccl_device_inline float len(const float3 a);
 ccl_device_inline float len_squared(const float3 a);
 
 ccl_device_inline float3 reflect(const float3 incident, const float3 normal);
 ccl_device_inline float3 project(const float3 v, const float3 v_proj);
 
-ccl_device_inline float3 saturate3(float3 a);
+ccl_device_inline float3 saturate(float3 a);
 ccl_device_inline float3 safe_normalize(const float3 a);
 ccl_device_inline float3 normalize_len(const float3 a, float *t);
 ccl_device_inline float3 safe_normalize_len(const float3 a, float *t);
-ccl_device_inline float3 safe_divide_float3_float3(const float3 a, const float3 b);
-ccl_device_inline float3 safe_divide_float3_float(const float3 a, const float b);
+ccl_device_inline float3 safe_divide(const float3 a, const float3 b);
+ccl_device_inline float3 safe_divide(const float3 a, const float b);
 ccl_device_inline float3 interp(float3 a, float3 b, float t);
-ccl_device_inline float3 sqr3(float3 a);
+ccl_device_inline float3 sqr(float3 a);
 
 ccl_device_inline bool is_zero(const float3 a);
-ccl_device_inline float reduce_add(const float3 a);
+
+ccl_device_inline float reduce_add_f(const float3 a);
+ccl_device_inline float reduce_min_f(const float3 a);
+ccl_device_inline float reduce_max_f(const float3 a);
+
+ccl_device_inline float3 reduce_add(const float3 a);
+ccl_device_inline float3 reduce_min(const float3 a);
+ccl_device_inline float3 reduce_max(const float3 a);
+
 ccl_device_inline float average(const float3 a);
-ccl_device_inline bool isequal_float3(const float3 a, const float3 b);
+ccl_device_inline bool is_equal(const float3 a, const float3 b);
 
 /*******************************************************************************
  * Definition.
@@ -358,16 +364,6 @@ ccl_device_inline float3 rcp(const float3 &a)
 }
 #endif /* !__KERNEL_OPENCL__ */
 
-ccl_device_inline float min3(float3 a)
-{
-  return min(min(a.x, a.y), a.z);
-}
-
-ccl_device_inline float max3(float3 a)
-{
-  return max(max(a.x, a.y), a.z);
-}
-
 ccl_device_inline float len(const float3 a)
 {
 #if defined(__KERNEL_SSE41__) && defined(__KERNEL_SSE__)
@@ -410,7 +406,7 @@ ccl_device_inline float3 project(const float3 v, const float3 v_proj)
   return (len_squared != 0.0f) ? (dot(v, v_proj) / len_squared) * v_proj : zero_float3();
 }
 
-ccl_device_inline float3 saturate3(float3 a)
+ccl_device_inline float3 saturate(float3 a)
 {
   return make_float3(saturate(a.x), saturate(a.y), saturate(a.z));
 }
@@ -434,14 +430,14 @@ ccl_device_inline float3 safe_normalize_len(const float3 a, float *t)
   return (*t != 0.0f) ? a / (*t) : a;
 }
 
-ccl_device_inline float3 safe_divide_float3_float3(const float3 a, const float3 b)
+ccl_device_inline float3 safe_divide(const float3 a, const float3 b)
 {
   return make_float3((b.x != 0.0f) ? a.x / b.x : 0.0f,
                      (b.y != 0.0f) ? a.y / b.y : 0.0f,
                      (b.z != 0.0f) ? a.z / b.z : 0.0f);
 }
 
-ccl_device_inline float3 safe_divide_float3_float(const float3 a, const float b)
+ccl_device_inline float3 safe_divide(const float3 a, const float b)
 {
   return (b != 0.0f) ? a / b : zero_float3();
 }
@@ -451,7 +447,7 @@ ccl_device_inline float3 interp(float3 a, float3 b, float t)
   return a + t * (b - a);
 }
 
-ccl_device_inline float3 sqr3(float3 a)
+ccl_device_inline float3 sqr(float3 a)
 {
   return a * a;
 }
@@ -465,7 +461,12 @@ ccl_device_inline bool is_zero(const float3 a)
 #endif
 }
 
-ccl_device_inline float reduce_add(const float3 a)
+ccl_device_inline float3 load_float3(const float *v)
+{
+  return make_float3(v[0], v[1], v[2]);
+}
+
+ccl_device_inline float reduce_add_f(const float3 a)
 {
 #if defined(__KERNEL_SSE__) && defined(__KERNEL_NEON__)
   __m128 t = a.m128;
@@ -476,12 +477,37 @@ ccl_device_inline float reduce_add(const float3 a)
 #endif
 }
 
-ccl_device_inline float average(const float3 a)
+ccl_device_inline float reduce_min_f(const float3 a)
 {
-  return reduce_add(a) * (1.0f / 3.0f);
+  return min(min(a.x, a.y), a.z);
 }
 
-ccl_device_inline bool isequal_float3(const float3 a, const float3 b)
+ccl_device_inline float reduce_max_f(const float3 a)
+{
+  return max(max(a.x, a.y), a.z);
+}
+
+ccl_device_inline float3 reduce_add(const float3 a)
+{
+  return make_float3(reduce_add_f(a));
+}
+
+ccl_device_inline float3 reduce_min(const float3 a)
+{
+  return make_float3(reduce_min_f(a));
+}
+
+ccl_device_inline float3 reduce_max(const float3 a)
+{
+  return make_float3(reduce_max_f(a));
+}
+
+ccl_device_inline float average(const float3 a)
+{
+  return reduce_add_f(a) * (1.0f / 3.0f);
+}
+
+ccl_device_inline bool is_equal(const float3 a, const float3 b)
 {
 #ifdef __KERNEL_OPENCL__
   return all(a == b);
@@ -490,17 +516,17 @@ ccl_device_inline bool isequal_float3(const float3 a, const float3 b)
 #endif
 }
 
-ccl_device_inline float3 pow3(float3 v, float e)
+ccl_device_inline float3 pow(float3 v, float e)
 {
   return make_float3(powf(v.x, e), powf(v.y, e), powf(v.z, e));
 }
 
-ccl_device_inline float3 exp3(float3 v)
+ccl_device_inline float3 exp(float3 v)
 {
   return make_float3(expf(v.x), expf(v.y), expf(v.z));
 }
 
-ccl_device_inline float3 log3(float3 v)
+ccl_device_inline float3 log(float3 v)
 {
   return make_float3(logf(v.x), logf(v.y), logf(v.z));
 }
@@ -517,18 +543,18 @@ ccl_device_inline int3 quick_floor_to_int3(const float3 a)
 #endif
 }
 
-ccl_device_inline bool isfinite3_safe(float3 v)
+ccl_device_inline bool is_finite(float3 v)
 {
-  return isfinite_safe(v.x) && isfinite_safe(v.y) && isfinite_safe(v.z);
+  return is_finite(v.x) && is_finite(v.y) && is_finite(v.z);
 }
 
-ccl_device_inline float3 ensure_finite3(float3 v)
+ccl_device_inline float3 ensure_finite(float3 v)
 {
-  if (!isfinite_safe(v.x))
+  if (!is_finite(v.x))
     v.x = 0.0f;
-  if (!isfinite_safe(v.y))
+  if (!is_finite(v.y))
     v.y = 0.0f;
-  if (!isfinite_safe(v.z))
+  if (!is_finite(v.z))
     v.z = 0.0f;
   return v;
 }

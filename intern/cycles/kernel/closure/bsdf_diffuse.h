@@ -53,28 +53,28 @@ ccl_device bool bsdf_diffuse_merge(const ShaderClosure *a, const ShaderClosure *
   const DiffuseBsdf *bsdf_a = (const DiffuseBsdf *)a;
   const DiffuseBsdf *bsdf_b = (const DiffuseBsdf *)b;
 
-  return (isequal_float3(bsdf_a->N, bsdf_b->N));
+  return (is_equal(bsdf_a->N, bsdf_b->N));
 }
 
-ccl_device float3 bsdf_diffuse_eval_reflect(const ShaderClosure *sc,
-                                            const float3 I,
-                                            const float3 omega_in,
-                                            float *pdf)
+ccl_device SpectralColor bsdf_diffuse_eval_reflect(const ShaderClosure *sc,
+                                                   const float3 I,
+                                                   const float3 omega_in,
+                                                   float *pdf)
 {
   const DiffuseBsdf *bsdf = (const DiffuseBsdf *)sc;
   float3 N = bsdf->N;
 
   float cos_pi = fmaxf(dot(N, omega_in), 0.0f) * M_1_PI_F;
   *pdf = cos_pi;
-  return make_float3(cos_pi, cos_pi, cos_pi);
+  return make_spectral_color(cos_pi);
 }
 
-ccl_device float3 bsdf_diffuse_eval_transmit(const ShaderClosure *sc,
-                                             const float3 I,
-                                             const float3 omega_in,
-                                             float *pdf)
+ccl_device SpectralColor bsdf_diffuse_eval_transmit(const ShaderClosure *sc,
+                                                    const float3 I,
+                                                    const float3 omega_in,
+                                                    float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_diffuse_sample(const ShaderClosure *sc,
@@ -84,7 +84,7 @@ ccl_device int bsdf_diffuse_sample(const ShaderClosure *sc,
                                    float3 dIdy,
                                    float randu,
                                    float randv,
-                                   float3 *eval,
+                                   SpectralColor *eval,
                                    float3 *omega_in,
                                    float3 *domega_in_dx,
                                    float3 *domega_in_dy,
@@ -97,7 +97,7 @@ ccl_device int bsdf_diffuse_sample(const ShaderClosure *sc,
   sample_cos_hemisphere(N, randu, randv, omega_in, pdf);
 
   if (dot(Ng, *omega_in) > 0.0f) {
-    *eval = make_float3(*pdf, *pdf, *pdf);
+    *eval = make_spectral_color(*pdf);
 #ifdef __RAY_DIFFERENTIALS__
     // TODO: find a better approximation for the diffuse bounce
     *domega_in_dx = (2 * dot(N, dIdx)) * N - dIdx;
@@ -118,25 +118,25 @@ ccl_device int bsdf_translucent_setup(DiffuseBsdf *bsdf)
   return SD_BSDF | SD_BSDF_HAS_EVAL;
 }
 
-ccl_device float3 bsdf_translucent_eval_reflect(const ShaderClosure *sc,
-                                                const float3 I,
-                                                const float3 omega_in,
-                                                float *pdf)
+ccl_device SpectralColor bsdf_translucent_eval_reflect(const ShaderClosure *sc,
+                                                       const float3 I,
+                                                       const float3 omega_in,
+                                                       float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
-ccl_device float3 bsdf_translucent_eval_transmit(const ShaderClosure *sc,
-                                                 const float3 I,
-                                                 const float3 omega_in,
-                                                 float *pdf)
+ccl_device SpectralColor bsdf_translucent_eval_transmit(const ShaderClosure *sc,
+                                                        const float3 I,
+                                                        const float3 omega_in,
+                                                        float *pdf)
 {
   const DiffuseBsdf *bsdf = (const DiffuseBsdf *)sc;
   float3 N = bsdf->N;
 
   float cos_pi = fmaxf(-dot(N, omega_in), 0.0f) * M_1_PI_F;
   *pdf = cos_pi;
-  return make_float3(cos_pi, cos_pi, cos_pi);
+  return make_spectral_color(cos_pi);
 }
 
 ccl_device int bsdf_translucent_sample(const ShaderClosure *sc,
@@ -146,7 +146,7 @@ ccl_device int bsdf_translucent_sample(const ShaderClosure *sc,
                                        float3 dIdy,
                                        float randu,
                                        float randv,
-                                       float3 *eval,
+                                       SpectralColor *eval,
                                        float3 *omega_in,
                                        float3 *domega_in_dx,
                                        float3 *domega_in_dy,
@@ -159,7 +159,7 @@ ccl_device int bsdf_translucent_sample(const ShaderClosure *sc,
   // distribution over the hemisphere
   sample_cos_hemisphere(-N, randu, randv, omega_in, pdf);
   if (dot(Ng, *omega_in) < 0) {
-    *eval = make_float3(*pdf, *pdf, *pdf);
+    *eval = make_spectral_color(*pdf);
 #ifdef __RAY_DIFFERENTIALS__
     // TODO: find a better approximation for the diffuse bounce
     *domega_in_dx = -((2 * dot(N, dIdx)) * N - dIdx);

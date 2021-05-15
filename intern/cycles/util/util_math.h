@@ -272,7 +272,7 @@ ccl_device_inline bool isnan_safe(float f)
   return (x << 1) > 0xff000000u;
 }
 
-ccl_device_inline bool isfinite_safe(float f)
+ccl_device_inline bool is_finite(float f)
 {
   /* By IEEE 754 rule, 2*Inf equals Inf */
   unsigned int x = __float_as_uint(f);
@@ -281,7 +281,7 @@ ccl_device_inline bool isfinite_safe(float f)
 
 ccl_device_inline float ensure_finite(float v)
 {
-  return isfinite_safe(v) ? v : 0.0f;
+  return is_finite(v) ? v : 0.0f;
 }
 
 #ifndef __KERNEL_OPENCL__
@@ -512,17 +512,6 @@ ccl_device_inline float3 safe_invert_color(float3 a)
   x = (a.x != 0.0f) ? 1.0f / a.x : 0.0f;
   y = (a.y != 0.0f) ? 1.0f / a.y : 0.0f;
   z = (a.z != 0.0f) ? 1.0f / a.z : 0.0f;
-
-  return make_float3(x, y, z);
-}
-
-ccl_device_inline float3 safe_divide_color(float3 a, float3 b)
-{
-  float x, y, z;
-
-  x = (b.x != 0.0f) ? a.x / b.x : 0.0f;
-  y = (b.y != 0.0f) ? a.y / b.y : 0.0f;
-  z = (b.z != 0.0f) ? a.z / b.z : 0.0f;
 
   return make_float3(x, y, z);
 }

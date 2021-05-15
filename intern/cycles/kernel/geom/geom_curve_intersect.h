@@ -566,7 +566,7 @@ ccl_device_inline bool ribbon_intersect(const float3 ray_org,
   /* Evaluate first point and radius scaled normal direction. */
   float4 p0 = catmull_rom_basis_eval(curve, 0.0f);
   float3 dp0dt = float4_to_float3(catmull_rom_basis_derivative(curve, 0.0f));
-  if (max3(fabs(dp0dt)) < eps) {
+  if (reduce_max_f(fabs(dp0dt)) < eps) {
     const float4 p1 = catmull_rom_basis_eval(curve, step_size);
     dp0dt = float4_to_float3(p1 - p0);
   }
@@ -581,7 +581,7 @@ ccl_device_inline bool ribbon_intersect(const float3 ray_org,
 
     /* Evaluate next point. */
     float3 dp1dt = float4_to_float3(catmull_rom_basis_derivative(curve, u + step_size));
-    dp1dt = (max3(fabs(dp1dt)) < eps) ? float4_to_float3(p1 - p0) : dp1dt;
+    dp1dt = (reduce_max_f(fabs(dp1dt)) < eps) ? float4_to_float3(p1 - p0) : dp1dt;
     const float3 wn1 = normalize(make_float3(dp1dt.y, -dp1dt.x, 0.0f)) * p1.w;
 
     if (valid) {

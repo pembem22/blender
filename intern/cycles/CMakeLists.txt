@@ -234,17 +234,17 @@ if(WITH_CYCLES_PTEX)
   add_definitions(-DWITH_PTEX)
 endif()
 
-if(WITH_CYCLES_OSL)
-  add_definitions(-DWITH_OSL)
-  # osl 1.9.x
-  add_definitions(-DOSL_STATIC_BUILD)
-  # pre 1.9
-  add_definitions(-DOSL_STATIC_LIBRARY)
-  include_directories(
-    SYSTEM
-    ${OSL_INCLUDE_DIR}
-  )
-endif()
+# if(WITH_CYCLES_OSL)
+#   add_definitions(-DWITH_OSL)
+#   # osl 1.9.x
+#   add_definitions(-DOSL_STATIC_BUILD)
+#   # pre 1.9
+#   add_definitions(-DOSL_STATIC_LIBRARY)
+#   include_directories(
+#     SYSTEM
+#     ${OSL_INCLUDE_DIR}
+#   )
+# endif()
 
 if(WITH_CYCLES_DEVICE_OPTIX)
   find_package(OptiX)

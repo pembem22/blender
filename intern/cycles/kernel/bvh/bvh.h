@@ -141,7 +141,7 @@ CCL_NAMESPACE_BEGIN
 
 ccl_device_inline bool scene_intersect_valid(const Ray *ray)
 {
-  /* NOTE: Due to some vectorization code  non-finite origin point might
+  /* NOTE: Due to some vectorization code non-finite origin point might
    * cause lots of false-positive intersections which will overflow traversal
    * stack.
    * This code is a quick way to perform early output, to avoid crashes in
@@ -151,7 +151,7 @@ ccl_device_inline bool scene_intersect_valid(const Ray *ray)
    * Scene intersection may also called with empty rays for conditional trace
    * calls that evaluate to false, so filter those out.
    */
-  return isfinite_safe(ray->P.x) && isfinite_safe(ray->D.x) && len_squared(ray->D) != 0.0f;
+  return is_finite(ray->P.x) && is_finite(ray->D.x) && len_squared(ray->D) != 0.0f;
 }
 
 ccl_device_intersect bool scene_intersect(const KernelGlobals *kg,

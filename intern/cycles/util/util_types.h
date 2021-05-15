@@ -111,6 +111,8 @@ CCL_NAMESPACE_END
 
 #include "util/util_types_vector3.h"
 
+#include "util/util_types_spectral_color.h"
+
 /* Vectorized types implementation. */
 #include "util/util_types_uchar2_impl.h"
 #include "util/util_types_uchar3_impl.h"

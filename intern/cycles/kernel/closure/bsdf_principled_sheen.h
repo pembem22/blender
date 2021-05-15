@@ -45,7 +45,7 @@ ccl_device_inline float calculate_avg_principled_sheen_brdf(float3 N, float3 I)
   return schlick_fresnel(NdotI) * NdotI;
 }
 
-ccl_device float3
+ccl_device SpectralColor
 calculate_principled_sheen_brdf(float3 N, float3 V, float3 L, float3 H, float *pdf)
 {
   float NdotL = dot(N, L);
@@ -53,14 +53,14 @@ calculate_principled_sheen_brdf(float3 N, float3 V, float3 L, float3 H, float *p
 
   if (NdotL < 0 || NdotV < 0) {
     *pdf = 0.0f;
-    return make_float3(0.0f, 0.0f, 0.0f);
+    return zero_spectral_color();
   }
 
   float LdotH = dot(L, H);
 
   float value = schlick_fresnel(LdotH) * NdotL;
 
-  return make_float3(value, value, value);
+  return make_spectral_color(value);
 }
 
 ccl_device int bsdf_principled_sheen_setup(const ShaderData *sd, PrincipledSheenBsdf *bsdf)
@@ -71,10 +71,10 @@ ccl_device int bsdf_principled_sheen_setup(const ShaderData *sd, PrincipledSheen
   return SD_BSDF | SD_BSDF_HAS_EVAL;
 }
 
-ccl_device float3 bsdf_principled_sheen_eval_reflect(const ShaderClosure *sc,
-                                                     const float3 I,
-                                                     const float3 omega_in,
-                                                     float *pdf)
+ccl_device SpectralColor bsdf_principled_sheen_eval_reflect(const ShaderClosure *sc,
+                                                            const float3 I,
+                                                            const float3 omega_in,
+                                                            float *pdf)
 {
   const PrincipledSheenBsdf *bsdf = (const PrincipledSheenBsdf *)sc;
 
@@ -89,16 +89,16 @@ ccl_device float3 bsdf_principled_sheen_eval_reflect(const ShaderClosure *sc,
   }
   else {
     *pdf = 0.0f;
-    return make_float3(0.0f, 0.0f, 0.0f);
+    return zero_spectral_color();
   }
 }
 
-ccl_device float3 bsdf_principled_sheen_eval_transmit(const ShaderClosure *sc,
-                                                      const float3 I,
-                                                      const float3 omega_in,
-                                                      float *pdf)
+ccl_device SpectralColor bsdf_principled_sheen_eval_transmit(const ShaderClosure *sc,
+                                                             const float3 I,
+                                                             const float3 omega_in,
+                                                             float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_principled_sheen_sample(const ShaderClosure *sc,
@@ -108,7 +108,7 @@ ccl_device int bsdf_principled_sheen_sample(const ShaderClosure *sc,
                                             float3 dIdy,
                                             float randu,
                                             float randv,
-                                            float3 *eval,
+                                            SpectralColor *eval,
                                             float3 *omega_in,
                                             float3 *domega_in_dx,
                                             float3 *domega_in_dy,

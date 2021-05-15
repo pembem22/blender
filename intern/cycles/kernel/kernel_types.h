@@ -44,6 +44,7 @@ CCL_NAMESPACE_BEGIN
 #define FILTER_TABLE_SIZE 1024
 #define RAMP_TABLE_SIZE 256
 #define SHUTTER_TABLE_SIZE 256
+#define WAVELENGTH_CDF_TABLE_SIZE 256
 
 #define BSSRDF_MIN_RADIUS 1e-8f
 #define BSSRDF_MAX_HITS 4
@@ -62,6 +63,9 @@ CCL_NAMESPACE_BEGIN
 #define PASS_UNUSED (~0)
 
 #define VOLUME_STACK_SIZE 32
+
+#define MIN_WAVELENGTH 380.0f
+#define MAX_WAVELENGTH 730.0f
 
 /* Split kernel constants */
 #define WORK_POOL_SIZE_GPU 64
@@ -99,6 +103,7 @@ CCL_NAMESPACE_BEGIN
 #define __AO__
 #define __PASSES__
 #define __HAIR__
+#define __SPECTRAL_RENDERING__
 
 /* Without these we get an AO render, used by OpenCL preview kernel. */
 #ifndef __KERNEL_AO_PREVIEW__
@@ -224,7 +229,7 @@ enum PathTraceDimension {
   PRNG_LENS_U = 2,
   PRNG_LENS_V = 3,
   PRNG_TIME = 4,
-  PRNG_UNUSED_0 = 5,
+  PRNG_WAVELENGTH = 5,
   PRNG_UNUSED_1 = 6, /* for some reason (6, 7) is a bad sobol pattern */
   PRNG_UNUSED_2 = 7, /* with a low number of samples (< 64) */
   PRNG_BASE_NUM = 10,
@@ -524,8 +529,8 @@ typedef ccl_addr_space struct PathRadiance {
 } PathRadiance;
 
 typedef struct BsdfEval {
-  float3 diffuse;
-  float3 glossy;
+  SpectralColor diffuse;
+  SpectralColor glossy;
 } BsdfEval;
 
 /* Shader Flag */
@@ -767,7 +772,7 @@ typedef struct AttributeDescriptor {
  * padded to be 16 bytes, while it's only 12 bytes on the GPU. */
 
 #define SHADER_CLOSURE_BASE \
-  float3 weight; \
+  SpectralColor weight; \
   ClosureType type; \
   float sample_weight; \
   float3 N
@@ -957,12 +962,12 @@ typedef ccl_addr_space struct ccl_align(16) ShaderData
   int num_closure;
   int num_closure_left;
   float randb_closure;
-  float3 svm_closure_weight;
+  SpectralColor svm_closure_weight;
 
   /* Closure weights summed directly, so we can evaluate
    * emission and shadow transparency with MAX_CLOSURE 0. */
-  float3 closure_emission_background;
-  float3 closure_transparent_extinction;
+  SpectralColor closure_emission_background;
+  SpectralColor closure_transparent_extinction;
 
   /* At the end so we can adjust size in ShaderDataTinyStorage. */
   struct ShaderClosure closure[MAX_CLOSURE];
@@ -1139,7 +1144,8 @@ typedef struct KernelCamera {
   int rolling_shutter_type;
   float rolling_shutter_duration;
 
-  int pad;
+  int wavelength_cdf_table_offset;
+  int camera_response_function_table_offset;
 } KernelCamera;
 static_assert_align(KernelCamera, 16);
 
@@ -1536,6 +1542,7 @@ typedef struct KernelShaderEvalInput {
   int object;
   int prim;
   float u, v;
+  SpectralColor wavelengths;
 } KernelShaderEvalInput;
 static_assert_align(KernelShaderEvalInput, 16);
 

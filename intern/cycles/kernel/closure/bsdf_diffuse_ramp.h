@@ -68,17 +68,21 @@ ccl_device void bsdf_diffuse_ramp_blur(ShaderClosure *sc, float roughness)
 {
 }
 
-ccl_device float3 bsdf_diffuse_ramp_eval_reflect(const ShaderClosure *sc,
-                                                 const float3 I,
-                                                 const float3 omega_in,
-                                                 float *pdf)
+ccl_device SpectralColor bsdf_diffuse_ramp_eval_reflect(const ShaderClosure *sc,
+                                                        const float3 I,
+                                                        const float3 omega_in,
+                                                        float *pdf)
 {
+#  ifndef __SPECTRAL_RENDERING__
   const DiffuseRampBsdf *bsdf = (const DiffuseRampBsdf *)sc;
   float3 N = bsdf->N;
 
   float cos_pi = fmaxf(dot(N, omega_in), 0.0f);
   *pdf = cos_pi * M_1_PI_F;
   return bsdf_diffuse_ramp_get_color(bsdf->colors, cos_pi) * M_1_PI_F;
+#  else
+  assert(false);
+#  endif
 }
 
 ccl_device float3 bsdf_diffuse_ramp_eval_transmit(const ShaderClosure *sc,

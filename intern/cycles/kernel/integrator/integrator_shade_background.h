@@ -23,7 +23,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-ccl_device_noinline_cpu float3 integrator_eval_background_shader(
+ccl_device_noinline_cpu SpectralColor integrator_eval_background_shader(
     INTEGRATOR_STATE_ARGS, ccl_global float *ccl_restrict render_buffer)
 {
 #ifdef __BACKGROUND__
@@ -38,11 +38,11 @@ ccl_device_noinline_cpu float3 integrator_eval_background_shader(
         ((shader & SHADER_EXCLUDE_TRANSMIT) && (path_flag & PATH_RAY_TRANSMIT)) ||
         ((shader & SHADER_EXCLUDE_CAMERA) && (path_flag & PATH_RAY_CAMERA)) ||
         ((shader & SHADER_EXCLUDE_SCATTER) && (path_flag & PATH_RAY_VOLUME_SCATTER)))
-      return zero_float3();
+      return zero_spectral_color();
   }
 
   /* Fast path for constant color shader. */
-  float3 L = zero_float3();
+  SpectralColor L = zero_spectral_color();
   if (shader_constant_emission_eval(kg, shader, &L)) {
     return L;
   }
@@ -85,7 +85,7 @@ ccl_device_noinline_cpu float3 integrator_eval_background_shader(
 
   return L;
 #else
-  return make_float3(0.8f, 0.8f, 0.8f);
+  return make_spectral_color(0.8f);
 #endif
 }
 
@@ -109,9 +109,9 @@ ccl_device_inline void integrate_background(INTEGRATOR_STATE_ARGS,
   }
 
   /* Evaluate background shader. */
-  float3 L = (eval_background) ?
-                 integrator_eval_background_shader(INTEGRATOR_STATE_PASS, render_buffer) :
-                 zero_float3();
+  SpectralColor L = (eval_background) ?
+                        integrator_eval_background_shader(INTEGRATOR_STATE_PASS, render_buffer) :
+                        zero_spectral_color();
 
   /* When using the ao bounces approximation, adjust background
    * shader intensity with ao factor. */
@@ -150,7 +150,7 @@ ccl_device_inline void integrate_distant_lights(INTEGRATOR_STATE_ARGS,
       /* TODO: does aliasing like this break automatic SoA in CUDA? */
       ShaderDataTinyStorage emission_sd_storage;
       ShaderData *emission_sd = AS_SHADER_DATA(&emission_sd_storage);
-      float3 light_eval = light_sample_shader_eval(
+      SpectralColor light_eval = light_sample_shader_eval(
           INTEGRATOR_STATE_PASS, emission_sd, &ls, ray_time);
       if (is_zero(light_eval)) {
         return;

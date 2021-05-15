@@ -34,7 +34,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-ccl_device void bsdf_transparent_setup(ShaderData *sd, const float3 weight, int path_flag)
+ccl_device void bsdf_transparent_setup(ShaderData *sd, const SpectralColor weight, int path_flag)
 {
   /* Check cutoff weight. */
   float sample_weight = fabsf(average(weight));
@@ -81,20 +81,20 @@ ccl_device void bsdf_transparent_setup(ShaderData *sd, const float3 weight, int 
   }
 }
 
-ccl_device float3 bsdf_transparent_eval_reflect(const ShaderClosure *sc,
-                                                const float3 I,
-                                                const float3 omega_in,
-                                                float *pdf)
+ccl_device SpectralColor bsdf_transparent_eval_reflect(const ShaderClosure *sc,
+                                                       const float3 I,
+                                                       const float3 omega_in,
+                                                       float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
-ccl_device float3 bsdf_transparent_eval_transmit(const ShaderClosure *sc,
-                                                 const float3 I,
-                                                 const float3 omega_in,
-                                                 float *pdf)
+ccl_device SpectralColor bsdf_transparent_eval_transmit(const ShaderClosure *sc,
+                                                        const float3 I,
+                                                        const float3 omega_in,
+                                                        float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_transparent_sample(const ShaderClosure *sc,
@@ -104,7 +104,7 @@ ccl_device int bsdf_transparent_sample(const ShaderClosure *sc,
                                        float3 dIdy,
                                        float randu,
                                        float randv,
-                                       float3 *eval,
+                                       SpectralColor *eval,
                                        float3 *omega_in,
                                        float3 *domega_in_dx,
                                        float3 *domega_in_dy,
@@ -116,8 +116,8 @@ ccl_device int bsdf_transparent_sample(const ShaderClosure *sc,
   *domega_in_dx = -dIdx;
   *domega_in_dy = -dIdy;
 #endif
-  *pdf = 1;
-  *eval = make_float3(1, 1, 1);
+  *pdf = 1.0f;
+  *eval = one_spectral_color();
   return LABEL_TRANSMIT | LABEL_TRANSPARENT;
 }
 

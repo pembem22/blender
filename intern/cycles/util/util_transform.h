@@ -472,15 +472,15 @@ ccl_device void transform_motion_array_interpolate(Transform *tfm,
   transform_compose(tfm, &decomp);
 }
 
-ccl_device_inline bool transform_isfinite_safe(Transform *tfm)
+ccl_device_inline bool transform_is_finite(Transform *tfm)
 {
-  return isfinite4_safe(tfm->x) && isfinite4_safe(tfm->y) && isfinite4_safe(tfm->z);
+  return is_finite(tfm->x) && is_finite(tfm->y) && is_finite(tfm->z);
 }
 
-ccl_device_inline bool transform_decomposed_isfinite_safe(DecomposedTransform *decomp)
+ccl_device_inline bool transform_decomposed_is_finite(DecomposedTransform *decomp)
 {
-  return isfinite4_safe(decomp->x) && isfinite4_safe(decomp->y) && isfinite4_safe(decomp->z) &&
-         isfinite4_safe(decomp->w);
+  return is_finite(decomp->x) && is_finite(decomp->y) && is_finite(decomp->z) &&
+         is_finite(decomp->w);
 }
 
 #ifndef __KERNEL_GPU__

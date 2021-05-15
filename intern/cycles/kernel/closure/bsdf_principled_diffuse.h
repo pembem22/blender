@@ -34,7 +34,7 @@ typedef ccl_addr_space struct PrincipledDiffuseBsdf {
 static_assert(sizeof(ShaderClosure) >= sizeof(PrincipledDiffuseBsdf),
               "PrincipledDiffuseBsdf is too large!");
 
-ccl_device float3 calculate_principled_diffuse_brdf(
+ccl_device SpectralColor calculate_principled_diffuse_brdf(
     const PrincipledDiffuseBsdf *bsdf, float3 N, float3 V, float3 L, float3 H, float *pdf)
 {
   float NdotL = max(dot(N, L), 0.0f);
@@ -42,7 +42,7 @@ ccl_device float3 calculate_principled_diffuse_brdf(
 
   if (NdotL < 0 || NdotV < 0) {
     *pdf = 0.0f;
-    return make_float3(0.0f, 0.0f, 0.0f);
+    return zero_spectral_color();
   }
 
   float LdotH = dot(L, H);
@@ -53,7 +53,7 @@ ccl_device float3 calculate_principled_diffuse_brdf(
 
   float value = M_1_PI_F * NdotL * Fd;
 
-  return make_float3(value, value, value);
+  return make_spectral_color(value);
 }
 
 ccl_device int bsdf_principled_diffuse_setup(PrincipledDiffuseBsdf *bsdf)
@@ -67,13 +67,13 @@ ccl_device bool bsdf_principled_diffuse_merge(const ShaderClosure *a, const Shad
   const PrincipledDiffuseBsdf *bsdf_a = (const PrincipledDiffuseBsdf *)a;
   const PrincipledDiffuseBsdf *bsdf_b = (const PrincipledDiffuseBsdf *)b;
 
-  return (isequal_float3(bsdf_a->N, bsdf_b->N) && bsdf_a->roughness == bsdf_b->roughness);
+  return (is_equal(bsdf_a->N, bsdf_b->N) && bsdf_a->roughness == bsdf_b->roughness);
 }
 
-ccl_device float3 bsdf_principled_diffuse_eval_reflect(const ShaderClosure *sc,
-                                                       const float3 I,
-                                                       const float3 omega_in,
-                                                       float *pdf)
+ccl_device SpectralColor bsdf_principled_diffuse_eval_reflect(const ShaderClosure *sc,
+                                                              const float3 I,
+                                                              const float3 omega_in,
+                                                              float *pdf)
 {
   const PrincipledDiffuseBsdf *bsdf = (const PrincipledDiffuseBsdf *)sc;
 
@@ -88,16 +88,16 @@ ccl_device float3 bsdf_principled_diffuse_eval_reflect(const ShaderClosure *sc,
   }
   else {
     *pdf = 0.0f;
-    return make_float3(0.0f, 0.0f, 0.0f);
+    return zero_spectral_color();
   }
 }
 
-ccl_device float3 bsdf_principled_diffuse_eval_transmit(const ShaderClosure *sc,
-                                                        const float3 I,
-                                                        const float3 omega_in,
-                                                        float *pdf)
+ccl_device SpectralColor bsdf_principled_diffuse_eval_transmit(const ShaderClosure *sc,
+                                                               const float3 I,
+                                                               const float3 omega_in,
+                                                               float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_principled_diffuse_sample(const ShaderClosure *sc,
@@ -107,7 +107,7 @@ ccl_device int bsdf_principled_diffuse_sample(const ShaderClosure *sc,
                                               float3 dIdy,
                                               float randu,
                                               float randv,
-                                              float3 *eval,
+                                              SpectralColor *eval,
                                               float3 *omega_in,
                                               float3 *domega_in_dx,
                                               float3 *domega_in_dy,

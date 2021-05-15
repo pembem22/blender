@@ -194,6 +194,7 @@ set(SRC_SVM_HEADERS
   svm/svm_normal.h
   svm/svm_ramp.h
   svm/svm_ramp_util.h
+  svm/svm_rgb_to_spectrum.h
   svm/svm_sepcomb_hsv.h
   svm/svm_sepcomb_vector.h
   svm/svm_sky.h

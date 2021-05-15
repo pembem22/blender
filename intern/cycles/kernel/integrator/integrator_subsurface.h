@@ -114,7 +114,7 @@ ccl_device bool subsurface_bounce(INTEGRATOR_STATE_ARGS, ShaderData *sd, const S
   /* Pass BSSRDF parameters. */
   INTEGRATOR_STATE_WRITE(path, flag) |= PATH_RAY_SUBSURFACE;
   INTEGRATOR_STATE_WRITE(path, throughput) *= shader_bssrdf_sample_weight(sd, sc);
-  INTEGRATOR_STATE_WRITE(path, diffuse_glossy_ratio) = one_float3();
+  INTEGRATOR_STATE_WRITE(path, diffuse_glossy_ratio) = one_spectral_color();
 
   const float roughness = (sc->type == CLOSURE_BSSRDF_PRINCIPLED_ID ||
                            sc->type == CLOSURE_BSSRDF_PRINCIPLED_RANDOM_WALK_ID) ?
@@ -140,7 +140,7 @@ ccl_device void subsurface_shader_data_setup(INTEGRATOR_STATE_ARGS, ShaderData *
   sd->num_closure = 0;
   sd->num_closure_left = kernel_data.integrator.max_closures;
 
-  const float3 weight = one_float3();
+  const SpectralColor weight = one_spectral_color();
   const float roughness = INTEGRATOR_STATE(subsurface, roughness);
 
 #  ifdef __PRINCIPLED__
@@ -191,23 +191,23 @@ ccl_device void subsurface_random_walk_remap(const float A,
   *sigma_t = 1.0f / fmaxf(d * s, 1e-16f);
 }
 
-ccl_device void subsurface_random_walk_coefficients(
-    const float3 albedo, const float3 radius, float3 *sigma_t, float3 *alpha, float3 *throughput)
+ccl_device void subsurface_random_walk_coefficients(const SpectralColor albedo,
+                                                    const SpectralColor radius,
+                                                    SpectralColor *sigma_t,
+                                                    SpectralColor *alpha,
+                                                    SpectralColor *throughput)
 {
-  float sigma_t_x, sigma_t_y, sigma_t_z;
-  float alpha_x, alpha_y, alpha_z;
-
-  subsurface_random_walk_remap(albedo.x, radius.x, &sigma_t_x, &alpha_x);
-  subsurface_random_walk_remap(albedo.y, radius.y, &sigma_t_y, &alpha_y);
-  subsurface_random_walk_remap(albedo.z, radius.z, &sigma_t_z, &alpha_z);
-
-  *sigma_t = make_float3(sigma_t_x, sigma_t_y, sigma_t_z);
-  *alpha = make_float3(alpha_x, alpha_y, alpha_z);
+  FOREACH_CHANNEL (i) {
+    subsurface_random_walk_remap(GET_CHANNEL(albedo, i),
+                                 GET_CHANNEL(radius, i),
+                                 &GET_CHANNEL(*sigma_t, i),
+                                 &GET_CHANNEL(*alpha, i));
+  }
 
   /* Throughput already contains closure weight at this point, which includes the
    * albedo, as well as closure mixing and Fresnel weights. Divide out the albedo
    * which will be added through scattering. */
-  *throughput = safe_divide_color(*throughput, albedo);
+  *throughput = safe_divide(*throughput, albedo);
 }
 
 /* References for Dwivedi sampling:
@@ -256,12 +256,12 @@ ccl_device_forceinline float3 direction_from_cosine(float3 D, float cos_theta, f
   return dir.x * T + dir.y * B + dir.z * D;
 }
 
-ccl_device_forceinline float3 subsurface_random_walk_pdf(float3 sigma_t,
-                                                         float t,
-                                                         bool hit,
-                                                         float3 *transmittance)
+ccl_device_forceinline SpectralColor subsurface_random_walk_pdf(SpectralColor sigma_t,
+                                                                float t,
+                                                                bool hit,
+                                                                SpectralColor *transmittance)
 {
-  float3 T = volume_color_transmittance(sigma_t, t);
+  SpectralColor T = volume_color_transmittance(sigma_t, t);
   if (transmittance) {
     *transmittance = T;
   }
@@ -312,13 +312,13 @@ ccl_device_inline bool subsurface_random_walk(INTEGRATOR_STATE_ARGS)
 
   /* Convert subsurface to volume coefficients.
    * The single-scattering albedo is named alpha to avoid confusion with the surface albedo. */
-  const float3 albedo = INTEGRATOR_STATE(subsurface, albedo);
-  const float3 radius = INTEGRATOR_STATE(subsurface, radius);
+  const SpectralColor albedo = INTEGRATOR_STATE(subsurface, albedo);
+  const SpectralColor radius = INTEGRATOR_STATE(subsurface, radius);
 
-  float3 sigma_t, alpha;
-  float3 throughput = INTEGRATOR_STATE_WRITE(path, throughput);
+  SpectralColor sigma_t, alpha;
+  SpectralColor throughput = INTEGRATOR_STATE_WRITE(path, throughput);
   subsurface_random_walk_coefficients(albedo, radius, &sigma_t, &alpha, &throughput);
-  float3 sigma_s = sigma_t * alpha;
+  SpectralColor sigma_s = sigma_t * alpha;
 
   /* Theoretically it should be better to use the exact alpha for the channel we're sampling at
    * each bounce, but in practice there doesn't seem to be a noticeable difference in exchange
@@ -328,7 +328,7 @@ ccl_device_inline bool subsurface_random_walk(INTEGRATOR_STATE_ARGS)
    * Since the strength of the guided sampling increases as alpha gets lower, using a value that
    * is too low results in fireflies while one that's too high just gives a bit more noise.
    * Therefore, the code here uses the highest of the three albedos to be safe. */
-  float diffusion_length = diffusion_length_dwivedi(max3(alpha));
+  float diffusion_length = diffusion_length_dwivedi(reduce_max_f(alpha));
   /* Precompute term for phase sampling. */
   float phase_log = logf((diffusion_length + 1) / (diffusion_length - 1));
 
@@ -349,7 +349,7 @@ ccl_device_inline bool subsurface_random_walk(INTEGRATOR_STATE_ARGS)
 
     /* Sample color channel, use MIS with balance heuristic. */
     float rphase = path_state_rng_1D(kg, &rng_state, PRNG_PHASE_CHANNEL);
-    float3 channel_pdf;
+    SpectralColor channel_pdf;
     int channel = volume_sample_channel(alpha, throughput, rphase, &channel_pdf);
     float sample_sigma_t = volume_channel_get(sigma_t, channel);
     float randt = path_state_rng_1D(kg, &rng_state, PRNG_SCATTER_DISTANCE);
@@ -424,7 +424,7 @@ ccl_device_inline bool subsurface_random_walk(INTEGRATOR_STATE_ARGS)
      * If yes, we will later use backwards guided sampling in order to have a decent
      * chance of connecting to it.
      * Todo: Maybe use less than 10 times the mean free path? */
-    ray.t = (bounce == 0) ? max(t, 10.0f / (min3(sigma_t))) : t;
+    ray.t = (bounce == 0) ? max(t, 10.0f / (reduce_min_f(sigma_t))) : t;
     scene_intersect_local(kg, &ray, &ss_isect, object, NULL, 1);
     hit = (ss_isect.num_hits > 0);
 
@@ -462,16 +462,18 @@ ccl_device_inline bool subsurface_random_walk(INTEGRATOR_STATE_ARGS)
     /* Advance to new scatter location. */
     ray.P += t * ray.D;
 
-    float3 transmittance;
-    float3 pdf = subsurface_random_walk_pdf(sigma_t, t, hit, &transmittance);
+    SpectralColor transmittance;
+    SpectralColor pdf = subsurface_random_walk_pdf(sigma_t, t, hit, &transmittance);
     if (bounce > 0) {
       /* Compute PDF just like we do for classic sampling, but with the stretched sigma_t. */
-      float3 guided_pdf = subsurface_random_walk_pdf(forward_stretching * sigma_t, t, hit, NULL);
+      SpectralColor guided_pdf = subsurface_random_walk_pdf(
+          forward_stretching * sigma_t, t, hit, NULL);
 
       if (have_opposite_interface) {
         /* First step of MIS: Depending on geometry we might have two methods for guided
          * sampling, so perform MIS between them. */
-        float3 back_pdf = subsurface_random_walk_pdf(backward_stretching * sigma_t, t, hit, NULL);
+        SpectralColor back_pdf = subsurface_random_walk_pdf(
+            backward_stretching * sigma_t, t, hit, NULL);
         guided_pdf = mix(
             guided_pdf * forward_pdf_factor, back_pdf * backward_pdf_factor, backward_fraction);
       }
@@ -493,16 +495,13 @@ ccl_device_inline bool subsurface_random_walk(INTEGRATOR_STATE_ARGS)
       /* If we hit the surface, we are done. */
       break;
     }
-    else if (throughput.x < VOLUME_THROUGHPUT_EPSILON &&
-             throughput.y < VOLUME_THROUGHPUT_EPSILON &&
-             throughput.z < VOLUME_THROUGHPUT_EPSILON) {
+    else if (reduce_max_f(throughput) < VOLUME_THROUGHPUT_EPSILON) {
       /* Avoid unnecessary work and precision issue when throughput gets really small. */
       break;
     }
   }
 
-  kernel_assert(isfinite_safe(throughput.x) && isfinite_safe(throughput.y) &&
-                isfinite_safe(throughput.z));
+  kernel_assert(is_finite(throughput));
 
   /* Return number of hits in ss_isect. */
   if (!hit) {

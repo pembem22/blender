@@ -44,6 +44,26 @@ CCL_NAMESPACE_BEGIN
 
 /* Stack */
 
+ccl_device_inline SpectralColor stack_load_spectral_color(float *stack, uint a)
+{
+  kernel_assert(a + CHANNELS_PER_RAY - 1 < SVM_STACK_SIZE);
+
+  SpectralColor f;
+  FOREACH_CHANNEL (i) {
+    GET_CHANNEL(f, i) = stack[a + i];
+  }
+  return f;
+}
+
+ccl_device_inline void stack_store_spectral_color(float *stack, uint a, SpectralColor f)
+{
+  kernel_assert(a + CHANNELS_PER_RAY - 1 < SVM_STACK_SIZE);
+
+  FOREACH_CHANNEL (i) {
+    stack[a + i] = GET_CHANNEL(f, i);
+  }
+}
+
 ccl_device_inline float3 stack_load_float3(float *stack, uint a)
 {
   kernel_assert(a + 2 < SVM_STACK_SIZE);
@@ -194,6 +214,7 @@ CCL_NAMESPACE_END
 #include "kernel/svm/svm_noisetex.h"
 #include "kernel/svm/svm_normal.h"
 #include "kernel/svm/svm_ramp.h"
+#include "kernel/svm/svm_rgb_to_spectrum.h"
 #include "kernel/svm/svm_sepcomb_hsv.h"
 #include "kernel/svm/svm_sepcomb_vector.h"
 #include "kernel/svm/svm_sky.h"
@@ -258,7 +279,7 @@ ccl_device_noinline void svm_eval_nodes(INTEGRATOR_STATE_CONST_ARGS,
         break;
       }
       case NODE_CLOSURE_BSDF:
-        svm_node_closure_bsdf(kg, sd, stack, node, type, path_flag, &offset);
+        svm_node_closure_bsdf(INTEGRATOR_STATE_PASS, sd, stack, node, type, path_flag, &offset);
         break;
       case NODE_CLOSURE_EMISSION:
         svm_node_closure_emission(sd, stack, node);
@@ -324,6 +345,9 @@ ccl_device_noinline void svm_eval_nodes(INTEGRATOR_STATE_CONST_ARGS,
         svm_node_vector_displacement(kg, sd, stack, node, &offset);
         break;
 #  endif /* NODES_FEATURE(NODE_FEATURE_BUMP) */
+      case NODE_RGB_TO_SPECTRUM:
+        svm_node_rgb_to_spectrum(INTEGRATOR_STATE_PASS, sd, stack, node.y, node.z);
+        break;
       case NODE_TEX_IMAGE:
         svm_node_tex_image(kg, sd, stack, node, &offset);
         break;
@@ -387,7 +411,8 @@ ccl_device_noinline void svm_eval_nodes(INTEGRATOR_STATE_CONST_ARGS,
         svm_node_closure_volume(kg, sd, stack, node, type);
         break;
       case NODE_PRINCIPLED_VOLUME:
-        svm_node_principled_volume(kg, sd, stack, node, type, path_flag, &offset);
+        svm_node_principled_volume(
+            INTEGRATOR_STATE_PASS, sd, stack, node, type, path_flag, &offset);
         break;
 #  endif /* NODES_FEATURE(NODE_FEATURE_VOLUME) */
       case NODE_MATH:

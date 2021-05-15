@@ -20,7 +20,7 @@ CCL_NAMESPACE_BEGIN
 
 /* VOLUME EXTINCTION */
 
-ccl_device void volume_extinction_setup(ShaderData *sd, float3 weight)
+ccl_device void volume_extinction_setup(ShaderData *sd, SpectralColor weight)
 {
   if (sd->flag & SD_EXTINCTION) {
     sd->closure_transparent_extinction += weight;
@@ -69,10 +69,10 @@ ccl_device bool volume_henyey_greenstein_merge(const ShaderClosure *a, const Sha
   return (volume_a->g == volume_b->g);
 }
 
-ccl_device float3 volume_henyey_greenstein_eval_phase(const ShaderClosure *sc,
-                                                      const float3 I,
-                                                      float3 omega_in,
-                                                      float *pdf)
+ccl_device SpectralColor volume_henyey_greenstein_eval_phase(const ShaderClosure *sc,
+                                                             const float3 I,
+                                                             float3 omega_in,
+                                                             float *pdf)
 {
   const HenyeyGreensteinVolume *volume = (const HenyeyGreensteinVolume *)sc;
   float g = volume->g;
@@ -86,7 +86,7 @@ ccl_device float3 volume_henyey_greenstein_eval_phase(const ShaderClosure *sc,
     *pdf = single_peaked_henyey_greenstein(cos_theta, g);
   }
 
-  return make_float3(*pdf, *pdf, *pdf);
+  return make_spectral_color(*pdf);
 }
 
 ccl_device float3
@@ -127,7 +127,7 @@ ccl_device int volume_henyey_greenstein_sample(const ShaderClosure *sc,
                                                float3 dIdy,
                                                float randu,
                                                float randv,
-                                               float3 *eval,
+                                               SpectralColor *eval,
                                                float3 *omega_in,
                                                float3 *domega_in_dx,
                                                float3 *domega_in_dy,
@@ -138,7 +138,7 @@ ccl_device int volume_henyey_greenstein_sample(const ShaderClosure *sc,
 
   /* note that I points towards the viewer and so is used negated */
   *omega_in = henyey_greenstrein_sample(-I, g, randu, randv, pdf);
-  *eval = make_float3(*pdf, *pdf, *pdf); /* perfect importance sampling */
+  *eval = make_spectral_color(*pdf); /* perfect importance sampling */
 
 #ifdef __RAY_DIFFERENTIALS__
   /* todo: implement ray differential estimation */
@@ -151,10 +151,10 @@ ccl_device int volume_henyey_greenstein_sample(const ShaderClosure *sc,
 
 /* VOLUME CLOSURE */
 
-ccl_device float3 volume_phase_eval(const ShaderData *sd,
-                                    const ShaderClosure *sc,
-                                    float3 omega_in,
-                                    float *pdf)
+ccl_device SpectralColor volume_phase_eval(const ShaderData *sd,
+                                           const ShaderClosure *sc,
+                                           float3 omega_in,
+                                           float *pdf)
 {
   kernel_assert(sc->type == CLOSURE_VOLUME_HENYEY_GREENSTEIN_ID);
 
@@ -165,7 +165,7 @@ ccl_device int volume_phase_sample(const ShaderData *sd,
                                    const ShaderClosure *sc,
                                    float randu,
                                    float randv,
-                                   float3 *eval,
+                                   SpectralColor *eval,
                                    float3 *omega_in,
                                    differential3 *domega_in,
                                    float *pdf)
@@ -187,7 +187,7 @@ ccl_device int volume_phase_sample(const ShaderData *sd,
                                               pdf);
       break;
     default:
-      *eval = make_float3(0.0f, 0.0f, 0.0f);
+      *eval = zero_spectral_color();
       label = LABEL_NONE;
       break;
   }
@@ -201,46 +201,47 @@ ccl_device int volume_phase_sample(const ShaderData *sd,
  * unnecessary work in volumes and subsurface scattering. */
 #define VOLUME_THROUGHPUT_EPSILON 1e-6f
 
-ccl_device float3 volume_color_transmittance(float3 sigma, float t)
+ccl_device SpectralColor volume_color_transmittance(SpectralColor sigma, float t)
 {
-  return exp3(-sigma * t);
+  return exp(-sigma * t);
 }
 
-ccl_device float volume_channel_get(float3 value, int channel)
+ccl_device float volume_channel_get(SpectralColor value, int channel)
 {
-  return (channel == 0) ? value.x : ((channel == 1) ? value.y : value.z);
+  return GET_CHANNEL(value, channel);
 }
 
-ccl_device int volume_sample_channel(float3 albedo, float3 throughput, float rand, float3 *pdf)
+ccl_device int volume_sample_channel(SpectralColor albedo,
+                                     SpectralColor throughput,
+                                     float rand,
+                                     SpectralColor *pdf)
 {
   /* Sample color channel proportional to throughput and single scattering
    * albedo, to significantly reduce noise with many bounce, following:
    *
    * "Practical and Controllable Subsurface Scattering for Production Path
    *  Tracing". Matt Jen-Yuan Chiang, Peter Kutz, Brent Burley. SIGGRAPH 2016. */
-  float3 weights = fabs(throughput * albedo);
+  SpectralColor weights = fabs(throughput * albedo);
   float sum_weights = weights.x + weights.y + weights.z;
-  float3 weights_pdf;
+  SpectralColor weights_pdf;
 
   if (sum_weights > 0.0f) {
     weights_pdf = weights / sum_weights;
   }
   else {
-    weights_pdf = make_float3(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f);
+    weights_pdf = make_spectral_color(1.0f / CHANNELS_PER_RAY);
   }
 
   *pdf = weights_pdf;
 
-  /* OpenCL does not support -> on float3, so don't use pdf->x. */
-  if (rand < weights_pdf.x) {
-    return 0;
+  float sum = 0.0f;
+  FOREACH_CHANNEL (i) {
+    sum += GET_CHANNEL(weights_pdf, i);
+    if (rand < sum) {
+      return i;
+    }
   }
-  else if (rand < weights_pdf.x + weights_pdf.y) {
-    return 1;
-  }
-  else {
-    return 2;
-  }
+  return CHANNELS_PER_RAY - 1;
 }
 
 CCL_NAMESPACE_END

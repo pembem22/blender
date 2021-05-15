@@ -66,14 +66,14 @@ ccl_device bool bsdf_hair_merge(const ShaderClosure *a, const ShaderClosure *b)
   const HairBsdf *bsdf_a = (const HairBsdf *)a;
   const HairBsdf *bsdf_b = (const HairBsdf *)b;
 
-  return (isequal_float3(bsdf_a->T, bsdf_b->T)) && (bsdf_a->roughness1 == bsdf_b->roughness1) &&
+  return (is_equal(bsdf_a->T, bsdf_b->T)) && (bsdf_a->roughness1 == bsdf_b->roughness1) &&
          (bsdf_a->roughness2 == bsdf_b->roughness2) && (bsdf_a->offset == bsdf_b->offset);
 }
 
-ccl_device float3 bsdf_hair_reflection_eval_reflect(const ShaderClosure *sc,
-                                                    const float3 I,
-                                                    const float3 omega_in,
-                                                    float *pdf)
+ccl_device SpectralColor bsdf_hair_reflection_eval_reflect(const ShaderClosure *sc,
+                                                           const float3 I,
+                                                           const float3 omega_in,
+                                                           float *pdf)
 {
   const HairBsdf *bsdf = (const HairBsdf *)sc;
   float offset = bsdf->offset;
@@ -94,7 +94,7 @@ ccl_device float3 bsdf_hair_reflection_eval_reflect(const ShaderClosure *sc,
 
   if (M_PI_2_F - fabsf(theta_i) < 0.001f || cosphi_i < 0.0f) {
     *pdf = 0.0f;
-    return make_float3(*pdf, *pdf, *pdf);
+    return make_spectral_color(*pdf);
   }
 
   float roughness1_inv = 1.0f / roughness1;
@@ -114,29 +114,29 @@ ccl_device float3 bsdf_hair_reflection_eval_reflect(const ShaderClosure *sc,
                     (2 * (t * t + roughness1 * roughness1) * (a_R - b_R) * costheta_i);
   *pdf = phi_pdf * theta_pdf;
 
-  return make_float3(*pdf, *pdf, *pdf);
+  return make_spectral_color(*pdf);
 }
 
-ccl_device float3 bsdf_hair_transmission_eval_reflect(const ShaderClosure *sc,
-                                                      const float3 I,
-                                                      const float3 omega_in,
-                                                      float *pdf)
+ccl_device SpectralColor bsdf_hair_transmission_eval_reflect(const ShaderClosure *sc,
+                                                             const float3 I,
+                                                             const float3 omega_in,
+                                                             float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
-ccl_device float3 bsdf_hair_reflection_eval_transmit(const ShaderClosure *sc,
-                                                     const float3 I,
-                                                     const float3 omega_in,
-                                                     float *pdf)
+ccl_device SpectralColor bsdf_hair_reflection_eval_transmit(const ShaderClosure *sc,
+                                                            const float3 I,
+                                                            const float3 omega_in,
+                                                            float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
-ccl_device float3 bsdf_hair_transmission_eval_transmit(const ShaderClosure *sc,
-                                                       const float3 I,
-                                                       const float3 omega_in,
-                                                       float *pdf)
+ccl_device SpectralColor bsdf_hair_transmission_eval_transmit(const ShaderClosure *sc,
+                                                              const float3 I,
+                                                              const float3 omega_in,
+                                                              float *pdf)
 {
   const HairBsdf *bsdf = (const HairBsdf *)sc;
   float offset = bsdf->offset;
@@ -156,7 +156,7 @@ ccl_device float3 bsdf_hair_transmission_eval_transmit(const ShaderClosure *sc,
 
   if (M_PI_2_F - fabsf(theta_i) < 0.001f) {
     *pdf = 0.0f;
-    return make_float3(*pdf, *pdf, *pdf);
+    return make_spectral_color(*pdf);
   }
 
   float costheta_i = fast_cosf(theta_i);
@@ -176,7 +176,7 @@ ccl_device float3 bsdf_hair_transmission_eval_transmit(const ShaderClosure *sc,
   float phi_pdf = roughness2 / (c_TT * (p * p + roughness2 * roughness2));
 
   *pdf = phi_pdf * theta_pdf;
-  return make_float3(*pdf, *pdf, *pdf);
+  return make_spectral_color(*pdf);
 }
 
 ccl_device int bsdf_hair_reflection_sample(const ShaderClosure *sc,
@@ -186,7 +186,7 @@ ccl_device int bsdf_hair_reflection_sample(const ShaderClosure *sc,
                                            float3 dIdy,
                                            float randu,
                                            float randv,
-                                           float3 *eval,
+                                           SpectralColor *eval,
                                            float3 *omega_in,
                                            float3 *domega_in_dx,
                                            float3 *domega_in_dy,
@@ -235,7 +235,7 @@ ccl_device int bsdf_hair_reflection_sample(const ShaderClosure *sc,
   if (M_PI_2_F - fabsf(theta_i) < 0.001f)
     *pdf = 0.0f;
 
-  *eval = make_float3(*pdf, *pdf, *pdf);
+  *eval = make_spectral_color(*pdf);
 
   return LABEL_REFLECT | LABEL_GLOSSY;
 }
@@ -247,7 +247,7 @@ ccl_device int bsdf_hair_transmission_sample(const ShaderClosure *sc,
                                              float3 dIdy,
                                              float randu,
                                              float randv,
-                                             float3 *eval,
+                                             SpectralColor *eval,
                                              float3 *omega_in,
                                              float3 *domega_in_dx,
                                              float3 *domega_in_dy,
@@ -297,7 +297,7 @@ ccl_device int bsdf_hair_transmission_sample(const ShaderClosure *sc,
     *pdf = 0.0f;
   }
 
-  *eval = make_float3(*pdf, *pdf, *pdf);
+  *eval = make_spectral_color(*pdf);
 
   /* TODO(sergey): Should always be negative, but seems some precision issue
    * is involved here.

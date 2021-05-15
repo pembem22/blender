@@ -255,7 +255,7 @@ ccl_device void kernel_volume_shadow_heterogeneous(const KernelGlobals *kg,
        * check then. */
       sum += (-sigma_t * dt);
       if ((i & 0x07) == 0) { /* ToDo: Other interval? */
-        tp = *throughput * exp3(sum);
+        tp = *throughput * exp(sum);
 
         /* stop if nearly all light is blocked */
         if (tp.x < VOLUME_THROUGHPUT_EPSILON && tp.y < VOLUME_THROUGHPUT_EPSILON &&
@@ -268,7 +268,7 @@ ccl_device void kernel_volume_shadow_heterogeneous(const KernelGlobals *kg,
     t = new_t;
     if (t == ray->t) {
       /* Update throughput in case we haven't done it above */
-      tp = *throughput * exp3(sum);
+      tp = *throughput * exp(sum);
       break;
     }
   }

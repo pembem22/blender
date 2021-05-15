@@ -17,6 +17,7 @@
 #pragma once
 
 #include "kernel_adaptive_sampling.h"
+#include "kernel_color.h"
 #include "kernel_random.h"
 #include "kernel_write_passes.h"
 
@@ -32,11 +33,11 @@ CCL_NAMESPACE_BEGIN
 
 ccl_device_inline void bsdf_eval_init(BsdfEval *eval,
                                       const bool is_diffuse,
-                                      float3 value,
+                                      SpectralColor value,
                                       const bool use_light_pass)
 {
-  eval->diffuse = zero_float3();
-  eval->glossy = zero_float3();
+  eval->diffuse = zero_spectral_color();
+  eval->glossy = zero_spectral_color();
 
   if (is_diffuse) {
     eval->diffuse = value;
@@ -48,7 +49,7 @@ ccl_device_inline void bsdf_eval_init(BsdfEval *eval,
 
 ccl_device_inline void bsdf_eval_accum(BsdfEval *eval,
                                        const bool is_diffuse,
-                                       float3 value,
+                                       SpectralColor value,
                                        float mis_weight)
 {
   value *= mis_weight;
@@ -72,22 +73,22 @@ ccl_device_inline void bsdf_eval_mul(BsdfEval *eval, float value)
   eval->glossy *= value;
 }
 
-ccl_device_inline void bsdf_eval_mul3(BsdfEval *eval, float3 value)
+ccl_device_inline void bsdf_eval_mul(BsdfEval *eval, SpectralColor value)
 {
   eval->diffuse *= value;
   eval->glossy *= value;
 }
 
-ccl_device_inline float3 bsdf_eval_sum(const BsdfEval *eval)
+ccl_device_inline SpectralColor bsdf_eval_sum(const BsdfEval *eval)
 {
   return eval->diffuse + eval->glossy;
 }
 
-ccl_device_inline float3 bsdf_eval_diffuse_glossy_ratio(const BsdfEval *eval)
+ccl_device_inline SpectralColor bsdf_eval_diffuse_glossy_ratio(const BsdfEval *eval)
 {
   /* Ratio of diffuse and glossy to recover proportions for writing to render pass.
    * We assume reflection, transmission and volume scatter to be exclusive. */
-  return safe_divide_float3_float3(eval->diffuse, eval->diffuse + eval->glossy);
+  return safe_divide(eval->diffuse, eval->diffuse + eval->glossy);
 }
 
 /* Clamping
@@ -96,17 +97,19 @@ ccl_device_inline float3 bsdf_eval_diffuse_glossy_ratio(const BsdfEval *eval)
  * to render buffers instead of using per-thread memory, and to avoid the
  * impact of clamping on other contributions. */
 
-ccl_device_forceinline void kernel_accum_clamp(const KernelGlobals *kg, float3 *L, int bounce)
+ccl_device_forceinline void kernel_accum_clamp(const KernelGlobals *kg,
+                                               SpectralColor *L,
+                                               int bounce)
 {
   /* Make sure all components are finite, allowing the contribution to be usable by adaptive
    * sampling convergence check, but also to make it so render result never causes issues with
    * post-processing. */
-  *L = ensure_finite3(*L);
+  *L = ensure_finite(*L);
 
 #ifdef __CLAMP_SAMPLE__
   float limit = (bounce > 0) ? kernel_data.integrator.sample_clamp_indirect :
                                kernel_data.integrator.sample_clamp_direct;
-  float sum = reduce_add(fabs(*L));
+  float sum = reduce_add_f(fabs(*L));
   if (sum > limit) {
     *L *= limit / sum;
   }
@@ -200,7 +203,7 @@ ccl_device_inline void path_radiance_sum_shadowcatcher(const KernelGlobals *kg,
   float path_total = average(L->path_total);
   float shadow;
 
-  if (UNLIKELY(!isfinite_safe(path_total))) {
+  if (UNLIKELY(!is_finite(path_total))) {
     kernel_assert(!"Non-finite total radiance along the path");
     shadow = 0.0f;
   }
@@ -246,7 +249,7 @@ ccl_device_inline float3 path_radiance_clamp_and_sum(const KernelGlobals *kg,
     float sum = fabsf((L_sum).x) + fabsf((L_sum).y) + fabsf((L_sum).z);
 
     /* Reject invalid value */
-    if (!isfinite_safe(sum)) {
+    if (!is_finite(sum)) {
       kernel_assert(!"Non-finite sum in path_radiance_clamp_and_sum!");
       L_sum = zero_float3();
 
@@ -272,7 +275,7 @@ ccl_device_inline float3 path_radiance_clamp_and_sum(const KernelGlobals *kg,
 
     /* Reject invalid value */
     float sum = fabsf((L_sum).x) + fabsf((L_sum).y) + fabsf((L_sum).z);
-    if (!isfinite_safe(sum)) {
+    if (!is_finite(sum)) {
       kernel_assert(!"Non-finite final sum in path_radiance_clamp_and_sum!");
       L_sum = zero_float3();
     }
@@ -303,7 +306,7 @@ ccl_device_forceinline ccl_global float *kernel_accum_pixel_render_buffer(
 }
 
 ccl_device void kernel_accum_adaptive_buffer(INTEGRATOR_STATE_CONST_ARGS,
-                                             const float3 contribution,
+                                             const SpectralColor contribution,
                                              ccl_global float *ccl_restrict buffer)
 {
   /* Adaptive Sampling. Fill the additional buffer with the odd samples and calculate our stopping
@@ -311,31 +314,35 @@ ccl_device void kernel_accum_adaptive_buffer(INTEGRATOR_STATE_CONST_ARGS,
    * Carlo global illumination" except that here it is applied per pixel and not in hierarchical
    * tiles. */
 
+  const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);
+
   if (kernel_data.film.pass_adaptive_aux_buffer == PASS_UNUSED) {
     return;
   }
 
   const int sample = INTEGRATOR_STATE(path, sample);
   if (sample_is_even(kernel_data.integrator.sampling_pattern, sample)) {
-    kernel_write_pass_float4(
-        buffer + kernel_data.film.pass_adaptive_aux_buffer,
-        make_float4(contribution.x * 2.0f, contribution.y * 2.0f, contribution.z * 2.0f, 0.0f));
+    kernel_write_pass_float4(buffer + kernel_data.film.pass_adaptive_aux_buffer,
+                             make_float4(contribution_rgb.x * 2.0f,
+                                         contribution_rgb.y * 2.0f,
+                                         contribution_rgb.z * 2.0f,
+                                         0.0f));
   }
 }
 
 /* Write combined pass. */
 ccl_device_inline void kernel_accum_combined_pass(INTEGRATOR_STATE_CONST_ARGS,
-                                                  const float3 contribution,
+                                                  const SpectralColor contribution,
                                                   ccl_global float *ccl_restrict buffer)
 {
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
-    kernel_write_pass_float3(buffer, contribution);
+    kernel_write_pass_spectral_color(INTEGRATOR_STATE_PASS, buffer, contribution);
   }
 
 #ifdef __PASSES__
   if (kernel_data.film.pass_denoising_color != PASS_UNUSED) {
-    kernel_write_pass_float3_unaligned(buffer + kernel_data.film.pass_denoising_color,
-                                       contribution);
+    kernel_write_pass_spectral_color_unaligned(
+        INTEGRATOR_STATE_PASS, buffer + kernel_data.film.pass_denoising_color, contribution);
   }
 #endif
 
@@ -344,20 +351,23 @@ ccl_device_inline void kernel_accum_combined_pass(INTEGRATOR_STATE_CONST_ARGS,
 
 /* Write combined pass with transparency. */
 ccl_device_inline void kernel_accum_combined_transparent_pass(INTEGRATOR_STATE_CONST_ARGS,
-                                                              const float3 contribution,
+                                                              const SpectralColor contribution,
                                                               const float transparent,
                                                               ccl_global float *ccl_restrict
                                                                   buffer)
 {
+  const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);
+
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
     kernel_write_pass_float4(
-        buffer, make_float4(contribution.x, contribution.y, contribution.z, transparent));
+        buffer,
+        make_float4(contribution_rgb.x, contribution_rgb.y, contribution_rgb.z, transparent));
   }
 
 #ifdef __PASSES__
   if (kernel_data.film.pass_denoising_color != PASS_UNUSED) {
     kernel_write_pass_float3_unaligned(buffer + kernel_data.film.pass_denoising_color,
-                                       contribution);
+                                       contribution_rgb);
   }
 #endif
 
@@ -366,7 +376,7 @@ ccl_device_inline void kernel_accum_combined_transparent_pass(INTEGRATOR_STATE_C
 
 /* Write background or emission to appropriate pass. */
 ccl_device_inline void kernel_accum_emission_or_background_pass(INTEGRATOR_STATE_CONST_ARGS,
-                                                                float3 contribution,
+                                                                SpectralColor contribution,
                                                                 ccl_global float *ccl_restrict
                                                                     buffer,
                                                                 const int pass)
@@ -387,11 +397,12 @@ ccl_device_inline void kernel_accum_emission_or_background_pass(INTEGRATOR_STATE
 #  ifdef __DENOISING_FEATURES__
     if (path_flag & PATH_RAY_DENOISING_FEATURES) {
       if (kernel_data.film.pass_denoising_albedo != PASS_UNUSED) {
-        const float3 denoising_feature_throughput = INTEGRATOR_STATE(path,
-                                                                     denoising_feature_throughput);
-        const float3 denoising_albedo = denoising_feature_throughput * contribution;
-        kernel_write_pass_float3_unaligned(buffer + kernel_data.film.pass_denoising_albedo,
-                                           denoising_albedo);
+        const SpectralColor denoising_feature_throughput = INTEGRATOR_STATE(
+            path, denoising_feature_throughput);
+        const SpectralColor denoising_albedo = denoising_feature_throughput * contribution;
+        kernel_write_pass_spectral_color_unaligned(INTEGRATOR_STATE_PASS,
+                                                   buffer + kernel_data.film.pass_denoising_albedo,
+                                                   denoising_albedo);
       }
     }
 #  endif /* __DENOISING_FEATURES__ */
@@ -405,9 +416,10 @@ ccl_device_inline void kernel_accum_emission_or_background_pass(INTEGRATOR_STATE
     if (glossy_pass_offset != PASS_UNUSED) {
       /* Glossy is a subset of the throughput, reconstruct it here using the
        * diffuse-glossy ratio. */
-      const float3 ratio = INTEGRATOR_STATE(path, diffuse_glossy_ratio);
-      const float3 glossy_contribution = (one_float3() - ratio) * contribution;
-      kernel_write_pass_float3(buffer + glossy_pass_offset, glossy_contribution);
+      const SpectralColor ratio = INTEGRATOR_STATE(path, diffuse_glossy_ratio);
+      const SpectralColor glossy_contribution = (one_spectral_color() - ratio) * contribution;
+      kernel_write_pass_spectral_color(
+          INTEGRATOR_STATE_PASS, buffer + glossy_pass_offset, glossy_contribution);
     }
 
     /* Reconstruct diffuse subset of throughput. */
@@ -431,7 +443,7 @@ ccl_device_inline void kernel_accum_emission_or_background_pass(INTEGRATOR_STATE
 
   /* Single write call for GPU coherence. */
   if (pass_offset != PASS_UNUSED) {
-    kernel_write_pass_float3(buffer + pass_offset, contribution);
+    kernel_write_pass_spectral_color(INTEGRATOR_STATE_PASS, buffer + pass_offset, contribution);
   }
 #endif /* __PASSES__ */
 }
@@ -441,7 +453,7 @@ ccl_device_inline void kernel_accum_light(INTEGRATOR_STATE_CONST_ARGS,
                                           ccl_global float *ccl_restrict render_buffer)
 {
   /* The throughput for shadow paths already contains the light shader evaluation. */
-  float3 contribution = INTEGRATOR_STATE(shadow_path, throughput);
+  SpectralColor contribution = INTEGRATOR_STATE(shadow_path, throughput);
   kernel_accum_clamp(kg, &contribution, INTEGRATOR_STATE(shadow_path, bounce) - 1);
 
   ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,
@@ -463,9 +475,10 @@ ccl_device_inline void kernel_accum_light(INTEGRATOR_STATE_CONST_ARGS,
       if (glossy_pass_offset != PASS_UNUSED) {
         /* Glossy is a subset of the throughput, reconstruct it here using the
          * diffuse-glossy ratio. */
-        const float3 ratio = INTEGRATOR_STATE(shadow_path, diffuse_glossy_ratio);
-        const float3 glossy_contribution = (one_float3() - ratio) * contribution;
-        kernel_write_pass_float3(buffer + glossy_pass_offset, glossy_contribution);
+        const SpectralColor ratio = INTEGRATOR_STATE(shadow_path, diffuse_glossy_ratio);
+        const SpectralColor glossy_contribution = (one_spectral_color() - ratio) * contribution;
+        kernel_write_pass_spectral_color(
+            INTEGRATOR_STATE_PASS, buffer + glossy_pass_offset, glossy_contribution);
       }
 
       /* Reconstruct diffuse subset of throughput. */
@@ -491,7 +504,7 @@ ccl_device_inline void kernel_accum_light(INTEGRATOR_STATE_CONST_ARGS,
 
     /* Single write call for GPU coherence. */
     if (pass_offset != PASS_UNUSED) {
-      kernel_write_pass_float3(buffer + pass_offset, contribution);
+      kernel_write_pass_spectral_color(INTEGRATOR_STATE_PASS, buffer + pass_offset, contribution);
     }
 
     /* TODO: Write shadow pass. */
@@ -529,11 +542,11 @@ ccl_device_inline void kernel_accum_transparent(INTEGRATOR_STATE_CONST_ARGS,
  *
  * Includes transparency, matching kernel_accum_transparent. */
 ccl_device_inline void kernel_accum_background(INTEGRATOR_STATE_CONST_ARGS,
-                                               const float3 L,
+                                               const SpectralColor L,
                                                const float transparent,
                                                ccl_global float *ccl_restrict render_buffer)
 {
-  float3 contribution = INTEGRATOR_STATE(path, throughput) * L;
+  SpectralColor contribution = INTEGRATOR_STATE(path, throughput) * L;
   kernel_accum_clamp(kg, &contribution, INTEGRATOR_STATE(path, bounce) - 1);
 
   ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,
@@ -546,10 +559,10 @@ ccl_device_inline void kernel_accum_background(INTEGRATOR_STATE_CONST_ARGS,
 
 /* Write emission to render buffer. */
 ccl_device_inline void kernel_accum_emission(INTEGRATOR_STATE_CONST_ARGS,
-                                             const float3 L,
+                                             const SpectralColor L,
                                              ccl_global float *ccl_restrict render_buffer)
 {
-  float3 contribution = INTEGRATOR_STATE(path, throughput) * L;
+  SpectralColor contribution = INTEGRATOR_STATE(path, throughput) * L;
   kernel_accum_clamp(kg, &contribution, INTEGRATOR_STATE(path, bounce) - 1);
 
   ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,

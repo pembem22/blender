@@ -73,13 +73,13 @@ ccl_device_inline bool integrate_surface_holdout(INTEGRATOR_STATE_CONST_ARGS,
 
   if (((sd->flag & SD_HOLDOUT) || (sd->object_flag & SD_OBJECT_HOLDOUT_MASK)) &&
       (path_flag & PATH_RAY_TRANSPARENT_BACKGROUND)) {
-    const float3 holdout_weight = shader_holdout_apply(kg, sd);
+    const SpectralColor holdout_weight = shader_holdout_apply(kg, sd);
     if (kernel_data.background.transparent) {
-      const float3 throughput = INTEGRATOR_STATE(path, throughput);
+      const SpectralColor throughput = INTEGRATOR_STATE(path, throughput);
       const float transparent = average(holdout_weight * throughput);
       kernel_accum_transparent(INTEGRATOR_STATE_PASS, transparent, render_buffer);
     }
-    if (isequal_float3(holdout_weight, one_float3())) {
+    if (is_equal(holdout_weight, one_spectral_color())) {
       return false;
     }
   }
@@ -96,7 +96,7 @@ ccl_device_inline void integrate_surface_emission(INTEGRATOR_STATE_CONST_ARGS,
   const uint32_t path_flag = INTEGRATOR_STATE(path, flag);
 
   /* Evaluate emissive closure. */
-  float3 L = shader_emissive_eval(sd);
+  SpectralColor L = shader_emissive_eval(sd);
 
 #  ifdef __HAIR__
   if (!(path_flag & PATH_RAY_MIS_SKIP) && (sd->flag & SD_USE_MIS) &&
@@ -154,7 +154,7 @@ ccl_device_inline void integrate_surface_direct_light(INTEGRATOR_STATE_ARGS,
    * non-constant light sources. */
   ShaderDataTinyStorage emission_sd_storage;
   ShaderData *emission_sd = AS_SHADER_DATA(&emission_sd_storage);
-  const float3 light_eval = light_sample_shader_eval(
+  const SpectralColor light_eval = light_sample_shader_eval(
       INTEGRATOR_STATE_PASS, emission_sd, &ls, sd->time);
   if (is_zero(light_eval)) {
     return;
@@ -164,8 +164,9 @@ ccl_device_inline void integrate_surface_direct_light(INTEGRATOR_STATE_ARGS,
   const bool is_transmission = shader_bsdf_is_transmission(sd, ls.D);
 
   BsdfEval bsdf_eval ccl_optional_struct_init;
-  shader_bsdf_eval(kg, sd, ls.D, is_transmission, &bsdf_eval, ls.pdf, ls.shader);
-  bsdf_eval_mul3(&bsdf_eval, light_eval / ls.pdf);
+  shader_bsdf_eval(
+      INTEGRATOR_STATE_PASS, sd, ls.D, is_transmission, &bsdf_eval, ls.pdf, ls.shader);
+  bsdf_eval_mul(&bsdf_eval, light_eval / ls.pdf);
 
   /* Path termination. */
   const float terminate = path_state_rng_light_termination(kg, rng_state);
@@ -187,9 +188,10 @@ ccl_device_inline void integrate_surface_direct_light(INTEGRATOR_STATE_ARGS,
   uint32_t shadow_flag = INTEGRATOR_STATE(path, flag);
   shadow_flag |= (is_light) ? PATH_RAY_SHADOW_FOR_LIGHT : 0;
   shadow_flag |= (is_transmission) ? PATH_RAY_TRANSMISSION_PASS : PATH_RAY_REFLECT_PASS;
-  const float3 diffuse_glossy_ratio = (bounce == 0) ? bsdf_eval_diffuse_glossy_ratio(&bsdf_eval) :
-                                                      INTEGRATOR_STATE(path, diffuse_glossy_ratio);
-  const float3 throughput = INTEGRATOR_STATE(path, throughput) * bsdf_eval_sum(&bsdf_eval);
+  const SpectralColor diffuse_glossy_ratio = (bounce == 0) ?
+                                                 bsdf_eval_diffuse_glossy_ratio(&bsdf_eval) :
+                                                 INTEGRATOR_STATE(path, diffuse_glossy_ratio);
+  const SpectralColor throughput = INTEGRATOR_STATE(path, throughput) * bsdf_eval_sum(&bsdf_eval);
 
   INTEGRATOR_STATE_WRITE(shadow_path, flag) = shadow_flag;
   INTEGRATOR_STATE_WRITE(shadow_path, bounce) = bounce;
@@ -229,8 +231,15 @@ ccl_device bool integrate_surface_bounce(INTEGRATOR_STATE_ARGS,
     differential3 bsdf_domega_in ccl_optional_struct_init;
     int label;
 
-    label = shader_bsdf_sample_closure(
-        kg, sd, sc, bsdf_u, bsdf_v, &bsdf_eval, &bsdf_omega_in, &bsdf_domega_in, &bsdf_pdf);
+    label = shader_bsdf_sample_closure(INTEGRATOR_STATE_PASS,
+                                       sd,
+                                       sc,
+                                       bsdf_u,
+                                       bsdf_v,
+                                       &bsdf_eval,
+                                       &bsdf_omega_in,
+                                       &bsdf_domega_in,
+                                       &bsdf_pdf);
 
     if (bsdf_pdf == 0.0f || bsdf_eval_is_zero(&bsdf_eval)) {
       return false;
@@ -250,7 +259,7 @@ ccl_device bool integrate_surface_bounce(INTEGRATOR_STATE_ARGS,
 #endif
 
     /* Update throughput. */
-    float3 throughput = INTEGRATOR_STATE(path, throughput);
+    SpectralColor throughput = INTEGRATOR_STATE(path, throughput);
     throughput *= bsdf_eval_sum(&bsdf_eval) / bsdf_pdf;
     INTEGRATOR_STATE_WRITE(path, throughput) = throughput;
     if (INTEGRATOR_STATE(path, bounce) == 0) {

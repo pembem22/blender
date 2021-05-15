@@ -68,16 +68,6 @@ __forceinline float &float4::operator[](int i)
   return *(&x + i);
 }
 
-ccl_device_inline float4 make_float4(float f)
-{
-#  ifdef __KERNEL_SSE__
-  float4 a(_mm_set1_ps(f));
-#  else
-  float4 a = {f, f, f, f};
-#  endif
-  return a;
-}
-
 ccl_device_inline float4 make_float4(float x, float y, float z, float w)
 {
 #  ifdef __KERNEL_SSE__
@@ -103,6 +93,16 @@ ccl_device_inline void print_float4(const char *label, const float4 &a)
   printf("%s: %.8f %.8f %.8f %.8f\n", label, (double)a.x, (double)a.y, (double)a.z, (double)a.w);
 }
 #endif /* __KERNEL_GPU__ */
+
+ccl_device_inline float4 make_float4(float f)
+{
+#ifdef __KERNEL_SSE__
+  float4 a(_mm_set1_ps(f));
+#else
+  float4 a = {f, f, f, f};
+#endif
+  return a;
+}
 
 CCL_NAMESPACE_END
 

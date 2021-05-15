@@ -60,13 +60,13 @@ ccl_device bool bsdf_ashikhmin_velvet_merge(const ShaderClosure *a, const Shader
   const VelvetBsdf *bsdf_a = (const VelvetBsdf *)a;
   const VelvetBsdf *bsdf_b = (const VelvetBsdf *)b;
 
-  return (isequal_float3(bsdf_a->N, bsdf_b->N)) && (bsdf_a->sigma == bsdf_b->sigma);
+  return (is_equal(bsdf_a->N, bsdf_b->N)) && (bsdf_a->sigma == bsdf_b->sigma);
 }
 
-ccl_device float3 bsdf_ashikhmin_velvet_eval_reflect(const ShaderClosure *sc,
-                                                     const float3 I,
-                                                     const float3 omega_in,
-                                                     float *pdf)
+ccl_device SpectralColor bsdf_ashikhmin_velvet_eval_reflect(const ShaderClosure *sc,
+                                                            const float3 I,
+                                                            const float3 omega_in,
+                                                            float *pdf)
 {
   const VelvetBsdf *bsdf = (const VelvetBsdf *)sc;
   float m_invsigma2 = bsdf->invsigma2;
@@ -80,8 +80,9 @@ ccl_device float3 bsdf_ashikhmin_velvet_eval_reflect(const ShaderClosure *sc,
     float cosNH = dot(N, H);
     float cosHO = fabsf(dot(I, H));
 
-    if (!(fabsf(cosNH) < 1.0f - 1e-5f && cosHO > 1e-5f))
-      return make_float3(0.0f, 0.0f, 0.0f);
+    if (!(fabsf(cosNH) < 1.0f - 1e-5f && cosHO > 1e-5f)) {
+      return zero_spectral_color();
+    }
 
     float cosNHdivHO = cosNH / cosHO;
     cosNHdivHO = fmaxf(cosNHdivHO, 1e-5f);
@@ -99,18 +100,18 @@ ccl_device float3 bsdf_ashikhmin_velvet_eval_reflect(const ShaderClosure *sc,
     float out = 0.25f * (D * G) / cosNO;
 
     *pdf = 0.5f * M_1_PI_F;
-    return make_float3(out, out, out);
+    return make_spectral_color(out);
   }
 
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
-ccl_device float3 bsdf_ashikhmin_velvet_eval_transmit(const ShaderClosure *sc,
-                                                      const float3 I,
-                                                      const float3 omega_in,
-                                                      float *pdf)
+ccl_device SpectralColor bsdf_ashikhmin_velvet_eval_transmit(const ShaderClosure *sc,
+                                                             const float3 I,
+                                                             const float3 omega_in,
+                                                             float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_ashikhmin_velvet_sample(const ShaderClosure *sc,
@@ -120,7 +121,7 @@ ccl_device int bsdf_ashikhmin_velvet_sample(const ShaderClosure *sc,
                                             float3 dIdy,
                                             float randu,
                                             float randv,
-                                            float3 *eval,
+                                            SpectralColor *eval,
                                             float3 *omega_in,
                                             float3 *domega_in_dx,
                                             float3 *domega_in_dy,
@@ -158,7 +159,7 @@ ccl_device int bsdf_ashikhmin_velvet_sample(const ShaderClosure *sc,
 
       float power = 0.25f * (D * G) / cosNO;
 
-      *eval = make_float3(power, power, power);
+      *eval = make_spectral_color(power);
 
 #ifdef __RAY_DIFFERENTIALS__
       // TODO: find a better approximation for the retroreflective bounce

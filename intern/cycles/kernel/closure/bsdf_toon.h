@@ -59,11 +59,11 @@ ccl_device bool bsdf_toon_merge(const ShaderClosure *a, const ShaderClosure *b)
   const ToonBsdf *bsdf_a = (const ToonBsdf *)a;
   const ToonBsdf *bsdf_b = (const ToonBsdf *)b;
 
-  return (isequal_float3(bsdf_a->N, bsdf_b->N)) && (bsdf_a->size == bsdf_b->size) &&
+  return (is_equal(bsdf_a->N, bsdf_b->N)) && (bsdf_a->size == bsdf_b->size) &&
          (bsdf_a->smooth == bsdf_b->smooth);
 }
 
-ccl_device float3 bsdf_toon_get_intensity(float max_angle, float smooth, float angle)
+ccl_device SpectralColor bsdf_toon_get_intensity(float max_angle, float smooth, float angle)
 {
   float is;
 
@@ -74,7 +74,7 @@ ccl_device float3 bsdf_toon_get_intensity(float max_angle, float smooth, float a
   else
     is = 0.0f;
 
-  return make_float3(is, is, is);
+  return make_spectral_color(is);
 }
 
 ccl_device float bsdf_toon_get_sample_angle(float max_angle, float smooth)
@@ -82,17 +82,17 @@ ccl_device float bsdf_toon_get_sample_angle(float max_angle, float smooth)
   return fminf(max_angle + smooth, M_PI_2_F);
 }
 
-ccl_device float3 bsdf_diffuse_toon_eval_reflect(const ShaderClosure *sc,
-                                                 const float3 I,
-                                                 const float3 omega_in,
-                                                 float *pdf)
+ccl_device SpectralColor bsdf_diffuse_toon_eval_reflect(const ShaderClosure *sc,
+                                                        const float3 I,
+                                                        const float3 omega_in,
+                                                        float *pdf)
 {
   const ToonBsdf *bsdf = (const ToonBsdf *)sc;
   float max_angle = bsdf->size * M_PI_2_F;
   float smooth = bsdf->smooth * M_PI_2_F;
   float angle = safe_acosf(fmaxf(dot(bsdf->N, omega_in), 0.0f));
 
-  float3 eval = bsdf_toon_get_intensity(max_angle, smooth, angle);
+  SpectralColor eval = bsdf_toon_get_intensity(max_angle, smooth, angle);
 
   if (eval.x > 0.0f) {
     float sample_angle = bsdf_toon_get_sample_angle(max_angle, smooth);
@@ -101,15 +101,14 @@ ccl_device float3 bsdf_diffuse_toon_eval_reflect(const ShaderClosure *sc,
     return *pdf * eval;
   }
 
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
-
-ccl_device float3 bsdf_diffuse_toon_eval_transmit(const ShaderClosure *sc,
-                                                  const float3 I,
-                                                  const float3 omega_in,
-                                                  float *pdf)
+ccl_device SpectralColor bsdf_diffuse_toon_eval_transmit(const ShaderClosure *sc,
+                                                         const float3 I,
+                                                         const float3 omega_in,
+                                                         float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_diffuse_toon_sample(const ShaderClosure *sc,
@@ -119,7 +118,7 @@ ccl_device int bsdf_diffuse_toon_sample(const ShaderClosure *sc,
                                         float3 dIdy,
                                         float randu,
                                         float randv,
-                                        float3 *eval,
+                                        SpectralColor *eval,
                                         float3 *omega_in,
                                         float3 *domega_in_dx,
                                         float3 *domega_in_dy,
@@ -161,10 +160,10 @@ ccl_device int bsdf_glossy_toon_setup(ToonBsdf *bsdf)
   return SD_BSDF | SD_BSDF_HAS_EVAL;
 }
 
-ccl_device float3 bsdf_glossy_toon_eval_reflect(const ShaderClosure *sc,
-                                                const float3 I,
-                                                const float3 omega_in,
-                                                float *pdf)
+ccl_device SpectralColor bsdf_glossy_toon_eval_reflect(const ShaderClosure *sc,
+                                                       const float3 I,
+                                                       const float3 omega_in,
+                                                       float *pdf)
 {
   const ToonBsdf *bsdf = (const ToonBsdf *)sc;
   float max_angle = bsdf->size * M_PI_2_F;
@@ -179,22 +178,22 @@ ccl_device float3 bsdf_glossy_toon_eval_reflect(const ShaderClosure *sc,
 
     float angle = safe_acosf(fmaxf(cosRI, 0.0f));
 
-    float3 eval = bsdf_toon_get_intensity(max_angle, smooth, angle);
+    SpectralColor eval = bsdf_toon_get_intensity(max_angle, smooth, angle);
     float sample_angle = bsdf_toon_get_sample_angle(max_angle, smooth);
 
     *pdf = 0.5f * M_1_PI_F / (1.0f - cosf(sample_angle));
     return *pdf * eval;
   }
 
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
-ccl_device float3 bsdf_glossy_toon_eval_transmit(const ShaderClosure *sc,
-                                                 const float3 I,
-                                                 const float3 omega_in,
-                                                 float *pdf)
+ccl_device SpectralColor bsdf_glossy_toon_eval_transmit(const ShaderClosure *sc,
+                                                        const float3 I,
+                                                        const float3 omega_in,
+                                                        float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_glossy_toon_sample(const ShaderClosure *sc,
@@ -204,7 +203,7 @@ ccl_device int bsdf_glossy_toon_sample(const ShaderClosure *sc,
                                        float3 dIdy,
                                        float randu,
                                        float randv,
-                                       float3 *eval,
+                                       SpectralColor *eval,
                                        float3 *omega_in,
                                        float3 *domega_in_dx,
                                        float3 *domega_in_dy,

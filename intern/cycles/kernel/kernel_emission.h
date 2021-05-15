@@ -24,13 +24,13 @@
 CCL_NAMESPACE_BEGIN
 
 /* Evaluate shader on light. */
-ccl_device_noinline_cpu float3 light_sample_shader_eval(INTEGRATOR_STATE_ARGS,
-                                                        ShaderData *emission_sd,
-                                                        LightSample *ls,
-                                                        float time)
+ccl_device_noinline_cpu SpectralColor light_sample_shader_eval(INTEGRATOR_STATE_ARGS,
+                                                               ShaderData *emission_sd,
+                                                               LightSample *ls,
+                                                               float time)
 {
   /* setup shading at emitter */
-  float3 eval = zero_float3();
+  SpectralColor eval = zero_spectral_color();
 
   if (shader_constant_emission_eval(kg, ls->shader, &eval)) {
     if ((ls->prim != PRIM_NONE) && dot(ls->Ng, ls->D) > 0.0f) {
@@ -85,7 +85,7 @@ ccl_device_noinline_cpu float3 light_sample_shader_eval(INTEGRATOR_STATE_ARGS,
 
   if (ls->lamp != LAMP_NONE) {
     const ccl_global KernelLight *klight = &kernel_tex_fetch(__lights, ls->lamp);
-    eval *= make_float3(klight->strength[0], klight->strength[1], klight->strength[2]);
+    eval *= rgb_to_spectrum(INTEGRATOR_STATE_PASS, load_float3(klight->strength));
   }
 
   return eval;
@@ -125,7 +125,7 @@ ccl_device_inline bool light_sample_terminate(const KernelGlobals *ccl_restrict 
 #  endif
 #endif
   ) {
-    float probability = max3(fabs(bsdf_eval_sum(eval))) *
+    float probability = reduce_max_f(fabs(bsdf_eval_sum(eval))) *
                         kernel_data.integrator.light_inv_rr_threshold;
     if (probability < 1.0f) {
       if (rand_terminate >= probability) {

@@ -42,20 +42,20 @@ ccl_device int bsdf_reflection_setup(MicrofacetBsdf *bsdf)
   return SD_BSDF;
 }
 
-ccl_device float3 bsdf_reflection_eval_reflect(const ShaderClosure *sc,
-                                               const float3 I,
-                                               const float3 omega_in,
-                                               float *pdf)
+ccl_device SpectralColor bsdf_reflection_eval_reflect(const ShaderClosure *sc,
+                                                      const float3 I,
+                                                      const float3 omega_in,
+                                                      float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
-ccl_device float3 bsdf_reflection_eval_transmit(const ShaderClosure *sc,
-                                                const float3 I,
-                                                const float3 omega_in,
-                                                float *pdf)
+ccl_device SpectralColor bsdf_reflection_eval_transmit(const ShaderClosure *sc,
+                                                       const float3 I,
+                                                       const float3 omega_in,
+                                                       float *pdf)
 {
-  return make_float3(0.0f, 0.0f, 0.0f);
+  return zero_spectral_color();
 }
 
 ccl_device int bsdf_reflection_sample(const ShaderClosure *sc,
@@ -65,7 +65,7 @@ ccl_device int bsdf_reflection_sample(const ShaderClosure *sc,
                                       float3 dIdy,
                                       float randu,
                                       float randv,
-                                      float3 *eval,
+                                      SpectralColor *eval,
                                       float3 *omega_in,
                                       float3 *domega_in_dx,
                                       float3 *domega_in_dy,
@@ -85,7 +85,7 @@ ccl_device int bsdf_reflection_sample(const ShaderClosure *sc,
 #endif
       /* Some high number for MIS. */
       *pdf = 1e6f;
-      *eval = make_float3(1e6f, 1e6f, 1e6f);
+      *eval = make_spectral_color(1e6f);
     }
   }
   return LABEL_REFLECT | LABEL_SINGULAR;
