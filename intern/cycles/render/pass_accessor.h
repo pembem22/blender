@@ -48,6 +48,10 @@ class PassAccessor {
 
   int get_pass_offset(PassType type) const;
 
+  /* NOTE: Leaves pass and offset unchanged if the pass is not found. */
+  bool get_pass_by_name(const string &name, const Pass **r_pass, int *r_offset = nullptr) const;
+  bool get_pass_by_type(const PassType type, const Pass **r_pass, int *r_offset = nullptr) const;
+
  protected:
   const vector<Pass> &passes_;
 
@@ -58,6 +62,8 @@ class PassAccessor {
 
   float exposure_ = 0.0f;
   int num_samples_ = 0;
+
+  bool approximate_shadow_in_matte_ = false;
 };
 
 CCL_NAMESPACE_END

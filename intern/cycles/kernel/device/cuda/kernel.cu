@@ -26,8 +26,8 @@
 #  include "kernel/device/cuda/parallel_prefix_sum.h"
 #  include "kernel/device/cuda/parallel_sorted_index.h"
 
-#  include "kernel/integrator/integrator_path_state.h"
 #  include "kernel/integrator/integrator_state.h"
+#  include "kernel/integrator/integrator_state_flow.h"
 #  include "kernel/integrator/integrator_state_util.h"
 
 #  include "kernel/integrator/integrator_init_from_camera.h"
@@ -261,6 +261,16 @@ extern "C" __global__ void __launch_bounds__(CUDA_PARALLEL_ACTIVE_INDEX_DEFAULT_
 {
   cuda_parallel_active_index_array<CUDA_PARALLEL_ACTIVE_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, [](const int path_index) {
+        if (kernel_data.integrator.has_shadow_catcher) {
+          /* NOTE: The kernel invocation limits number of states checked, ensuring that only
+           * non-shadow-catcher states are checked here. */
+
+          /* Only allow termination of both complementary states did finish their job. */
+          if (INTEGRATOR_SHADOW_CATCHER_STATE(path, queued_kernel) != 0 ||
+              INTEGRATOR_SHADOW_CATCHER_STATE(shadow_path, queued_kernel) != 0) {
+            return false;
+          }
+        }
         return (INTEGRATOR_STATE(path, queued_kernel) == 0) &&
                (INTEGRATOR_STATE(shadow_path, queued_kernel) == 0);
       });
@@ -273,7 +283,7 @@ extern "C" __global__ void __launch_bounds__(CUDA_PARALLEL_SORTED_INDEX_DEFAULT_
   cuda_parallel_sorted_index_array<CUDA_PARALLEL_SORTED_INDEX_DEFAULT_BLOCK_SIZE>(
       num_states, indices, num_indices, key_prefix_sum, [kernel](const int path_index) {
         return (INTEGRATOR_STATE(path, queued_kernel) == kernel) ?
-                   __integrator_sort_key[path_index] :
+                   INTEGRATOR_STATE(path, shader_sort_key) :
                    CUDA_PARALLEL_SORTED_INDEX_INACTIVE_KEY;
       });
 }
@@ -299,7 +309,7 @@ extern "C" __global__ void CUDA_LAUNCH_BOUNDS(CUDA_KERNEL_BLOCK_NUM_THREADS,
                                                     bool reset,
                                                     int offset,
                                                     int stride,
-                                                    int *all_pixels_converged)
+                                                    uint *num_active_pixels)
 {
   const int work_index = ccl_global_id(0);
   const int y = work_index / sw;
@@ -313,10 +323,9 @@ extern "C" __global__ void CUDA_LAUNCH_BOUNDS(CUDA_KERNEL_BLOCK_NUM_THREADS,
   }
 
   /* NOTE: All threads specified in the mask must execute the intrinsic. */
-  if (__any_sync(0xffffffff, !converged)) {
-    if (threadIdx.x == 0) {
-      all_pixels_converged[0] = 0;
-    }
+  const uint num_active_pixels_mask = __ballot_sync(0xffffffff, !converged);
+  if (threadIdx.x == 0) {
+    atomic_fetch_and_add_uint32(num_active_pixels, __popc(num_active_pixels_mask));
   }
 }
 
@@ -466,7 +475,7 @@ extern "C" __global__ void CUDA_LAUNCH_BOUNDS(CUDA_KERNEL_BLOCK_NUM_THREADS,
     pixel_scale = 1.0f / num_samples;
   }
   else {
-    pixel_scale = 1.0f / buffer[pass_sample_count];
+    pixel_scale = 1.0f / __float_as_uint(buffer[pass_sample_count]);
   }
 
   if (num_inputs > 0) {
@@ -486,7 +495,7 @@ extern "C" __global__ void CUDA_LAUNCH_BOUNDS(CUDA_KERNEL_BLOCK_NUM_THREADS,
   }
 
   if (num_inputs > 2) {
-    const float *in = buffer + pass_offset.y;
+    const float *in = buffer + pass_offset.z;
     float *out = rgb + (x + y * sw) * 3 + (sw * sh * 2) * 3;
     out[0] = in[0] * pixel_scale;
     out[1] = in[1] * pixel_scale;
@@ -526,7 +535,7 @@ extern "C" __global__ void CUDA_LAUNCH_BOUNDS(CUDA_KERNEL_BLOCK_NUM_THREADS,
     pixel_scale = num_samples;
   }
   else {
-    pixel_scale = buffer[pass_sample_count];
+    pixel_scale = __float_as_uint(buffer[pass_sample_count]);
   }
 
   buffer[0] = in[0] * pixel_scale;

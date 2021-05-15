@@ -21,6 +21,7 @@
 #include "kernel/kernel_camera.h"
 #include "kernel/kernel_path_state.h"
 #include "kernel/kernel_random.h"
+#include "kernel/kernel_shadow_catcher.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -67,18 +68,26 @@ ccl_device bool integrator_init_from_camera(INTEGRATOR_STATE_ARGS,
                                             ccl_global float *render_buffer,
                                             const int x,
                                             const int y,
-                                            const int sample)
+                                            const int scheduled_sample)
 {
   /* Initialize path state to give basic buffer access and allow early outputs. */
   path_state_init(INTEGRATOR_STATE_PASS, tile, x, y);
+
+  /* Always make sure the state is initialized, so that features disabled in the kernel will not
+   * affect the logic on the host device. */
+  kernel_shadow_catcher_state_init(INTEGRATOR_STATE_PASS);
 
   /* Check whether the pixel has converged and should not be sampled anymore. */
   if (!kernel_need_sample_pixel(INTEGRATOR_STATE_PASS, render_buffer)) {
     return false;
   }
 
-  /* Always count the sample, even if the camera sample will reject the ray. */
-  kernel_accum_sample(INTEGRATOR_STATE_PASS, render_buffer);
+  /* Count the sample and get an effective sample for this pixel.
+   *
+   * This logic allows to both count actual number of sampels per pixel, and to add samples to this
+   * pixel after it was converged and samples were added somewhere else (in which case the
+   * `scheduled_sample` will be different from actual number of samples in this pixel). */
+  const int sample = kernel_accum_sample(INTEGRATOR_STATE_PASS, render_buffer, scheduled_sample);
 
   /* Initialize random number seed for path. */
   const uint rng_hash = path_rng_hash_init(kg, sample, x, y);

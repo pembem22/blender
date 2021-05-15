@@ -546,6 +546,11 @@ class BsdfBaseNode : public ShaderNode {
     return false;
   }
 
+  virtual int get_feature()
+  {
+    return ShaderNode::get_feature() | NODE_FEATURE_BSDF;
+  }
+
  protected:
   ClosureType closure;
 };
@@ -782,6 +787,11 @@ class EmissionNode : public ShaderNode {
     return true;
   }
 
+  virtual int get_feature()
+  {
+    return ShaderNode::get_feature() | NODE_FEATURE_EMISSION;
+  }
+
   NODE_SOCKET_API(float3, color)
   NODE_SOCKET_API(float, strength)
   NODE_SOCKET_API(float, surface_mix_weight)
@@ -791,6 +801,11 @@ class BackgroundNode : public ShaderNode {
  public:
   SHADER_NODE_CLASS(BackgroundNode)
   void constant_fold(const ConstantFolder &folder);
+
+  virtual int get_feature()
+  {
+    return ShaderNode::get_feature() | NODE_FEATURE_EMISSION;
+  }
 
   NODE_SOCKET_API(float3, color)
   NODE_SOCKET_API(float, strength)
@@ -1600,10 +1615,22 @@ class SetNormalNode : public ShaderNode {
   NODE_SOCKET_API(float3, direction)
 };
 
-class OSLNode : public ShaderNode {
+class OSLNode final : public ShaderNode {
  public:
   static OSLNode *create(ShaderGraph *graph, size_t num_inputs, const OSLNode *from = NULL);
   ~OSLNode();
+
+  static void operator delete(void *ptr)
+  {
+    /* Override delete operator to silence new-delete-type-mismatch ASAN warnings
+     * regarding size mismatch in the destructor. This is intentional as we allocate
+     * extra space at the end of the node. */
+    ::operator delete(ptr);
+  }
+  static void operator delete(void *, void *)
+  {
+    /* Deliberately empty placement delete operator, to avoid MSVC warning C4291. */
+  }
 
   ShaderNode *clone(ShaderGraph *graph) const;
 

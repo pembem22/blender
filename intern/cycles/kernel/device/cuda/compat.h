@@ -83,9 +83,7 @@ __device__ half __float2half(const float f)
 #define ccl_align(n) __align__(n)
 #define ccl_optional_struct_init
 
-/* TODO(sergey): Should be able to use [[maybe_unused]] once the kernels are compiled with C++17
- * standard support, */
-#define ccl_attr_maybe_unused
+#define ccl_attr_maybe_unused [[maybe_unused]]
 
 #define ATTR_FALLTHROUGH
 
@@ -161,14 +159,6 @@ ccl_device_inline uint ccl_num_groups(uint d)
       return 0;
   }
 }
-
-/* Textures */
-
-/* Use arrays for regular data. */
-#define kernel_tex_fetch(t, index) t[(index)]
-#define kernel_tex_array(t) (t)
-
-#define kernel_data __data
 
 /* Use fast math functions */
 

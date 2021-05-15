@@ -443,7 +443,9 @@ class CYCLES_RENDER_PT_light_paths_fast_gi(CyclesButtonsPanel, Panel):
 
         if world:
           light = world.light_settings
-          layout.prop(light, "distance", text="AO Distance")
+          col = layout.column(align=True)
+          col.prop(light, "ao_factor", text="AO Factor")
+          col.prop(light, "distance", text="AO Distance")
 
 
 class CYCLES_RENDER_PT_motion_blur(CyclesButtonsPanel, Panel):
@@ -784,6 +786,7 @@ class CYCLES_RENDER_PT_passes_light(CyclesButtonsPanel, Panel):
         col.prop(view_layer, "use_pass_environment")
         col.prop(view_layer, "use_pass_shadow")
         col.prop(view_layer, "use_pass_ambient_occlusion", text="Ambient Occlusion")
+        col.prop(cycles_view_layer, "use_pass_shadow_catcher")
 
 
 class CYCLES_RENDER_PT_passes_crypto(CyclesButtonsPanel, ViewLayerCryptomattePanel, Panel):

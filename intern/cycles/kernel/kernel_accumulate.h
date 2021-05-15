@@ -19,11 +19,13 @@
 #include "kernel_adaptive_sampling.h"
 #include "kernel_color.h"
 #include "kernel_random.h"
+#include "kernel_shadow_catcher.h"
 #include "kernel_write_passes.h"
 
 CCL_NAMESPACE_BEGIN
 
-/* BSDF Eval
+/* --------------------------------------------------------------------
+ * BSDF Evaluation
  *
  * BSDF evaluation result, split between diffuse and glossy. This is used to
  * accumulate render passes separately. Note that reflection, transmission
@@ -91,7 +93,8 @@ ccl_device_inline SpectralColor bsdf_eval_diffuse_glossy_ratio(const BsdfEval *e
   return safe_divide(eval->diffuse, eval->diffuse + eval->glossy);
 }
 
-/* Clamping
+/* --------------------------------------------------------------------
+ * Clamping
  *
  * Clamping is done on a per-contribution basis so that we can write directly
  * to render buffers instead of using per-thread memory, and to avoid the
@@ -115,6 +118,14 @@ ccl_device_forceinline void kernel_accum_clamp(const KernelGlobals *kg,
   }
 #endif
 }
+
+/* --------------------------------------------------------------------
+ * Legacy functions.
+ *
+ * TODO: Seems to be mainly related to shadow catcher, which is about to have new implementation.
+ * Some other code is related to clamping, which is done in `kernel_accum_clamp()`. Port remaining
+ * parts over, remove legacy code.
+ */
 
 #if 0
 ccl_device_inline void path_radiance_accum_light(const KernelGlobals *kg,
@@ -295,6 +306,10 @@ ccl_device_inline float3 path_radiance_clamp_and_sum(const KernelGlobals *kg,
 }
 #endif
 
+/* --------------------------------------------------------------------
+ * Pass accumulation utilities.
+ */
+
 /* Get pointer to pixel in render buffer. */
 ccl_device_forceinline ccl_global float *kernel_accum_pixel_render_buffer(
     INTEGRATOR_STATE_CONST_ARGS, ccl_global float *ccl_restrict render_buffer)
@@ -303,6 +318,24 @@ ccl_device_forceinline ccl_global float *kernel_accum_pixel_render_buffer(
   const uint64_t render_buffer_offset = (uint64_t)render_pixel_index *
                                         kernel_data.film.pass_stride;
   return render_buffer + render_buffer_offset;
+}
+
+/* --------------------------------------------------------------------
+ * Adaptive sampling.
+ */
+
+ccl_device_inline int kernel_accum_sample(INTEGRATOR_STATE_CONST_ARGS,
+                                          ccl_global float *ccl_restrict render_buffer,
+                                          int sample)
+{
+  if (kernel_data.film.pass_sample_count == PASS_UNUSED) {
+    return sample;
+  }
+
+  ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,
+                                                              render_buffer);
+
+  return atomic_fetch_and_add_uint32((uint *)(buffer) + kernel_data.film.pass_sample_count, 1);
 }
 
 ccl_device void kernel_accum_adaptive_buffer(INTEGRATOR_STATE_CONST_ARGS,
@@ -330,11 +363,88 @@ ccl_device void kernel_accum_adaptive_buffer(INTEGRATOR_STATE_CONST_ARGS,
   }
 }
 
+/* --------------------------------------------------------------------
+ * Shadow catcher.
+ */
+
+#ifdef __SHADOW_CATCHER__
+
+/* Accumulate contribution to the Shadow Catcher pass.
+ *
+ * Returns truth if the contribution is fully handled here and is not to be added to the other
+ * passes (like combined, adaptive sampling, denoising passes). */
+
+ccl_device bool kernel_accum_shadow_catcher(INTEGRATOR_STATE_CONST_ARGS,
+                                            const float3 contribution,
+                                            ccl_global float *ccl_restrict buffer)
+{
+  const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);
+
+  /* Matte pass. */
+  if (kernel_data.film.pass_shadow_catcher_matte != PASS_UNUSED) {
+    if (kernel_shadow_catcher_is_matte_path(INTEGRATOR_STATE_PASS)) {
+      kernel_write_pass_float3(buffer + kernel_data.film.pass_shadow_catcher_matte,
+                               contribution_rgb);
+    }
+  }
+
+  /* Shadow catcher pass. */
+  if (kernel_data.film.pass_shadow_catcher != PASS_UNUSED) {
+    if (kernel_shadow_catcher_is_object_pass(INTEGRATOR_STATE_PASS)) {
+      kernel_write_pass_float3(buffer + kernel_data.film.pass_shadow_catcher, contribution_rgb);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+ccl_device bool kernel_accum_shadow_catcher_transparent(INTEGRATOR_STATE_CONST_ARGS,
+                                                        const SpectralColor contribution,
+                                                        const float transparent,
+                                                        ccl_global float *ccl_restrict buffer)
+{
+  const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);
+
+  /* Matte pass. */
+  if (kernel_data.film.pass_shadow_catcher_matte != PASS_UNUSED) {
+    if (kernel_shadow_catcher_is_matte_path(INTEGRATOR_STATE_PASS)) {
+      kernel_write_pass_float4(
+          buffer + kernel_data.film.pass_shadow_catcher_matte,
+          make_float4(contribution_rgb.x, contribution_rgb.y, contribution_rgb.z, transparent));
+    }
+  }
+
+  /* Shadow catcher pass. */
+  if (kernel_data.film.pass_shadow_catcher != PASS_UNUSED) {
+    if (kernel_shadow_catcher_is_object_pass(INTEGRATOR_STATE_PASS)) {
+      kernel_write_pass_float4(
+          buffer + kernel_data.film.pass_shadow_catcher,
+          make_float4(contribution_rgb.x, contribution_rgb.y, contribution_rgb.z, transparent));
+      return true;
+    }
+  }
+
+  return false;
+}
+
+#endif /* __SHADOW_CATCHER__ */
+
+/* --------------------------------------------------------------------
+ * Render passes.
+ */
+
 /* Write combined pass. */
 ccl_device_inline void kernel_accum_combined_pass(INTEGRATOR_STATE_CONST_ARGS,
                                                   const SpectralColor contribution,
                                                   ccl_global float *ccl_restrict buffer)
 {
+#ifdef __SHADOW_CATCHER__
+  if (kernel_accum_shadow_catcher(INTEGRATOR_STATE_PASS, contribution, buffer)) {
+    return;
+  }
+#endif
+
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
     kernel_write_pass_spectral_color(INTEGRATOR_STATE_PASS, buffer, contribution);
   }
@@ -356,6 +466,13 @@ ccl_device_inline void kernel_accum_combined_transparent_pass(INTEGRATOR_STATE_C
                                                               ccl_global float *ccl_restrict
                                                                   buffer)
 {
+#ifdef __SHADOW_CATCHER__
+  if (kernel_accum_shadow_catcher_transparent(
+          INTEGRATOR_STATE_PASS, contribution, transparent, buffer)) {
+    return;
+  }
+#endif
+
   const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);
 
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
@@ -571,21 +688,6 @@ ccl_device_inline void kernel_accum_emission(INTEGRATOR_STATE_CONST_ARGS,
   kernel_accum_combined_pass(INTEGRATOR_STATE_PASS, contribution, buffer);
   kernel_accum_emission_or_background_pass(
       INTEGRATOR_STATE_PASS, contribution, buffer, kernel_data.film.pass_emission);
-}
-
-/* Adaptive sampling passes. */
-
-ccl_device_inline void kernel_accum_sample(INTEGRATOR_STATE_CONST_ARGS,
-                                           ccl_global float *ccl_restrict render_buffer)
-{
-  if (kernel_data.film.pass_sample_count == PASS_UNUSED) {
-    return;
-  }
-
-  ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,
-                                                              render_buffer);
-
-  kernel_write_pass_float(buffer + kernel_data.film.pass_sample_count, 1.0f);
 }
 
 CCL_NAMESPACE_END

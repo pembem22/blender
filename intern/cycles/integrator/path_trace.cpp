@@ -196,29 +196,56 @@ void PathTrace::adaptive_sample(RenderWork &render_work)
     return;
   }
 
-  const double start_time = time_dt();
+  bool did_reschedule_on_idle = false;
 
-  bool all_pixels_converged = true;
-
-  VLOG(3) << "Will filter adaptive stopping buffer, threshold "
-          << render_work.adaptive_sampling.threshold;
-  if (render_work.adaptive_sampling.reset) {
-    VLOG(3) << "Will re-calculate convergency flag for currently converged pixels.";
-  }
-
-  tbb::parallel_for_each(path_trace_works_, [&](unique_ptr<PathTraceWork> &path_trace_work) {
-    if (!path_trace_work->adaptive_sampling_converge_and_filter(
-            render_work.adaptive_sampling.threshold, render_work.adaptive_sampling.reset)) {
-      all_pixels_converged = false;
+  while (true) {
+    VLOG(3) << "Will filter adaptive stopping buffer, threshold "
+            << render_work.adaptive_sampling.threshold;
+    if (render_work.adaptive_sampling.reset) {
+      VLOG(3) << "Will re-calculate convergency flag for currently converged pixels.";
     }
-  });
 
-  render_scheduler_.report_adaptive_filter_time(
-      render_work, time_dt() - start_time, is_cancel_requested());
+    const double start_time = time_dt();
 
-  if (all_pixels_converged) {
-    VLOG(3) << "All pixels converged.";
-    render_scheduler_.set_path_trace_finished(render_work);
+    uint num_active_pixels = 0;
+    tbb::parallel_for_each(path_trace_works_, [&](unique_ptr<PathTraceWork> &path_trace_work) {
+      const uint num_active_pixels_in_work =
+          path_trace_work->adaptive_sampling_converge_filter_count_active(
+              render_work.adaptive_sampling.threshold, render_work.adaptive_sampling.reset);
+      if (num_active_pixels_in_work) {
+        atomic_add_and_fetch_u(&num_active_pixels, num_active_pixels_in_work);
+      }
+    });
+
+    render_scheduler_.report_adaptive_filter_time(
+        render_work, time_dt() - start_time, is_cancel_requested());
+
+    if (num_active_pixels == 0) {
+      VLOG(3) << "All pixels converged.";
+      if (!render_scheduler_.render_work_reschedule_on_converge(render_work)) {
+        break;
+      }
+      VLOG(3) << "Continuing with lower threshold.";
+    }
+    else if (did_reschedule_on_idle) {
+      break;
+    }
+    else if (num_active_pixels < 128 * 128) {
+      /* NOTE: The hardcoded value of 128^2 is more of an empirical value to keep GPU busy so that
+       * there is no performance loss from the progressive noise floor feature.
+       *
+       * A better heuristic is possible here: for example, use maximum of 128^2 and percentage of
+       * the final resolution. */
+      if (!render_scheduler_.render_work_reschedule_on_idle(render_work)) {
+        VLOG(3) << "Rescheduling is not possible: final threshold is reached.";
+        break;
+      }
+      VLOG(3) << "Rescheduling lower threshold.";
+      did_reschedule_on_idle = true;
+    }
+    else {
+      break;
+    }
   }
 }
 
@@ -420,6 +447,137 @@ bool PathTrace::get_render_tile_pixels(PassAccessor &pass_accessor, float *pixel
   }
 
   return pass_accessor.get_render_tile_pixels(full_render_buffers_.get(), pixels);
+}
+
+/* --------------------------------------------------------------------
+ * Report generation.
+ */
+
+static const char *device_type_for_description(const DeviceType type)
+{
+  switch (type) {
+    case DEVICE_NONE:
+      return "None";
+
+    case DEVICE_CPU:
+      return "CPU";
+    case DEVICE_OPENCL:
+      return "OpenCL";
+    case DEVICE_CUDA:
+      return "CUDA";
+    case DEVICE_OPTIX:
+      return "OptiX";
+    case DEVICE_DUMMY:
+      return "Dummy";
+    case DEVICE_MULTI:
+      return "Multi";
+  }
+
+  return "UNKNOWN";
+}
+
+/* Construct description of the device which will appear in the full report. */
+/* TODO(sergey): Consider making it more reusable utility. */
+static string full_device_info_description(const DeviceInfo &device_info)
+{
+  string full_description = device_info.description;
+
+  full_description += " (" + string(device_type_for_description(device_info.type)) + ")";
+
+  if (device_info.display_device) {
+    full_description += " (display)";
+  }
+
+  if (device_info.type == DEVICE_CPU) {
+    full_description += " (" + to_string(device_info.cpu_threads) + " threads)";
+  }
+
+  full_description += " [" + device_info.id + "]";
+
+  return full_description;
+}
+
+/* Construct string which will contain information about devices, possibly multiple of the devices.
+ *
+ * In the simple case the result looks like:
+ *
+ *   Message: Full Device Description
+ *
+ * If there are multiple devices then the result looks like:
+ *
+ *   Message: Full First Device Description
+ *            Full Second Device Description
+ *
+ * Note that the newlines are placed in a way so that the result can be easily concatenated to the
+ * full report. */
+static string device_info_list_report(const string &message, const DeviceInfo &device_info)
+{
+  string result = "\n" + message + ": ";
+  const string pad(message.length() + 2, ' ');
+
+  if (device_info.multi_devices.empty()) {
+    result += full_device_info_description(device_info) + "\n";
+    return result;
+  }
+
+  bool is_first = true;
+  for (const DeviceInfo &sub_device_info : device_info.multi_devices) {
+    if (!is_first) {
+      result += pad;
+    }
+
+    result += full_device_info_description(sub_device_info) + "\n";
+
+    is_first = false;
+  }
+
+  return result;
+}
+
+static string path_trace_devices_report(const vector<unique_ptr<PathTraceWork>> &path_trace_works)
+{
+  DeviceInfo device_info;
+  device_info.type = DEVICE_MULTI;
+
+  for (auto &&path_trace_work : path_trace_works) {
+    device_info.multi_devices.push_back(path_trace_work->get_device()->info);
+  }
+
+  return device_info_list_report("Path tracing on", device_info);
+}
+
+static string denoiser_device_report(const Denoiser *denoiser)
+{
+  if (!denoiser) {
+    return "";
+  }
+
+  if (!denoiser->get_params().use) {
+    return "";
+  }
+
+  const DeviceInfo device_info = denoiser->get_denoiser_device_info();
+  if (device_info.type == DEVICE_NONE) {
+    return "";
+  }
+
+  return device_info_list_report("Denoising on", device_info);
+}
+
+string PathTrace::full_report() const
+{
+  string result = "\nFull path tracing report\n";
+
+  result += path_trace_devices_report(path_trace_works_);
+  result += denoiser_device_report(denoiser_.get());
+
+  /* Report from the render scheduler, which includes:
+   * - Render mode (interactive, offline, headless)
+   * - Adaptive sampling and denoiser parameters
+   * - Breakdown of timing. */
+  result += render_scheduler_.full_report();
+
+  return result;
 }
 
 CCL_NAMESPACE_END

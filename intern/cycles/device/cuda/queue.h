@@ -35,7 +35,11 @@ class CUDADeviceQueue : public DeviceQueue {
   CUDADeviceQueue(CUDADevice *device);
   ~CUDADeviceQueue();
 
+  virtual int num_concurrent_states(const size_t state_size) const override;
+
   virtual void init_execution() override;
+
+  virtual bool kernel_available(DeviceKernel kernel) const override;
 
   virtual bool enqueue(DeviceKernel kernel, const int work_size, void *args[]) override;
 
@@ -53,7 +57,6 @@ class CUDADeviceQueue : public DeviceQueue {
  protected:
   CUDADevice *cuda_device_;
   CUstream cuda_stream_;
-  double last_sync_time_;
 };
 
 CCL_NAMESPACE_END

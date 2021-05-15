@@ -62,28 +62,73 @@ CCL_NAMESPACE_BEGIN
 #define INTEGRATOR_VOLUME_STACK_SIZE 4
 #define INTEGRATOR_SHADOW_ISECT_SIZE 4
 
+/* Data structures */
+
+/* Integrator State
+ *
+ * CPU rendering path state with AoS layout. */
+typedef struct IntegratorState {
+#define KERNEL_STRUCT_BEGIN(name) struct {
+#define KERNEL_STRUCT_MEMBER(parent_struct, type, name) type name;
+#define KERNEL_STRUCT_ARRAY_MEMBER KERNEL_STRUCT_MEMBER
+#define KERNEL_STRUCT_END(name) \
+  } \
+  name;
+#define KERNEL_STRUCT_END_ARRAY(name, size) \
+  } \
+  name[size];
+#include "kernel/integrator/integrator_state_template.h"
+#undef KERNEL_STRUCT_BEGIN
+#undef KERNEL_STRUCT_MEMBER
+#undef KERNEL_STRUCT_ARRAY_MEMBER
+#undef KERNEL_STRUCT_END
+#undef KERNEL_STRUCT_END_ARRAY
+} IntegratorState;
+
+/* Path Queue
+ *
+ * Keep track of which kernels are queued to be executed next in the path
+ * for GPU rendering. */
+typedef struct IntegratorQueueCounter {
+  int num_queued[DEVICE_KERNEL_INTEGRATOR_NUM];
+} IntegratorQueueCounter;
+
+/* Integrator State GPU
+ *
+ * GPU rendering path state with SoA layout. */
+typedef struct IntegratorStateGPU {
+#define KERNEL_STRUCT_BEGIN(name) struct {
+#define KERNEL_STRUCT_MEMBER(parent_struct, type, name) type *name;
+#define KERNEL_STRUCT_ARRAY_MEMBER KERNEL_STRUCT_MEMBER
+#define KERNEL_STRUCT_END(name) \
+  } \
+  name;
+#define KERNEL_STRUCT_END_ARRAY(name, size) \
+  } \
+  name[size];
+#include "kernel/integrator/integrator_state_template.h"
+#undef KERNEL_STRUCT_BEGIN
+#undef KERNEL_STRUCT_MEMBER
+#undef KERNEL_STRUCT_ARRAY_MEMBER
+#undef KERNEL_STRUCT_END
+#undef KERNEL_STRUCT_END_ARRAY
+
+  IntegratorQueueCounter *queue_counter;
+  int *sort_key_counter;
+
+  /* Offset of a complementary shadow catcher state for the current main state. */
+  int shadow_catcher_state_offset;
+} IntegratorStateGPU;
+
 /* Abstraction
  *
- * Macros to access data structures on different devices. */
+ * Macros to access data structures on different devices.
+ *
+ * Note that there is a special access function for the shadow catcher state. This access is to
+ * happen from a kernel which operates on a "main" path. Attempt to use shadow catcher accessors
+ * from a kernel which operates on a shadow catcher state will cause bad memory acces. */
 
 #ifdef __KERNEL_CPU__
-
-/* Combined state for path. */
-typedef struct IntegratorState {
-#  define KERNEL_STRUCT_BEGIN(name) struct {
-#  define KERNEL_STRUCT_MEMBER(type, name) type name;
-#  define KERNEL_STRUCT_END(name) \
-    } \
-    name;
-#  define KERNEL_STRUCT_END_ARRAY(name, size) \
-    } \
-    name[size];
-#  include "kernel/integrator/integrator_state_template.h"
-#  undef KERNEL_STRUCT_BEGIN
-#  undef KERNEL_STRUCT_MEMBER
-#  undef KERNEL_STRUCT_END
-#  undef KERNEL_STRUCT_END_ARRAY
-} IntegratorState;
 
 /* Scalar access on CPU. */
 
@@ -106,72 +151,52 @@ typedef struct IntegratorState {
 #  define INTEGRATOR_STATE_ARRAY_WRITE(nested_struct, array_index, member) \
     ((state)->nested_struct[array_index].member)
 
+#  define INTEGRATOR_SHADOW_CATCHER_STATE_PASS kg, (state + 1)
+
+#  define INTEGRATOR_SHADOW_CATCHER_STATE(nested_struct, member) \
+    (((const IntegratorState *)state + 1)->nested_struct.member)
+#  define INTEGRATOR_SHADOW_CATCHER_STATE_WRITE(nested_struct, member) \
+    ((state + 1)->nested_struct.member)
+
+#  define INTEGRATOR_SHADOW_CATCHER_STATE_ARRAY(nested_struct, array_index, member) \
+    (((const IntegratorState *)state + 1)->nested_struct[array_index].member)
+#  define INTEGRATOR_SHADOW_CATCHER_STATE_ARRAY_WRITE(nested_struct, array_index, member) \
+    ((state + 1)->nested_struct[array_index].member)
+
 #else /* __KERNEL_CPU__ */
 
-/* Array access on GPU with Structure-of-Arrays.
- *
- * PathTraceWorkGPU on the host manages memory allocation and assumes the struct
- * memory list is an array of 64-bit pointers. */
+/* Array access on GPU with Structure-of-Arrays. */
 
-typedef struct IntegratorState {
-#  define KERNEL_STRUCT_BEGIN(name) struct {
-#  define KERNEL_STRUCT_MEMBER(type, name) type *name;
-#  define KERNEL_STRUCT_END(name) \
-    } \
-    name;
-#  define KERNEL_STRUCT_END_ARRAY(name, size) \
-    } \
-    name[size];
-#  include "kernel/integrator/integrator_state_template.h"
-#  undef KERNEL_STRUCT_BEGIN
-#  undef KERNEL_STRUCT_MEMBER
-#  undef KERNEL_STRUCT_END
-#  undef KERNEL_STRUCT_END_ARRAY
-} IntegratorState;
+#  define INTEGRATOR_STATE_ARGS const KernelGlobals *ccl_restrict kg, const int path_index
+#  define INTEGRATOR_STATE_CONST_ARGS const KernelGlobals *ccl_restrict kg, const int path_index
+#  define INTEGRATOR_STATE_PASS kg, path_index
 
-#  ifdef __KERNEL_OPTIX__
+#  define INTEGRATOR_STATE_PASS_NULL kg, -1
+#  define INTEGRATOR_STATE_IS_NULL (path_index == -1)
 
-#    define INTEGRATOR_STATE_ARGS const KernelGlobals *ccl_restrict kg, const int path_index
-#    define INTEGRATOR_STATE_CONST_ARGS const KernelGlobals *ccl_restrict kg, const int path_index
-#    define INTEGRATOR_STATE_PASS kg, path_index
+#  define INTEGRATOR_STATE(nested_struct, member) \
+    kernel_integrator_state.nested_struct.member[path_index]
+#  define INTEGRATOR_STATE_WRITE(nested_struct, member) INTEGRATOR_STATE(nested_struct, member)
 
-#    define INTEGRATOR_STATE_PASS_NULL kg, -1
-#    define INTEGRATOR_STATE_IS_NULL (path_index == -1)
+#  define INTEGRATOR_STATE_ARRAY(nested_struct, array_index, member) \
+    kernel_integrator_state.nested_struct[array_index].member[path_index]
+#  define INTEGRATOR_STATE_ARRAY_WRITE(nested_struct, array_index, member) \
+    INTEGRATOR_STATE_ARRAY(nested_struct, array_index, member)
 
-#    define INTEGRATOR_STATE(nested_struct, member) __params.__integrator_state.nested_struct.member[path_index]
-#    define INTEGRATOR_STATE_WRITE(nested_struct, member) INTEGRATOR_STATE(nested_struct, member)
+#  define INTEGRATOR_SHADOW_CATCHER_STATE_PASS \
+    kg, (path_index + kernel_integrator_state.shadow_catcher_state_offset)
 
-#    define INTEGRATOR_STATE_ARRAY(nested_struct, array_index, member) \
-      __params.__integrator_state.nested_struct[array_index].member[path_index]
-#    define INTEGRATOR_STATE_ARRAY_WRITE(nested_struct, array_index, member) \
-      INTEGRATOR_STATE_ARRAY(nested_struct, array_index, member)
+#  define INTEGRATOR_SHADOW_CATCHER_STATE(nested_struct, member) \
+    kernel_integrator_state.nested_struct \
+        .member[path_index + kernel_integrator_state.shadow_catcher_state_offset]
+#  define INTEGRATOR_SHADOW_CATCHER_STATE_WRITE(nested_struct, member) \
+    INTEGRATOR_SHADOW_CATCHER_STATE(nested_struct, member)
 
-#  else /* __KERNEL_OPTIX__ */
-
-ccl_device_constant IntegratorState __integrator_state;
-ccl_device_constant IntegratorQueueCounter *__integrator_queue_counter;
-
-/* TODO: compress as uint16? or leave out entirely and recompute key in sorting code? */
-ccl_device_constant int *__integrator_sort_key;
-ccl_device_constant int *__integrator_sort_key_counter;
-
-#    define INTEGRATOR_STATE_ARGS const KernelGlobals *ccl_restrict kg, const int path_index
-#    define INTEGRATOR_STATE_CONST_ARGS const KernelGlobals *ccl_restrict kg, const int path_index
-#    define INTEGRATOR_STATE_PASS kg, path_index
-
-#    define INTEGRATOR_STATE_PASS_NULL kg, -1
-#    define INTEGRATOR_STATE_IS_NULL (path_index == -1)
-
-#    define INTEGRATOR_STATE(nested_struct, member) \
-      __integrator_state.nested_struct.member[path_index]
-#    define INTEGRATOR_STATE_WRITE(nested_struct, member) INTEGRATOR_STATE(nested_struct, member)
-
-#    define INTEGRATOR_STATE_ARRAY(nested_struct, array_index, member) \
-      __integrator_state.nested_struct[array_index].member[path_index]
-#    define INTEGRATOR_STATE_ARRAY_WRITE(nested_struct, array_index, member) \
-      INTEGRATOR_STATE_ARRAY(nested_struct, array_index, member)
-
-#  endif /* __KERNEL_OPTIX__ */
+#  define INTEGRATOR_SHADOW_CATCHER_STATE_ARRAY(nested_struct, array_index, member) \
+    kernel_integrator_state.nested_struct[array_index] \
+        .member[path_index + kernel_integrator_state.shadow_catcher_state_offset]
+#  define INTEGRATOR_SHADOW_CATCHER_STATE_ARRAY_WRITE(nested_struct, array_index, member) \
+    INTEGRATOR_SHADOW_CATCHER_STATE_ARRAY(nested_struct, array_index, member)
 
 #endif /* __KERNEL_CPU__ */
 

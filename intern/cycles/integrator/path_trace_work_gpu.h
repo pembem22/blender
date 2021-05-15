@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "kernel/integrator/integrator_path_state.h"
 #include "kernel/integrator/integrator_state.h"
 
 #include "device/device_graphics_interop.h"
@@ -48,10 +47,10 @@ class PathTraceWorkGPU : public PathTraceWork {
 
   virtual void copy_to_gpu_display(GPUDisplay *gpu_display, float sample_scale) override;
 
-  virtual bool adaptive_sampling_converge_and_filter(float threshold, bool reset) override;
+  virtual int adaptive_sampling_converge_filter_count_active(float threshold, bool reset) override;
 
  protected:
-  void alloc_integrator_state();
+  void alloc_integrator_soa();
   void alloc_integrator_queue();
   void alloc_integrator_sorting();
 
@@ -68,7 +67,10 @@ class PathTraceWorkGPU : public PathTraceWork {
 
   int get_num_active_paths();
 
-  int get_max_num_paths();
+  /* Maximum number of paths which are allowed to be initialized from the camera.
+   * For the shadow catcher case we limit number of camera rays to make it so split is possible.
+   * If there are no shadow catcher in the scene, it the same as `max_num_paths_`. */
+  int get_max_num_camera_paths() const;
 
   /* Naive implementation of the `copy_to_gpu_display()` which performs film conversion on the
    * device, then copies pixels to the host and pushes them to the `gpu_display`. */
@@ -82,12 +84,17 @@ class PathTraceWorkGPU : public PathTraceWork {
    * This is a common part of both `copy_to_gpu_display` implementations. */
   void enqueue_film_convert(device_ptr d_rgba_half, float sample_scale);
 
-  bool adaptive_sampling_convergence_check(float threshold, bool reset);
+  int adaptive_sampling_convergence_check_count_active(float threshold, bool reset);
   void enqueue_adaptive_sampling_filter_x();
   void enqueue_adaptive_sampling_filter_y();
 
-  /* Integrator queues.
-   * There are as many of queues as the concurrent queues the device supports. */
+  bool has_shadow_catcher() const;
+
+  /* Offset from the current path state index to its complementary shadow catcher state.
+   * If there are no shadow catchers in the scene is 0 to simplify some calculations. */
+  int get_shadow_catcher_state_offset() const;
+
+  /* Integrator queue. */
   unique_ptr<DeviceQueue> queue_;
 
   /* Scheduler which gives work to path tracing threads. */
@@ -97,12 +104,12 @@ class PathTraceWorkGPU : public PathTraceWork {
   RenderBuffers *render_buffers_;
 
   /* Integrate state for paths. */
+  IntegratorStateGPU integrator_state_gpu_;
+  /* SoA arrays for integrator state. */
   vector<unique_ptr<device_memory>> integrator_state_soa_;
   /* Keep track of number of queued kernels. */
   device_vector<IntegratorQueueCounter> integrator_queue_counter_;
   /* Key for shader sorting. */
-  /* TODO: device only? */
-  device_vector<int> integrator_sort_key_;
   device_vector<int> integrator_sort_key_counter_;
 
   /* Temporary buffer to get an array of queued path for a particular kernel. */
@@ -121,6 +128,9 @@ class PathTraceWorkGPU : public PathTraceWork {
   /* Cached result of device->should_use_graphics_interop(). */
   bool interop_use_checked_ = false;
   bool interop_use_ = false;
+
+  /* Maximum number of concurrent integrator states. */
+  int max_num_paths_;
 
   /* Maximum path index, effective number of paths used may be smaller than
    * the size of the integrator_state_ buffer so can avoid iterating over the

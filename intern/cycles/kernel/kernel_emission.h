@@ -67,7 +67,8 @@ ccl_device_noinline_cpu SpectralColor light_sample_shader_eval(INTEGRATOR_STATE_
 
     /* No proper path flag, we're evaluating this for all closures. that's
      * weak but we'd have to do multiple evaluations otherwise. */
-    shader_eval_surface(INTEGRATOR_STATE_PASS, emission_sd, NULL, PATH_RAY_EMISSION);
+    shader_eval_surface<NODE_FEATURE_MASK_LIGHT>(
+        INTEGRATOR_STATE_PASS, emission_sd, NULL, PATH_RAY_EMISSION);
 
     /* Evaluate closures. */
 #ifdef __BACKGROUND_MIS__
@@ -117,14 +118,7 @@ ccl_device_inline bool light_sample_terminate(const KernelGlobals *ccl_restrict 
     return true;
   }
 
-  if (kernel_data.integrator.light_inv_rr_threshold > 0.0f
-  /* TODO */
-#if 0
-#  ifdef __SHADOW_TRICKS__
-      && (state->flag & PATH_RAY_SHADOW_CATCHER) == 0
-#  endif
-#endif
-  ) {
+  if (kernel_data.integrator.light_inv_rr_threshold > 0.0f) {
     float probability = reduce_max_f(fabs(bsdf_eval_sum(eval))) *
                         kernel_data.integrator.light_inv_rr_threshold;
     if (probability < 1.0f) {

@@ -455,7 +455,8 @@ ccl_device void kernel_background_evaluate(INTEGRATOR_STATE_CONST_ARGS,
   /* Evaluate shader.
    * This is being evaluated for all BSDFs, so path flag does not contain a specific type. */
   const int path_flag = PATH_RAY_EMISSION;
-  shader_eval_surface(INTEGRATOR_STATE_PASS_NULL, &sd, NULL, path_flag);
+
+  shader_eval_surface<NODE_FEATURE_MASK_LIGHT>(INTEGRATOR_STATE_PASS_NULL, &sd, NULL, path_flag);
   const SpectralColor color = shader_background_eval(&sd);
 
   const float3 color_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, color);

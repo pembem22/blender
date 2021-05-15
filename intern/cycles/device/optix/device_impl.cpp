@@ -97,7 +97,7 @@ OptiXDevice::OptiXDevice(const DeviceInfo &info, Stats &stats, Profiler &profile
 #  endif
 
   /* Fix weird compiler bug that assigns wrong size. */
-  launch_params.data_elements = sizeof(KernelParams);
+  launch_params.data_elements = sizeof(KernelParamsOptiX);
 
   /* Allocate launch parameter buffer memory on device. */
   launch_params.alloc_to_device(1);
@@ -673,21 +673,31 @@ bool OptiXDevice::denoise_create_if_needed(const DenoiseParams &params)
 
   /* Create OptiX denoiser handle on demand when it is first used. */
   OptixDenoiserOptions denoiser_options = {};
+#  if OPTIX_ABI_VERSION >= 47
+  denoiser_options.guideAlbedo = input_passes >= 2;
+  denoiser_options.guideNormal = input_passes >= 3;
+  const OptixResult result = optixDenoiserCreate(
+      context, OPTIX_DENOISER_MODEL_KIND_HDR, &denoiser_options, &denoiser_.optix_denoiser);
+#  else
   denoiser_options.inputKind = static_cast<OptixDenoiserInputKind>(OPTIX_DENOISER_INPUT_RGB +
                                                                    (input_passes - 1));
-#  if OPTIX_ABI_VERSION < 28
+#    if OPTIX_ABI_VERSION < 28
   denoiser_options.pixelFormat = OPTIX_PIXEL_FORMAT_FLOAT3;
-#  endif
+#    endif
 
   const OptixResult result = optixDenoiserCreate(
       context, &denoiser_options, &denoiser_.optix_denoiser);
+#  endif
+
   if (result != OPTIX_SUCCESS) {
     set_error("Failed to create OptiX denoiser");
     return false;
   }
 
+#  if OPTIX_ABI_VERSION < 47
   optix_assert(
       optixDenoiserSetModel(denoiser_.optix_denoiser, OPTIX_DENOISER_MODEL_KIND_HDR, nullptr, 0));
+#  endif
 
   /* OptiX denoiser handle was created with the requested number of input passes. */
   denoiser_.input_passes = input_passes;
@@ -745,7 +755,6 @@ bool OptiXDevice::denoise_run(OptiXDeviceQueue *queue,
                               const DeviceDenoiseTask &task,
                               const device_ptr d_input_rgb)
 {
-  const int input_passes = denoise_buffer_num_passes(task.params);
   const int pixel_stride = 3 * sizeof(float);
   const int input_stride = task.width * pixel_stride;
 
@@ -771,6 +780,30 @@ bool OptiXDevice::denoise_run(OptiXDeviceQueue *queue,
 
   /* Finally run denonising. */
   OptixDenoiserParams params = {}; /* All parameters are disabled/zero. */
+#  if OPTIX_ABI_VERSION >= 47
+  OptixDenoiserLayer image_layers = {};
+  image_layers.input = input_layers[0];
+  image_layers.output = output_layers[0];
+
+  OptixDenoiserGuideLayer guide_layers = {};
+  guide_layers.albedo = input_layers[1];
+  guide_layers.normal = input_layers[2];
+
+  optix_assert(optixDenoiserInvoke(denoiser_.optix_denoiser,
+                                   queue->stream(),
+                                   &params,
+                                   denoiser_.state.device_pointer,
+                                   denoiser_.scratch_offset,
+                                   &guide_layers,
+                                   &image_layers,
+                                   1,
+                                   0,
+                                   0,
+                                   denoiser_.state.device_pointer + denoiser_.scratch_offset,
+                                   denoiser_.scratch_size));
+#  else
+  const int input_passes = denoise_buffer_num_passes(task.params);
+
   optix_assert(optixDenoiserInvoke(denoiser_.optix_denoiser,
                                    queue->stream(),
                                    &params,
@@ -783,6 +816,7 @@ bool OptiXDevice::denoise_run(OptiXDeviceQueue *queue,
                                    output_layers,
                                    denoiser_.state.device_pointer + denoiser_.scratch_offset,
                                    denoiser_.scratch_size));
+#  endif
 
   return true;
 }
@@ -1387,20 +1421,17 @@ void OptiXDevice::const_copy_to(const char *name, void *host, size_t size)
     KernelData *const data = (KernelData *)host;
     *(OptixTraversableHandle *)&data->bvh.scene = tlas_handle;
 
-    update_launch_params(offsetof(KernelParams, data), host, size);
+    update_launch_params(offsetof(KernelParamsOptiX, data), host, size);
     return;
   }
 
   /* Update data storage pointers in launch parameters. */
 #  define KERNEL_TEX(data_type, tex_name) \
     if (strcmp(name, #tex_name) == 0) { \
-      update_launch_params(offsetof(KernelParams, tex_name), host, size); \
+      update_launch_params(offsetof(KernelParamsOptiX, tex_name), host, size); \
       return; \
     }
   KERNEL_TEX(IntegratorState, __integrator_state)
-  KERNEL_TEX(IntegratorQueueCounter *, __integrator_queue_counter)
-  KERNEL_TEX(int *, __integrator_sort_key)
-  KERNEL_TEX(int *, __integrator_sort_key_counter)
 #  include "kernel/kernel_textures.h"
 #  undef KERNEL_TEX
 }

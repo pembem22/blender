@@ -143,7 +143,7 @@ static void oidn_add_pass_if_needed(oidn::FilterRef *oidn_filter,
 
       float pixel_scale = scale;
       if (pass_sample_count != PASS_UNUSED) {
-        pixel_scale = 1.0f / buffer_pixel[pass_sample_count];
+        pixel_scale = 1.0f / __float_as_uint(buffer_pixel[pass_sample_count]);
       }
 
       scaled_row[x * 3 + 0] = pass_pixel[0] * pixel_scale;
@@ -183,7 +183,7 @@ static void oidn_scale_combined_pass_after_denoise(const BufferParams &buffer_pa
     float *buffer_row = buffer_data + buffer_offset + y * row_stride;
     for (int x = 0; x < width; ++x) {
       float *buffer_pixel = buffer_row + x * pixel_stride;
-      const float pixel_scale = buffer_pixel[pass_sample_count];
+      const float pixel_scale = __float_as_uint(buffer_pixel[pass_sample_count]);
 
       buffer_pixel[0] = buffer_pixel[0] * pixel_scale;
       buffer_pixel[1] = buffer_pixel[1] * pixel_scale;
@@ -232,6 +232,31 @@ void OIDNDenoiser::denoise_buffer(const BufferParams &buffer_params,
   /* TODO: It may be possible to avoid this copy, but we have to ensure that when other code copies
    * data from the device it doesn't overwrite the denoiser buffers. */
   render_buffers->buffer.copy_to_device();
+}
+
+DeviceInfo OIDNDenoiser::get_denoiser_device_info() const
+{
+  /* OpenImageDenoiser runs on CPU. Access the CPU device information with some safety fallbacks
+   * for possible variations of Cycles integration. */
+
+  vector<DeviceInfo> cpu_devices = Device::available_devices(DEVICE_MASK_CPU);
+
+  if (cpu_devices.empty()) {
+    LOG(ERROR) << "No CPU devices reported.";
+
+    DeviceInfo dummy_info;
+    dummy_info.type = DEVICE_NONE;
+    return dummy_info;
+  }
+
+  if (cpu_devices.size() > 1) {
+    DeviceInfo device_info;
+    device_info.type = DEVICE_MULTI;
+    device_info.multi_devices = cpu_devices;
+    return device_info;
+  }
+
+  return cpu_devices[0];
 }
 
 void OIDNDenoiser::initialize()

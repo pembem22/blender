@@ -64,8 +64,8 @@ class PathTraceWork {
   virtual void copy_to_gpu_display(GPUDisplay *gpu_display, float sample_scale) = 0;
 
   /* Perform convergence test on the render buffer, and filter the convergence mask.
-   * Returns true if all pixels did converge. */
-  virtual bool adaptive_sampling_converge_and_filter(float threshold, bool reset) = 0;
+   * Returns number of active pixels (the ones which did not converge yet). */
+  virtual int adaptive_sampling_converge_filter_count_active(float threshold, bool reset) = 0;
 
   /* Cheap-ish request to see whether rendering is requested and is to be stopped as soon as
    * possible, without waiting for any samples to be finished. */
@@ -74,6 +74,12 @@ class PathTraceWork {
     /* NOTE: Rely on the fact that on x86 CPU reading scalar can happen without atomic even in
      * threaded environment. */
     return *cancel_requested_flag_;
+  }
+
+  /* Access to the device which is used to path trace this work on. */
+  Device *get_device() const
+  {
+    return device_;
   }
 
  protected:

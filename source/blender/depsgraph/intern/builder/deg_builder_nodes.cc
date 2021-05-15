@@ -554,6 +554,7 @@ void DepsgraphNodeBuilder::build_collection(LayerCollection *from_layer_collecti
     id_node->is_directly_visible = is_collection_visible;
 
     build_idproperties(collection->id.properties);
+    add_operation_node(&collection->id, NodeType::GEOMETRY, OperationCode::GEOMETRY_EVAL_DONE);
   }
   if (from_layer_collection != nullptr) {
     /* If we came from layer collection we don't go deeper, view layer
@@ -1555,6 +1556,12 @@ void DepsgraphNodeBuilder::build_nodetree_socket(bNodeSocket *socket)
   }
   else if (socket->type == SOCK_COLLECTION) {
     build_id((ID *)((bNodeSocketValueCollection *)socket->default_value)->value);
+  }
+  else if (socket->type == SOCK_TEXTURE) {
+    build_id((ID *)((bNodeSocketValueTexture *)socket->default_value)->value);
+  }
+  else if (socket->type == SOCK_MATERIAL) {
+    build_id((ID *)((bNodeSocketValueMaterial *)socket->default_value)->value);
   }
 }
 

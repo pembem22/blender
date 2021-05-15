@@ -38,31 +38,6 @@ ccl_device_inline void integrate_surface_shader_setup(INTEGRATOR_STATE_CONST_ARG
   shader_setup_from_ray(kg, sd, &ray, &isect);
 }
 
-/* TODO: this should move to its own kernel. */
-#if 0
-#  ifdef __SHADOW_TRICKS__
-ccl_device_inline bool integrate_surface_shadow_catcher(INTEGRATOR_STATE_CONST_ARGS)
-{
-  if ((sd->object_flag & SD_OBJECT_SHADOW_CATCHER)) {
-    if (state->flag & PATH_RAY_TRANSPARENT_BACKGROUND) {
-      state->flag |= (PATH_RAY_SHADOW_CATCHER | PATH_RAY_STORE_SHADOW_INFO);
-
-      float3 bg = zero_float3();
-      if (!kernel_data.background.transparent) {
-        bg = indirect_background(kg, emission_sd, state, NULL, ray);
-      }
-      path_radiance_accum_shadowcatcher(L, throughput, bg);
-    }
-  }
-  else if (state->flag & PATH_RAY_SHADOW_CATCHER) {
-    /* Only update transparency after shadow catcher bounce. */
-    L->shadow_transparency *= average(shader_bsdf_transparency(kg, sd));
-  }
-  return true;
-}
-#  endif /* __SHADOW_TRICKS__ */
-#endif
-
 #ifdef __HOLDOUT__
 ccl_device_inline bool integrate_surface_holdout(INTEGRATOR_STATE_CONST_ARGS,
                                                  ShaderData *sd,
@@ -135,11 +110,12 @@ ccl_device_inline void integrate_surface_direct_light(INTEGRATOR_STATE_ARGS,
   /* Sample position on a light. */
   LightSample ls ccl_optional_struct_init;
   {
+    const int path_flag = INTEGRATOR_STATE(path, flag);
     const uint bounce = INTEGRATOR_STATE(path, bounce);
     float light_u, light_v;
     path_state_rng_2D(kg, rng_state, PRNG_LIGHT_U, &light_u, &light_v);
 
-    if (!light_sample(kg, -1, light_u, light_v, sd->time, sd->P, bounce, &ls)) {
+    if (!light_sample(kg, light_u, light_v, sd->time, sd->P, bounce, path_flag, &ls)) {
       return;
     }
   }
@@ -339,7 +315,8 @@ ccl_device_inline bool integrate_surface(INTEGRATOR_STATE_ARGS,
 #endif
   {
     /* Evaluate shader. */
-    shader_eval_surface(INTEGRATOR_STATE_PASS, &sd, render_buffer, path_flag);
+    shader_eval_surface<NODE_FEATURE_MASK_SURFACE>(
+        INTEGRATOR_STATE_PASS, &sd, render_buffer, path_flag);
   }
 
 #ifdef __SUBSURFACE__
@@ -392,6 +369,10 @@ ccl_device_inline bool integrate_surface(INTEGRATOR_STATE_ARGS,
 
 #ifdef __DENOISING_FEATURES__
   kernel_write_denoising_features(INTEGRATOR_STATE_PASS, &sd, render_buffer);
+#endif
+
+#ifdef __SHADOW_CATCHER__
+  kernel_write_shadow_catcher_bounce_data(INTEGRATOR_STATE_PASS, &sd, render_buffer);
 #endif
 
   /* TODO */

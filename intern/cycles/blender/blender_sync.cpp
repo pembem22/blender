@@ -522,6 +522,8 @@ PassType BlenderSync::get_pass_type(BL::RenderPass &b_pass)
   MAP_PASS("Denoising Normal", PASS_DENOISING_NORMAL);
   MAP_PASS("Denoising Albedo", PASS_DENOISING_ALBEDO);
 
+  MAP_PASS("Shadow Catcher", PASS_SHADOW_CATCHER);
+
   MAP_PASS("Debug Render Time", PASS_RENDER_TIME);
 
   MAP_PASS("AdaptiveAuxBuffer", PASS_ADAPTIVE_AUX_BUFFER);
@@ -604,6 +606,11 @@ void BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay, BL::ViewLayer &b_v
     Pass::add(PASS_VOLUME_INDIRECT, passes, "VolumeInd");
   }
 
+  if (get_boolean(crl, "use_pass_shadow_catcher")) {
+    b_engine.add_pass("Shadow Catcher", 4, "RGBA", b_view_layer.name().c_str());
+    Pass::add(PASS_SHADOW_CATCHER, passes, "Shadow Catcher");
+  }
+
   /* Cryptomatte stores two ID/weight pairs per RGBA layer.
    * User facing parameter is the number of pairs. */
   int crypto_depth = divide_up(min(16, b_view_layer.pass_cryptomatte_depth()), 2);
@@ -669,12 +676,18 @@ void BlenderSync::free_data_after_sync(BL::Depsgraph &b_depsgraph)
    * caches to be releases from blender side in order to reduce peak memory
    * footprint during synchronization process.
    */
+
   const bool is_interface_locked = b_engine.render() && b_engine.render().use_lock_interface();
-  const bool can_free_caches = (BlenderSession::headless || is_interface_locked) &&
-                               /* Baking re-uses the depsgraph multiple times, clearing crashes
-                                * reading un-evaluated mesh data which isn't aligned with the
-                                * geometry we're baking, see T71012. */
-                               !scene->bake_manager->get_baking();
+  const bool is_persistent_data = b_engine.render() && b_engine.render().use_persistent_data();
+  const bool can_free_caches =
+      (BlenderSession::headless || is_interface_locked) &&
+      /* Baking re-uses the depsgraph multiple times, clearing crashes
+       * reading un-evaluated mesh data which isn't aligned with the
+       * geometry we're baking, see T71012. */
+      !scene->bake_manager->get_baking() &&
+      /* Persistent data must main caches for performance and correctness. */
+      !is_persistent_data;
+
   if (!can_free_caches) {
     return;
   }

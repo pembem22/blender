@@ -49,12 +49,8 @@ CCL_NAMESPACE_BEGIN
 ccl_device void shader_setup_object_transforms(const KernelGlobals *kg, ShaderData *sd, float time)
 {
   if (sd->object_flag & SD_OBJECT_MOTION) {
-    sd->ob_tfm = object_fetch_transform_motion(kg, sd->object, time);
-    sd->ob_itfm = transform_quick_inverse(sd->ob_tfm);
-  }
-  else {
-    sd->ob_tfm = object_fetch_transform(kg, sd->object, OBJECT_TRANSFORM);
-    sd->ob_itfm = object_fetch_transform(kg, sd->object, OBJECT_INVERSE_TRANSFORM);
+    sd->ob_tfm_motion = object_fetch_transform_motion(kg, sd->object, time);
+    sd->ob_itfm_motion = transform_quick_inverse(sd->ob_tfm_motion);
   }
 }
 #endif
@@ -299,16 +295,10 @@ ccl_device_inline void shader_setup_from_sample(const KernelGlobals *ccl_restric
 
 #ifdef __OBJECT_MOTION__
     shader_setup_object_transforms(kg, sd, time);
-  }
-  else if (lamp != LAMP_NONE) {
-    sd->ob_tfm = lamp_fetch_transform(kg, lamp, false);
-    sd->ob_itfm = lamp_fetch_transform(kg, lamp, true);
-    sd->lamp = lamp;
-#else
-  }
-  else if (lamp != LAMP_NONE) {
-    sd->lamp = lamp;
 #endif
+  }
+  else if (lamp != LAMP_NONE) {
+    sd->lamp = lamp;
   }
 
   /* transform into world space */
@@ -1046,6 +1036,7 @@ ccl_device SpectralColor shader_holdout_apply(const KernelGlobals *kg, ShaderDat
 
 /* Surface Evaluation */
 
+template<uint node_feature_mask>
 ccl_device void shader_eval_surface(INTEGRATOR_STATE_CONST_ARGS,
                                     ShaderData *sd,
                                     ccl_global float *buffer,
@@ -1080,7 +1071,8 @@ ccl_device void shader_eval_surface(INTEGRATOR_STATE_CONST_ARGS,
 #endif
   {
 #ifdef __SVM__
-    svm_eval_nodes(INTEGRATOR_STATE_PASS, sd, buffer, SHADER_TYPE_SURFACE, path_flag);
+    svm_eval_nodes<node_feature_mask, SHADER_TYPE_SURFACE>(
+        INTEGRATOR_STATE_PASS, sd, buffer, path_flag);
 #else
     if (sd->object == OBJECT_NONE) {
       sd->closure_emission_background = make_float3(0.8f, 0.8f, 0.8f);
@@ -1097,7 +1089,7 @@ ccl_device void shader_eval_surface(INTEGRATOR_STATE_CONST_ARGS,
 #endif
   }
 
-  if (sd->flag & SD_BSDF_NEEDS_LCG) {
+  if (NODES_FEATURE(BSDF) && (sd->flag & SD_BSDF_NEEDS_LCG)) {
     sd->lcg_state = lcg_state_init(INTEGRATOR_STATE(path, rng_hash),
                                    INTEGRATOR_STATE(path, rng_offset),
                                    INTEGRATOR_STATE(path, sample),
@@ -1296,7 +1288,8 @@ ccl_device_inline void shader_eval_volume(INTEGRATOR_STATE_CONST_ARGS,
     else
 #    endif
     {
-      svm_eval_nodes(INTEGRATOR_STATE_PASS, sd, NULL, SHADER_TYPE_VOLUME, path_flag);
+      svm_eval_nodes<NODE_FEATURE_MASK_VOLUME, SHADER_TYPE_VOLUME>(
+          INTEGRATOR_STATE_PASS, sd, NULL, path_flag);
     }
 #  endif
 
@@ -1323,7 +1316,8 @@ ccl_device void shader_eval_displacement(INTEGRATOR_STATE_CONST_ARGS, ShaderData
   else
 #  endif
   {
-    svm_eval_nodes(INTEGRATOR_STATE_PASS, sd, NULL, SHADER_TYPE_DISPLACEMENT, 0);
+    svm_eval_nodes<NODE_FEATURE_MASK_DISPLACEMENT, SHADER_TYPE_DISPLACEMENT>(
+        INTEGRATOR_STATE_PASS, sd, NULL, 0);
   }
 #endif
 }

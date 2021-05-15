@@ -143,21 +143,27 @@ void Scene::free_memory(bool final)
   delete bvh;
   bvh = NULL;
 
-  foreach (Shader *s, shaders)
-    delete s;
-  /* delete procedurals before other types as they may hold pointers to those types */
+  /* The order of deletion is important to make sure data is freed based on possible dependencies
+   * as the Nodes' reference counts are decremented in the destructors:
+   *
+   * - Procedurals can create and hold pointers to any other types.
+   * - Objects can hold pointers to Geometries and ParticleSystems
+   * - Lights and Geometries can hold pointers to Shaders.
+   *
+   * Similarly, we first delete all nodes and their associated device data, and then the managers
+   * and their associated device data.
+   */
   foreach (Procedural *p, procedurals)
     delete p;
-  foreach (Geometry *g, geometry)
-    delete g;
   foreach (Object *o, objects)
     delete o;
-  foreach (Light *l, lights)
-    delete l;
+  foreach (Geometry *g, geometry)
+    delete g;
   foreach (ParticleSystem *p, particle_systems)
     delete p;
+  foreach (Light *l, lights)
+    delete l;
 
-  shaders.clear();
   geometry.clear();
   objects.clear();
   lights.clear();
@@ -169,7 +175,25 @@ void Scene::free_memory(bool final)
     film->device_free(device, &dscene, this);
     background->device_free(device, &dscene);
     integrator->device_free(device, &dscene, true);
+  }
 
+  if (final) {
+    delete camera;
+    delete dicing_camera;
+    delete film;
+    delete background;
+    delete integrator;
+  }
+
+  /* Delete Shaders after every other nodes to ensure that we do not try to decrement the reference
+   * count on some dangling pointer. */
+  foreach (Shader *s, shaders)
+    delete s;
+
+  shaders.clear();
+
+  /* Now that all nodes have been deleted, we can safely delete managers and device data. */
+  if (device) {
     object_manager->device_free(device, &dscene, true);
     geometry_manager->device_free(device, &dscene, true);
     shader_manager->device_free(device, &dscene, this);
@@ -189,11 +213,6 @@ void Scene::free_memory(bool final)
 
   if (final) {
     delete lookup_tables;
-    delete camera;
-    delete dicing_camera;
-    delete film;
-    delete background;
-    delete integrator;
     delete object_manager;
     delete geometry_manager;
     delete shader_manager;
@@ -471,7 +490,7 @@ DeviceRequestedFeatures Scene::get_requested_device_features()
       requested_features.use_camera_motion |= geom->get_use_motion_blur();
     }
     if (object->get_is_shadow_catcher()) {
-      requested_features.use_shadow_tricks = true;
+      requested_features.use_shadow_catcher = true;
     }
     if (geom->is_mesh()) {
       Mesh *mesh = static_cast<Mesh *>(geom);
@@ -493,7 +512,6 @@ DeviceRequestedFeatures Scene::get_requested_device_features()
 
   if (Pass::contains(passes, PASS_DENOISING_COLOR)) {
     requested_features.use_denoising = true;
-    requested_features.use_shadow_tricks = true;
   }
 
   return requested_features;
@@ -504,9 +522,6 @@ bool Scene::update(Progress &progress)
   if (!need_update()) {
     return false;
   }
-
-  /* Updated used shader tag so we know which features are need for the kernel. */
-  shader_manager->update_shaders_used(this);
 
   /* Update max_closures. */
   KernelIntegrator *kintegrator = &dscene.data.integrator;
@@ -529,7 +544,7 @@ bool Scene::update(Progress &progress)
 
 void Scene::update_passes()
 {
-  if (!integrator->is_modified() && !film->is_modified()) {
+  if (!object_manager->need_update() && !integrator->is_modified() && !film->is_modified()) {
     return;
   }
 
@@ -563,6 +578,12 @@ void Scene::update_passes()
     }
   }
 
+  /* Create passes for shadow catcher. */
+  if (has_shadow_catcher()) {
+    Pass::add(PASS_SHADOW_CATCHER, passes, nullptr, true);
+    Pass::add(PASS_SHADOW_CATCHER_MATTE, passes, nullptr, true);
+  }
+
   film->tag_modified();
 }
 
@@ -592,9 +613,6 @@ bool Scene::load_kernels(Progress &progress, bool lock_scene)
       return false;
     }
 
-    progress.add_skip_time(timer, false);
-    VLOG(1) << "Total time spent loading kernels: " << time_dt() - timer.get_start();
-
     kernels_loaded = true;
     loaded_kernel_features = requested_features;
     return true;
@@ -613,7 +631,7 @@ int Scene::get_max_closure_count()
   int max_closures = 0;
   for (int i = 0; i < shaders.size(); i++) {
     Shader *shader = shaders[i];
-    if (shader->used) {
+    if (shader->reference_count()) {
       int num_closures = shader->graph->get_num_closures();
       max_closures = max(max_closures, num_closures);
     }
@@ -632,6 +650,19 @@ int Scene::get_max_closure_count()
   }
 
   return max_closure_global;
+}
+
+bool Scene::has_shadow_catcher() const
+{
+  /* TODO(sergey): Calculate once when object manager changes. */
+
+  for (Object *object : objects) {
+    if (object->get_is_shadow_catcher()) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 template<> Light *Scene::create_node<Light>()
@@ -774,9 +805,10 @@ template<> void Scene::delete_node_impl(ParticleSystem *node)
   particle_system_manager->tag_update(this);
 }
 
-template<> void Scene::delete_node_impl(Shader * /*node*/)
+template<> void Scene::delete_node_impl(Shader *shader)
 {
   /* don't delete unused shaders, not supported */
+  shader->clear_reference_count();
 }
 
 template<> void Scene::delete_node_impl(Procedural *node)
@@ -843,9 +875,12 @@ template<> void Scene::delete_nodes(const set<ParticleSystem *> &nodes, const No
   particle_system_manager->tag_update(this);
 }
 
-template<> void Scene::delete_nodes(const set<Shader *> & /*nodes*/, const NodeOwner * /*owner*/)
+template<> void Scene::delete_nodes(const set<Shader *> &nodes, const NodeOwner * /*owner*/)
 {
   /* don't delete unused shaders, not supported */
+  for (Shader *shader : nodes) {
+    shader->clear_reference_count();
+  }
 }
 
 template<> void Scene::delete_nodes(const set<Procedural *> &nodes, const NodeOwner *owner)

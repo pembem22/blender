@@ -20,14 +20,12 @@
 #  include "device/cuda/device_impl.h"
 #  include "device/cuda/kernel.h"
 
-#  include "util/util_time.h"
-
 CCL_NAMESPACE_BEGIN
 
 /* CUDADeviceQueue */
 
 CUDADeviceQueue::CUDADeviceQueue(CUDADevice *device)
-    : DeviceQueue(device), cuda_device_(device), cuda_stream_(nullptr), last_sync_time_(0.0)
+    : DeviceQueue(device), cuda_device_(device), cuda_stream_(nullptr)
 {
   const CUDAContextScope scope(cuda_device_);
   cuda_device_assert(cuda_device_, cuStreamCreate(&cuda_stream_, CU_STREAM_NON_BLOCKING));
@@ -39,6 +37,13 @@ CUDADeviceQueue::~CUDADeviceQueue()
   cuStreamDestroy(cuda_stream_);
 }
 
+int CUDADeviceQueue::num_concurrent_states(const size_t) const
+{
+  /* TODO: compute automatically. */
+  /* TODO: must have at least num_threads_per_block. */
+  return 1048576;
+}
+
 void CUDADeviceQueue::init_execution()
 {
   /* Synchronize all textures and memory copies before executing task. */
@@ -46,7 +51,12 @@ void CUDADeviceQueue::init_execution()
   cuda_device_->load_texture_info();
   cuda_device_assert(cuda_device_, cuCtxSynchronize());
 
-  last_sync_time_ = time_dt();
+  debug_init_execution();
+}
+
+bool CUDADeviceQueue::kernel_available(DeviceKernel kernel) const
+{
+  return cuda_device_->kernels.available(kernel);
 }
 
 bool CUDADeviceQueue::enqueue(DeviceKernel kernel, const int work_size, void *args[])
@@ -55,8 +65,7 @@ bool CUDADeviceQueue::enqueue(DeviceKernel kernel, const int work_size, void *ar
     return false;
   }
 
-  VLOG(3) << "CUDA queue launch " << device_kernel_as_string(kernel) << ", work_size "
-          << work_size;
+  debug_enqueue(kernel, work_size);
 
   const CUDAContextScope scope(cuda_device_);
   const CUDADeviceKernel &cuda_kernel = cuda_device_->kernels.get(kernel);
@@ -124,10 +133,7 @@ bool CUDADeviceQueue::synchronize()
 
   const CUDAContextScope scope(cuda_device_);
   cuda_device_assert(cuda_device_, cuStreamSynchronize(cuda_stream_));
-
-  double new_time = time_dt();
-  VLOG(3) << "CUDA queue synchronize, elapsed " << new_time - last_sync_time_ << "s";
-  last_sync_time_ = new_time;
+  debug_synchronize();
 
   return !(cuda_device_->have_error());
 }

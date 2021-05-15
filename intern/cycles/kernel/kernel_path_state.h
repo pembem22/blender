@@ -141,6 +141,15 @@ ccl_device_inline SpectralColor generate_wavelengths(INTEGRATOR_STATE_ARGS)
 }
 #endif
 
+/* Initialize queues, so that the this path is considered terminated.
+ * Used for early outputs in the camera ray initialization, as well as initialization of split
+ * states for shadow catcher. */
+ccl_device_inline void path_state_init_queues(INTEGRATOR_STATE_ARGS)
+{
+  INTEGRATOR_STATE_WRITE(path, queued_kernel) = 0;
+  INTEGRATOR_STATE_WRITE(shadow_path, queued_kernel) = 0;
+}
+
 /* Minimalistic initialization of the path state, which is needed for early outputs in the
  * integrator initialization to work. */
 ccl_device_inline void path_state_init(INTEGRATOR_STATE_ARGS,
@@ -152,8 +161,7 @@ ccl_device_inline void path_state_init(INTEGRATOR_STATE_ARGS,
 
   INTEGRATOR_STATE_WRITE(path, render_pixel_index) = render_pixel_index;
 
-  INTEGRATOR_STATE_WRITE(path, queued_kernel) = 0;
-  INTEGRATOR_STATE_WRITE(shadow_path, queued_kernel) = 0;
+  path_state_init_queues(INTEGRATOR_STATE_PASS);
 }
 
 /* Initialize the rest of the path state needed to continue the path integration. */
@@ -347,15 +355,21 @@ ccl_device_inline bool path_state_volume_next(INTEGRATOR_STATE_ARGS)
 
 ccl_device_inline uint path_state_ray_visibility(INTEGRATOR_STATE_CONST_ARGS)
 {
-  const uint32_t flag = INTEGRATOR_STATE(path, flag);
-  uint32_t visibility = flag & PATH_RAY_ALL_VISIBILITY;
+  const uint32_t path_flag = INTEGRATOR_STATE(path, flag);
+
+  uint32_t visibility = path_flag & PATH_RAY_ALL_VISIBILITY;
 
   /* For visibility, diffuse/glossy are for reflection only. */
-  if (visibility & PATH_RAY_TRANSMIT)
+  if (visibility & PATH_RAY_TRANSMIT) {
     visibility &= ~(PATH_RAY_DIFFUSE | PATH_RAY_GLOSSY);
+  }
+
   /* todo: this is not supported as its own ray visibility yet. */
-  if (flag & PATH_RAY_VOLUME_SCATTER)
+  if (path_flag & PATH_RAY_VOLUME_SCATTER) {
     visibility |= PATH_RAY_DIFFUSE;
+  }
+
+  visibility = SHADOW_CATCHER_PATH_VISIBILITY(path_flag, visibility);
 
   return visibility;
 }
@@ -374,12 +388,6 @@ ccl_device_inline float path_state_continuation_probability(INTEGRATOR_STATE_CON
     if (transparent_bounce <= kernel_data.integrator.transparent_min_bounce) {
       return 1.0f;
     }
-#ifdef __SHADOW_TRICKS__
-    /* Exception for shadow catcher not working correctly with RR. */
-    else if ((flag & PATH_RAY_SHADOW_CATCHER) && (transparent_bounce <= 8)) {
-      return 1.0f;
-    }
-#endif
   }
   else {
     const uint32_t bounce = INTEGRATOR_STATE(path, bounce);
@@ -387,12 +395,6 @@ ccl_device_inline float path_state_continuation_probability(INTEGRATOR_STATE_CON
     if (bounce <= kernel_data.integrator.min_bounce) {
       return 1.0f;
     }
-#ifdef __SHADOW_TRICKS__
-    /* Exception for shadow catcher not working correctly with RR. */
-    else if ((flag & PATH_RAY_SHADOW_CATCHER) && (bounce <= 3)) {
-      return 1.0f;
-    }
-#endif
   }
 
   /* Probabilistic termination: use sqrt() to roughly match typical view

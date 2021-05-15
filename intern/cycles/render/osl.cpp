@@ -91,10 +91,10 @@ void OSLShaderManager::reset(Scene * /*scene*/)
   shading_system_init();
 }
 
-void OSLShaderManager::device_update(Device *device,
-                                     DeviceScene *dscene,
-                                     Scene *scene,
-                                     Progress &progress)
+void OSLShaderManager::device_update_specific(Device *device,
+                                              DeviceScene *dscene,
+                                              Scene *scene,
+                                              Progress &progress)
 {
   if (!need_update())
     return;
@@ -257,25 +257,36 @@ void OSLShaderManager::shading_system_init()
 
     /* our own ray types */
     static const char *raytypes[] = {
-        "camera",      /* PATH_RAY_CAMERA */
-        "reflection",  /* PATH_RAY_REFLECT */
-        "refraction",  /* PATH_RAY_TRANSMIT */
-        "diffuse",     /* PATH_RAY_DIFFUSE */
-        "glossy",      /* PATH_RAY_GLOSSY */
-        "singular",    /* PATH_RAY_SINGULAR */
-        "transparent", /* PATH_RAY_TRANSPARENT */
+        "camera",         /* PATH_RAY_CAMERA */
+        "reflection",     /* PATH_RAY_REFLECT */
+        "refraction",     /* PATH_RAY_TRANSMIT */
+        "diffuse",        /* PATH_RAY_DIFFUSE */
+        "glossy",         /* PATH_RAY_GLOSSY */
+        "singular",       /* PATH_RAY_SINGULAR */
+        "transparent",    /* PATH_RAY_TRANSPARENT */
+        "volume_scatter", /* PATH_RAY_VOLUME_SCATTER */
 
-        "shadow", /* PATH_RAY_SHADOW_OPAQUE_NON_CATCHER */
-        "shadow", /* PATH_RAY_SHADOW_OPAQUE_CATCHER */
-        "shadow", /* PATH_RAY_SHADOW_TRANSPARENT_NON_CATCHER */
-        "shadow", /* PATH_RAY_SHADOW_TRANSPARENT_CATCHER */
+        "shadow", /* PATH_RAY_SHADOW_OPAQUE */
+        "shadow", /* PATH_RAY_SHADOW_TRANSPARENT */
 
-        "__unused__",  "volume_scatter", /* PATH_RAY_VOLUME_SCATTER */
-        "__unused__",
+        "__unused__", /* PATH_RAY_NODE_UNALIGNED */
+        "__unused__", /* PATH_RAY_MIS_SKIP */
 
-        "__unused__",  "diffuse_ancestor", /* PATH_RAY_DIFFUSE_ANCESTOR */
-        "__unused__",  "__unused__",       "__unused__", "__unused__",
-        "__unused__",  "__unused__",       "__unused__",
+        "diffuse_ancestor", /* PATH_RAY_DIFFUSE_ANCESTOR */
+
+        "__unused__", /* PATH_RAY_SINGLE_PASS_DONE */
+        "__unused__", /* PATH_RAY_TRANSPARENT_BACKGROUND */
+        "__unused__", /* PATH_RAY_TERMINATE_IMMEDIATE */
+        "__unused__", /* PATH_RAY_TERMINATE_AFTER_TRANSPARENT */
+        "__unused__", /* PATH_RAY_EMISSION */
+        "__unused__", /* PATH_RAY_SUBSURFACE */
+        "__unused__", /* PATH_RAY_DENOISING_FEATURES */
+        "__unused__", /* PATH_RAY_REFLECT_PASS */
+        "__unused__", /* PATH_RAY_TRANSMISSION_PASS */
+        "__unused__", /* PATH_RAY_VOLUME_PASS */
+        "__unused__", /* PATH_RAY_SHADOW_FOR_LIGHT */
+        "__unused__", /* PATH_RAY_SHADOW_CATCHER_HIT */
+        "__unused__", /* PATH_RAY_SHADOW_CATCHER_PASS */
     };
 
     const int nraytypes = sizeof(raytypes) / sizeof(raytypes[0]);
@@ -1149,7 +1160,7 @@ void OSLCompiler::compile(OSLGlobals *og, Shader *shader)
     shader->has_integrator_dependency = false;
 
     /* generate surface shader */
-    if (shader->used && graph && output->input("Surface")->link) {
+    if (shader->reference_count() && graph && output->input("Surface")->link) {
       shader->osl_surface_ref = compile_type(shader, shader->graph, SHADER_TYPE_SURFACE);
 
       if (has_bump)
@@ -1165,7 +1176,7 @@ void OSLCompiler::compile(OSLGlobals *og, Shader *shader)
     }
 
     /* generate volume shader */
-    if (shader->used && graph && output->input("Volume")->link) {
+    if (shader->reference_count() && graph && output->input("Volume")->link) {
       shader->osl_volume_ref = compile_type(shader, shader->graph, SHADER_TYPE_VOLUME);
       shader->has_volume = true;
     }
@@ -1173,7 +1184,7 @@ void OSLCompiler::compile(OSLGlobals *og, Shader *shader)
       shader->osl_volume_ref = OSL::ShaderGroupRef();
 
     /* generate displacement shader */
-    if (shader->used && graph && output->input("Displacement")->link) {
+    if (shader->reference_count() && graph && output->input("Displacement")->link) {
       shader->osl_displacement_ref = compile_type(shader, shader->graph, SHADER_TYPE_DISPLACEMENT);
       shader->has_displacement = true;
     }
