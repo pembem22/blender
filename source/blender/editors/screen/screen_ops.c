@@ -141,6 +141,14 @@ bool ED_operator_screenactive(bContext *C)
   return true;
 }
 
+bool ED_operator_screenactive_nobackground(bContext *C)
+{
+  if (G.background) {
+    return false;
+  }
+  return ED_operator_screenactive(C);
+}
+
 /* XXX added this to prevent anim state to change during renders */
 static bool ED_operator_screenactive_norender(bContext *C)
 {
@@ -686,7 +694,9 @@ static bool screen_active_editable(bContext *C)
 typedef struct sActionzoneData {
   ScrArea *sa1, *sa2;
   AZone *az;
-  int x, y, gesture_dir, modifier;
+  int x, y;
+  eScreenDir gesture_dir;
+  int modifier;
 } sActionzoneData;
 
 /* quick poll to save operators to be created and handled */
@@ -1037,16 +1047,16 @@ static int actionzone_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
       /* Calculate gesture cardinal direction. */
       if (delta_y > abs(delta_x)) {
-        sad->gesture_dir = 'n';
+        sad->gesture_dir = SCREEN_DIR_N;
       }
       else if (delta_x >= abs(delta_y)) {
-        sad->gesture_dir = 'e';
+        sad->gesture_dir = SCREEN_DIR_E;
       }
       else if (delta_y < -abs(delta_x)) {
-        sad->gesture_dir = 's';
+        sad->gesture_dir = SCREEN_DIR_S;
       }
       else {
-        sad->gesture_dir = 'w';
+        sad->gesture_dir = SCREEN_DIR_W;
       }
 
       bool is_gesture;
@@ -1063,22 +1073,24 @@ static int actionzone_modal(bContext *C, wmOperator *op, const wmEvent *event)
           /* Are we still in same area? */
           if (BKE_screen_find_area_xy(screen, SPACE_TYPE_ANY, event->x, event->y) == sad->sa1) {
             /* Same area, so possible split. */
-            WM_cursor_set(
-                win, (ELEM(sad->gesture_dir, 'n', 's')) ? WM_CURSOR_H_SPLIT : WM_CURSOR_V_SPLIT);
+            WM_cursor_set(win,
+                          SCREEN_DIR_IS_VERTICAL(sad->gesture_dir) ? WM_CURSOR_H_SPLIT :
+                                                                     WM_CURSOR_V_SPLIT);
             is_gesture = (delta_max > split_threshold);
           }
           else {
             /* Different area, so possible join. */
-            if (sad->gesture_dir == 'n') {
+            if (sad->gesture_dir == SCREEN_DIR_N) {
               WM_cursor_set(win, WM_CURSOR_N_ARROW);
             }
-            else if (sad->gesture_dir == 's') {
+            else if (sad->gesture_dir == SCREEN_DIR_S) {
               WM_cursor_set(win, WM_CURSOR_S_ARROW);
             }
-            else if (sad->gesture_dir == 'e') {
+            else if (sad->gesture_dir == SCREEN_DIR_E) {
               WM_cursor_set(win, WM_CURSOR_E_ARROW);
             }
             else {
+              BLI_assert(sad->gesture_dir == SCREEN_DIR_W);
               WM_cursor_set(win, WM_CURSOR_W_ARROW);
             }
             is_gesture = (delta_max > join_threshold);
@@ -1472,7 +1484,7 @@ static void SCREEN_OT_area_close(wmOperatorType *ot)
 
 typedef struct sAreaMoveData {
   int bigger, smaller, origval, step;
-  char dir;
+  eScreenAxis dir_axis;
   enum AreaMoveSnapType {
     /* Snapping disabled */
     SNAP_NONE = 0,
@@ -1491,7 +1503,7 @@ typedef struct sAreaMoveData {
  * need window bounds in order to get correct limits */
 static void area_move_set_limits(wmWindow *win,
                                  bScreen *screen,
-                                 int dir,
+                                 const eScreenAxis dir_axis,
                                  int *bigger,
                                  int *smaller,
                                  bool *use_bigger_smaller_snap)
@@ -1544,7 +1556,7 @@ static void area_move_set_limits(wmWindow *win,
   WM_window_rect_calc(win, &window_rect);
 
   LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-    if (dir == 'h') {
+    if (dir_axis == SCREEN_AXIS_H) {
       int areamin = ED_area_headersize();
 
       if (area->v1->vec.y > window_rect.ymin) {
@@ -1607,8 +1619,8 @@ static bool area_move_init(bContext *C, wmOperator *op)
   sAreaMoveData *md = MEM_callocN(sizeof(sAreaMoveData), "sAreaMoveData");
   op->customdata = md;
 
-  md->dir = screen_geom_edge_is_horizontal(actedge) ? 'h' : 'v';
-  if (md->dir == 'h') {
+  md->dir_axis = screen_geom_edge_is_horizontal(actedge) ? SCREEN_AXIS_H : SCREEN_AXIS_V;
+  if (md->dir_axis == SCREEN_AXIS_H) {
     md->origval = actedge->v1->vec.y;
   }
   else {
@@ -1623,7 +1635,8 @@ static bool area_move_init(bContext *C, wmOperator *op)
   }
 
   bool use_bigger_smaller_snap = false;
-  area_move_set_limits(win, screen, md->dir, &md->bigger, &md->smaller, &use_bigger_smaller_snap);
+  area_move_set_limits(
+      win, screen, md->dir_axis, &md->bigger, &md->smaller, &use_bigger_smaller_snap);
 
   md->snap_type = use_bigger_smaller_snap ? SNAP_BIGGER_SMALLER_ONLY : SNAP_AREAGRID;
 
@@ -1634,7 +1647,7 @@ static int area_snap_calc_location(const bScreen *screen,
                                    const enum AreaMoveSnapType snap_type,
                                    const int delta,
                                    const int origval,
-                                   const int dir,
+                                   const eScreenAxis dir_axis,
                                    const int bigger,
                                    const int smaller)
 {
@@ -1659,7 +1672,7 @@ static int area_snap_calc_location(const bScreen *screen,
       break;
 
     case SNAP_FRACTION_AND_ADJACENT: {
-      const int axis = (dir == 'v') ? 0 : 1;
+      const int axis = (dir_axis == SCREEN_AXIS_V) ? 0 : 1;
       int snap_dist_best = INT_MAX;
       {
         const float div_array[] = {
@@ -1727,7 +1740,7 @@ static int area_snap_calc_location(const bScreen *screen,
 static void area_move_apply_do(const bContext *C,
                                int delta,
                                const int origval,
-                               const int dir,
+                               const eScreenAxis dir_axis,
                                const int bigger,
                                const int smaller,
                                const enum AreaMoveSnapType snap_type)
@@ -1745,11 +1758,12 @@ static void area_move_apply_do(const bContext *C,
     final_loc = origval + delta;
   }
   else {
-    final_loc = area_snap_calc_location(screen, snap_type, delta, origval, dir, bigger, smaller);
+    final_loc = area_snap_calc_location(
+        screen, snap_type, delta, origval, dir_axis, bigger, smaller);
   }
 
   BLI_assert(final_loc != -1);
-  short axis = (dir == 'v') ? 0 : 1;
+  short axis = (dir_axis == SCREEN_AXIS_V) ? 0 : 1;
 
   ED_screen_verts_iter(win, screen, v1)
   {
@@ -1805,7 +1819,7 @@ static void area_move_apply(bContext *C, wmOperator *op)
   sAreaMoveData *md = op->customdata;
   int delta = RNA_int_get(op->ptr, "delta");
 
-  area_move_apply_do(C, delta, md->origval, md->dir, md->bigger, md->smaller, md->snap_type);
+  area_move_apply_do(C, delta, md->origval, md->dir_axis, md->bigger, md->smaller, md->snap_type);
 }
 
 static void area_move_exit(bContext *C, wmOperator *op)
@@ -1870,7 +1884,7 @@ static int area_move_modal(bContext *C, wmOperator *op, const wmEvent *event)
       int x = RNA_int_get(op->ptr, "x");
       int y = RNA_int_get(op->ptr, "y");
 
-      int delta = (md->dir == 'v') ? event->x - x : event->y - y;
+      const int delta = (md->dir_axis == SCREEN_AXIS_V) ? event->x - x : event->y - y;
       RNA_int_set(op->ptr, "delta", delta);
 
       area_move_apply(C, op);
@@ -1936,7 +1950,7 @@ static void SCREEN_OT_area_move(wmOperatorType *ot)
 /*
  * operator state vars:
  * fac              spit point
- * dir              direction 'v' or 'h'
+ * dir              direction #SCREEN_AXIS_V or #SCREEN_AXIS_H
  *
  * operator customdata:
  * area             pointer to (active) area
@@ -1973,7 +1987,7 @@ typedef struct sAreaSplitData {
   int delta;             /* delta move edge */
   int origmin, origsize; /* to calculate fac, for property storage */
   int previewmode;       /* draw previewline, then split */
-  void *draw_callback;   /* call `ED_screen_draw_split_preview` */
+  void *draw_callback;   /* call `screen_draw_split_preview` */
   bool do_snap;
 
   ScrEdge *nedge; /* new edge */
@@ -1988,10 +2002,10 @@ static void area_split_draw_cb(const struct wmWindow *UNUSED(win), void *userdat
 
   sAreaSplitData *sd = op->customdata;
   if (sd->sarea) {
-    int dir = RNA_enum_get(op->ptr, "direction");
+    const eScreenAxis dir_axis = RNA_enum_get(op->ptr, "direction");
     float fac = RNA_float_get(op->ptr, "factor");
 
-    ED_screen_draw_split_preview(sd->sarea, dir, fac);
+    screen_draw_split_preview(sd->sarea, dir_axis, fac);
   }
 }
 
@@ -2018,14 +2032,18 @@ static bool area_split_init(bContext *C, wmOperator *op)
   }
 
   /* required properties */
-  int dir = RNA_enum_get(op->ptr, "direction");
+  const eScreenAxis dir_axis = RNA_enum_get(op->ptr, "direction");
 
   /* minimal size */
-  if (dir == 'v' && area->winx < 2 * AREAMINX) {
-    return false;
+  if (dir_axis == SCREEN_AXIS_V) {
+    if (area->winx < 2 * AREAMINX) {
+      return false;
+    }
   }
-  if (dir == 'h' && area->winy < 2 * ED_area_headersize()) {
-    return false;
+  else {
+    if (area->winy < 2 * ED_area_headersize()) {
+      return false;
+    }
   }
 
   /* custom data */
@@ -2033,7 +2051,7 @@ static bool area_split_init(bContext *C, wmOperator *op)
   op->customdata = sd;
 
   sd->sarea = area;
-  if (dir == 'v') {
+  if (dir_axis == SCREEN_AXIS_V) {
     sd->origmin = area->v1->vec.x;
     sd->origsize = area->v4->vec.x - sd->origmin;
   }
@@ -2082,9 +2100,9 @@ static bool area_split_apply(bContext *C, wmOperator *op)
   sAreaSplitData *sd = (sAreaSplitData *)op->customdata;
 
   float fac = RNA_float_get(op->ptr, "factor");
-  int dir = RNA_enum_get(op->ptr, "direction");
+  const eScreenAxis dir_axis = RNA_enum_get(op->ptr, "direction");
 
-  sd->narea = area_split(win, screen, sd->sarea, dir, fac, 0); /* 0 = no merge */
+  sd->narea = area_split(win, screen, sd->sarea, dir_axis, fac, false); /* false = no merge */
 
   if (sd->narea == NULL) {
     return false;
@@ -2101,7 +2119,7 @@ static bool area_split_apply(bContext *C, wmOperator *op)
   sd->nedge->v1->editflag = 1;
   sd->nedge->v2->editflag = 1;
 
-  if (dir == 'h') {
+  if (dir_axis == SCREEN_AXIS_H) {
     sd->origval = sd->nedge->v1->vec.y;
   }
   else {
@@ -2150,8 +2168,8 @@ static void area_split_exit(bContext *C, wmOperator *op)
 static void area_split_preview_update_cursor(bContext *C, wmOperator *op)
 {
   wmWindow *win = CTX_wm_window(C);
-  int dir = RNA_enum_get(op->ptr, "direction");
-  WM_cursor_set(win, dir == 'h' ? WM_CURSOR_H_SPLIT : WM_CURSOR_V_SPLIT);
+  const eScreenAxis dir_axis = RNA_enum_get(op->ptr, "direction");
+  WM_cursor_set(win, (dir_axis == SCREEN_AXIS_H) ? WM_CURSOR_H_SPLIT : WM_CURSOR_V_SPLIT);
 }
 
 /* UI callback, adds new handler */
@@ -2167,7 +2185,7 @@ static int area_split_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   PropertyRNA *prop_factor = RNA_struct_find_property(op->ptr, "factor");
   PropertyRNA *prop_cursor = RNA_struct_find_property(op->ptr, "cursor");
 
-  int dir;
+  eScreenAxis dir_axis;
   if (event->type == EVT_ACTIONZONE_AREA) {
     sActionzoneData *sad = event->customdata;
 
@@ -2195,12 +2213,12 @@ static int area_split_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     float factor;
 
     /* Prepare operator state vars. */
-    if (ELEM(sad->gesture_dir, 'n', 's')) {
-      dir = 'h';
+    if (SCREEN_DIR_IS_VERTICAL(sad->gesture_dir)) {
+      dir_axis = SCREEN_AXIS_H;
       factor = factor_h;
     }
     else {
-      dir = 'v';
+      dir_axis = SCREEN_AXIS_V;
       factor = factor_v;
     }
 
@@ -2210,7 +2228,7 @@ static int area_split_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 
     RNA_property_float_set(op->ptr, prop_factor, factor);
 
-    RNA_property_enum_set(op->ptr, prop_dir, dir);
+    RNA_property_enum_set(op->ptr, prop_dir, dir_axis);
 
     /* general init, also non-UI case, adds customdata, sets area and defaults */
     if (!area_split_init(C, op)) {
@@ -2222,8 +2240,8 @@ static int area_split_invoke(bContext *C, wmOperator *op, const wmEvent *event)
     if (area == NULL) {
       return OPERATOR_CANCELLED;
     }
-    dir = RNA_property_enum_get(op->ptr, prop_dir);
-    if (dir == 'h') {
+    dir_axis = RNA_property_enum_get(op->ptr, prop_dir);
+    if (dir_axis == SCREEN_AXIS_H) {
       RNA_property_float_set(
           op->ptr, prop_factor, ((float)(event->x - area->v1->vec.x)) / (float)area->winx);
     }
@@ -2256,9 +2274,9 @@ static int area_split_invoke(bContext *C, wmOperator *op, const wmEvent *event)
       return OPERATOR_CANCELLED;
     }
 
-    dir = screen_geom_edge_is_horizontal(actedge) ? 'v' : 'h';
+    dir_axis = screen_geom_edge_is_horizontal(actedge) ? SCREEN_AXIS_V : SCREEN_AXIS_H;
 
-    RNA_property_enum_set(op->ptr, prop_dir, dir);
+    RNA_property_enum_set(op->ptr, prop_dir, dir_axis);
 
     /* special case, adds customdata, sets defaults */
     if (!area_split_menu_init(C, op)) {
@@ -2271,7 +2289,7 @@ static int area_split_invoke(bContext *C, wmOperator *op, const wmEvent *event)
   if (event->type == EVT_ACTIONZONE_AREA) {
     /* do the split */
     if (area_split_apply(C, op)) {
-      area_move_set_limits(win, screen, dir, &sd->bigger, &sd->smaller, NULL);
+      area_move_set_limits(win, screen, dir_axis, &sd->bigger, &sd->smaller, NULL);
 
       /* add temp handler for edge move or cancel */
       G.moving |= G_TRANSFORM_WM;
@@ -2359,8 +2377,9 @@ static int area_split_modal(bContext *C, wmOperator *op, const wmEvent *event)
       else {
         if (event->val == KM_PRESS) {
           if (sd->sarea) {
-            int dir = RNA_property_enum_get(op->ptr, prop_dir);
-            RNA_property_enum_set(op->ptr, prop_dir, (dir == 'v') ? 'h' : 'v');
+            const eScreenAxis dir_axis = RNA_property_enum_get(op->ptr, prop_dir);
+            RNA_property_enum_set(
+                op->ptr, prop_dir, (dir_axis == SCREEN_AXIS_V) ? SCREEN_AXIS_H : SCREEN_AXIS_V);
             area_split_preview_update_cursor(C, op);
             update_factor = true;
           }
@@ -2381,9 +2400,9 @@ static int area_split_modal(bContext *C, wmOperator *op, const wmEvent *event)
   }
 
   if (update_factor) {
-    const int dir = RNA_property_enum_get(op->ptr, prop_dir);
+    const eScreenAxis dir_axis = RNA_property_enum_get(op->ptr, prop_dir);
 
-    sd->delta = (dir == 'v') ? event->x - sd->origval : event->y - sd->origval;
+    sd->delta = (dir_axis == SCREEN_AXIS_V) ? event->x - sd->origval : event->y - sd->origval;
 
     if (sd->previewmode == 0) {
       if (sd->do_snap) {
@@ -2391,12 +2410,12 @@ static int area_split_modal(bContext *C, wmOperator *op, const wmEvent *event)
                                                      SNAP_FRACTION_AND_ADJACENT,
                                                      sd->delta,
                                                      sd->origval,
-                                                     dir,
+                                                     dir_axis,
                                                      sd->bigger,
                                                      sd->smaller);
         sd->delta = snap_loc - sd->origval;
       }
-      area_move_apply_do(C, sd->delta, sd->origval, dir, sd->bigger, sd->smaller, SNAP_NONE);
+      area_move_apply_do(C, sd->delta, sd->origval, dir_axis, sd->bigger, sd->smaller, SNAP_NONE);
     }
     else {
       if (sd->sarea) {
@@ -2407,7 +2426,7 @@ static int area_split_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
       if (sd->sarea) {
         ScrArea *area = sd->sarea;
-        if (dir == 'v') {
+        if (dir_axis == SCREEN_AXIS_V) {
           sd->origmin = area->v1->vec.x;
           sd->origsize = area->v4->vec.x - sd->origmin;
         }
@@ -2423,7 +2442,7 @@ static int area_split_modal(bContext *C, wmOperator *op, const wmEvent *event)
                                                        SNAP_FRACTION_AND_ADJACENT,
                                                        sd->delta,
                                                        sd->origval,
-                                                       dir,
+                                                       dir_axis,
                                                        sd->origmin + sd->origsize,
                                                        -sd->origmin);
 
@@ -2445,8 +2464,8 @@ static int area_split_modal(bContext *C, wmOperator *op, const wmEvent *event)
 }
 
 static const EnumPropertyItem prop_direction_items[] = {
-    {'h', "HORIZONTAL", 0, "Horizontal", ""},
-    {'v', "VERTICAL", 0, "Vertical", ""},
+    {SCREEN_AXIS_H, "HORIZONTAL", 0, "Horizontal", ""},
+    {SCREEN_AXIS_V, "VERTICAL", 0, "Vertical", ""},
     {0, NULL, 0, NULL, NULL},
 };
 
@@ -2467,7 +2486,7 @@ static void SCREEN_OT_area_split(wmOperatorType *ot)
   ot->flag = OPTYPE_BLOCKING | OPTYPE_INTERNAL;
 
   /* rna */
-  RNA_def_enum(ot->srna, "direction", prop_direction_items, 'h', "Direction", "");
+  RNA_def_enum(ot->srna, "direction", prop_direction_items, SCREEN_AXIS_H, "Direction", "");
   RNA_def_float(ot->srna, "factor", 0.5f, 0.0, 1.0, "Factor", "", 0.0, 1.0);
   RNA_def_int_vector(
       ot->srna, "cursor", 2, NULL, INT_MIN, INT_MAX, "Cursor", "", INT_MIN, INT_MAX);
@@ -3262,9 +3281,10 @@ static void SCREEN_OT_screen_full_area(wmOperatorType *ot)
  */
 
 typedef struct sAreaJoinData {
-  ScrArea *sa1;        /* first area to be considered */
-  ScrArea *sa2;        /* second area to be considered */
-  void *draw_callback; /* call 'ED_screen_draw_join_highlight' */
+  ScrArea *sa1;        /* Potential source area (kept). */
+  ScrArea *sa2;        /* Potential target area (removed or reduced). */
+  eScreenDir dir;      /* Direction of potential join. */
+  void *draw_callback; /* call #screen_draw_join_highlight */
 
 } sAreaJoinData;
 
@@ -3273,8 +3293,8 @@ static void area_join_draw_cb(const struct wmWindow *UNUSED(win), void *userdata
   const wmOperator *op = userdata;
 
   sAreaJoinData *sd = op->customdata;
-  if (sd->sa1 && sd->sa2) {
-    ED_screen_draw_join_highlight(sd->sa1, sd->sa2);
+  if (sd->sa1 && sd->sa2 && (sd->dir != SCREEN_DIR_NONE)) {
+    screen_draw_join_highlight(sd->sa1, sd->sa2);
   }
 }
 
@@ -3296,6 +3316,7 @@ static bool area_join_init(bContext *C, wmOperator *op, ScrArea *sa1, ScrArea *s
 
   jd->sa1 = sa1;
   jd->sa2 = sa2;
+  jd->dir = SCREEN_DIR_NONE;
 
   op->customdata = jd;
 
@@ -3308,7 +3329,7 @@ static bool area_join_init(bContext *C, wmOperator *op, ScrArea *sa1, ScrArea *s
 static bool area_join_apply(bContext *C, wmOperator *op)
 {
   sAreaJoinData *jd = (sAreaJoinData *)op->customdata;
-  if (!jd) {
+  if (!jd || (jd->dir == SCREEN_DIR_NONE)) {
     return false;
   }
 
@@ -3410,61 +3431,30 @@ static int area_join_modal(bContext *C, wmOperator *op, const wmEvent *event)
 
     case MOUSEMOVE: {
       ScrArea *area = BKE_screen_find_area_xy(screen, SPACE_TYPE_ANY, event->x, event->y);
-      int dir = -1;
+      jd->dir = area_getorientation(jd->sa1, jd->sa2);
 
-      if (area) {
-        if (jd->sa1 != area) {
-          dir = area_getorientation(jd->sa1, area);
-          if (dir != -1) {
-            jd->sa2 = area;
-          }
-          else {
-            /* we are not bordering on the previously selected area
-             * we check if area has common border with the one marked for removal
-             * in this case we can swap areas.
-             */
-            dir = area_getorientation(area, jd->sa2);
-            if (dir != -1) {
-              jd->sa1 = jd->sa2;
-              jd->sa2 = area;
-            }
-            else {
-              jd->sa2 = NULL;
-            }
-          }
-          WM_event_add_notifier(C, NC_WINDOW, NULL);
-        }
-        else {
-          /* we are back in the area previously selected for keeping
-           * we swap the areas if possible to allow user to choose */
-          if (jd->sa2 != NULL) {
-            jd->sa1 = jd->sa2;
-            jd->sa2 = area;
-            dir = area_getorientation(jd->sa1, jd->sa2);
-            if (dir == -1) {
-              printf("oops, didn't expect that!\n");
-            }
-          }
-          else {
-            dir = area_getorientation(jd->sa1, area);
-            if (dir != -1) {
-              jd->sa2 = area;
-            }
-          }
-          WM_event_add_notifier(C, NC_WINDOW, NULL);
-        }
+      if (area == jd->sa1) {
+        /* Hovering current source, so change direction. */
+        jd->sa1 = jd->sa2;
+        jd->sa2 = area;
+        jd->dir = area_getorientation(jd->sa1, jd->sa2);
+      }
+      else if (area != jd->sa2) {
+        jd->dir = SCREEN_DIR_NONE;
       }
 
-      if (dir == 1) {
+      WM_event_add_notifier(C, NC_WINDOW, NULL);
+
+      if (jd->dir == SCREEN_DIR_N) {
         WM_cursor_set(win, WM_CURSOR_N_ARROW);
       }
-      else if (dir == 3) {
+      else if (jd->dir == SCREEN_DIR_S) {
         WM_cursor_set(win, WM_CURSOR_S_ARROW);
       }
-      else if (dir == 2) {
+      else if (jd->dir == SCREEN_DIR_E) {
         WM_cursor_set(win, WM_CURSOR_E_ARROW);
       }
-      else if (dir == 0) {
+      else if (jd->dir == SCREEN_DIR_W) {
         WM_cursor_set(win, WM_CURSOR_W_ARROW);
       }
       else {
@@ -3475,6 +3465,10 @@ static int area_join_modal(bContext *C, wmOperator *op, const wmEvent *event)
     }
     case LEFTMOUSE:
       if (event->val == KM_RELEASE) {
+        if (jd->dir == SCREEN_DIR_NONE) {
+          area_join_cancel(C, op);
+          return OPERATOR_CANCELLED;
+        }
         ED_area_tag_redraw(jd->sa1);
         ED_area_tag_redraw(jd->sa2);
 
@@ -3545,7 +3539,7 @@ static int screen_area_options_invoke(bContext *C, wmOperator *op, const wmEvent
               &ptr);
   /* store initial mouse cursor position. */
   RNA_int_set_array(&ptr, "cursor", &event->x);
-  RNA_enum_set(&ptr, "direction", 'v');
+  RNA_enum_set(&ptr, "direction", SCREEN_AXIS_V);
 
   /* Horizontal Split */
   uiItemFullO(layout,
@@ -3558,7 +3552,7 @@ static int screen_area_options_invoke(bContext *C, wmOperator *op, const wmEvent
               &ptr);
   /* store initial mouse cursor position. */
   RNA_int_set_array(&ptr, "cursor", &event->x);
-  RNA_enum_set(&ptr, "direction", 'h');
+  RNA_enum_set(&ptr, "direction", SCREEN_AXIS_H);
 
   if (sa1 && sa2) {
     uiItemS(layout);
@@ -4143,7 +4137,7 @@ static void screen_area_menu_items(ScrArea *area, uiLayout *layout)
               &ptr);
 
   RNA_int_set_array(&ptr, "cursor", loc);
-  RNA_enum_set(&ptr, "direction", 'v');
+  RNA_enum_set(&ptr, "direction", SCREEN_AXIS_V);
 
   /* Horizontal Split */
   uiItemFullO(layout,
@@ -4156,7 +4150,7 @@ static void screen_area_menu_items(ScrArea *area, uiLayout *layout)
               &ptr);
 
   RNA_int_set_array(&ptr, "cursor", &loc[0]);
-  RNA_enum_set(&ptr, "direction", 'h');
+  RNA_enum_set(&ptr, "direction", SCREEN_AXIS_H);
 
   uiItemS(layout);
 
@@ -4219,7 +4213,7 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
     uiItemS(layout);
     uiItemO(layout, but_flip_str, ICON_NONE, "SCREEN_OT_region_flip");
     uiItemS(layout);
-   screen_area_menu_items(area, layout);
+    screen_area_menu_items(area, layout);
   }
 }
 
@@ -4984,7 +4978,7 @@ static void SCREEN_OT_userpref_show(struct wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = userpref_show_exec;
-  ot->poll = ED_operator_screenactive;
+  ot->poll = ED_operator_screenactive_nobackground; /* Not in background as this opens a window. */
 }
 
 /** \} */
@@ -5061,7 +5055,7 @@ static void SCREEN_OT_drivers_editor_show(struct wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = drivers_editor_show_exec;
-  ot->poll = ED_operator_screenactive;
+  ot->poll = ED_operator_screenactive_nobackground; /* Not in background as this opens a window. */
 }
 
 /** \} */
@@ -5105,7 +5099,7 @@ static void SCREEN_OT_info_log_show(struct wmOperatorType *ot)
 
   /* api callbacks */
   ot->exec = info_log_show_exec;
-  ot->poll = ED_operator_screenactive;
+  ot->poll = ED_operator_screenactive_nobackground;
 }
 
 /** \} */
@@ -5437,7 +5431,7 @@ static void context_cycle_prop_get(bScreen *screen,
 
 static int space_context_cycle_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
 {
-  const int direction = RNA_enum_get(op->ptr, "direction");
+  const eScreenCycle direction = RNA_enum_get(op->ptr, "direction");
 
   PointerRNA ptr;
   PropertyRNA *prop;
@@ -5486,7 +5480,7 @@ static int space_workspace_cycle_invoke(bContext *C, wmOperator *op, const wmEve
   }
 
   Main *bmain = CTX_data_main(C);
-  const int direction = RNA_enum_get(op->ptr, "direction");
+  const eScreenCycle direction = RNA_enum_get(op->ptr, "direction");
   WorkSpace *workspace_src = WM_window_get_active_workspace(win);
   WorkSpace *workspace_dst = NULL;
 
