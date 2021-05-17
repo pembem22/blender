@@ -200,6 +200,9 @@ int SVMCompiler::stack_size(SocketType::Type type)
     case SocketType::POINT:
       size = 3;
       break;
+    case SocketType::SPECTRAL:
+      size = CHANNELS_PER_RAY;
+      break;
     case SocketType::CLOSURE:
       size = 0;
       break;
@@ -280,7 +283,8 @@ int SVMCompiler::stack_assign(ShaderInput *input)
         add_node(NODE_VALUE_F, node->get_int(input->socket_type), input->stack_offset);
       }
       else if (input->type() == SocketType::VECTOR || input->type() == SocketType::NORMAL ||
-               input->type() == SocketType::POINT || input->type() == SocketType::COLOR) {
+               input->type() == SocketType::POINT || input->type() == SocketType::COLOR ||
+               input->type() == SocketType::SPECTRAL) {
 
         add_node(NODE_VALUE_V, input->stack_offset);
         add_node(NODE_VALUE_V, node->get_float3(input->socket_type));

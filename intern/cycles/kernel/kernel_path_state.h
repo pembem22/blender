@@ -134,7 +134,7 @@ ccl_device_inline SpectralColor generate_wavelengths(INTEGRATOR_STATE_ARGS)
     //                                             current_channel_offset,
     //                                             kernel_data.cam.wavelength_importance_cdf_offset,
     //                                             WAVELENGTH_IMPORTANCE_TABLE_SIZE);
-    GET_CHANNEL(result, i) = current_channel_offset;
+    GET_CHANNEL(result, i) = lerp(MIN_WAVELENGTH, MAX_WAVELENGTH, current_channel_offset);
   }
 
   return result;

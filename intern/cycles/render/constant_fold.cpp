@@ -32,6 +32,13 @@ ConstantFolder::ConstantFolder(ShaderGraph *graph,
 
 bool ConstantFolder::all_inputs_constant() const
 {
+  /* Do not fold nodes with spectral output socket. */
+  foreach (ShaderOutput *output, node->outputs) {
+    if (output->type() == SocketType::SPECTRAL) {
+      return false;
+    }
+  }
+
   foreach (ShaderInput *input, node->inputs) {
     if (input->link) {
       return false;

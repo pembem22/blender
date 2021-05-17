@@ -785,26 +785,28 @@ ccl_device float find_position_in_lookup_unit_step(
 
 ccl_device float3 wavelength_to_xyz(const KernelGlobals *kg, float wavelength)
 {
-  int table_offset = kernel_data.cam.camera_response_function_table_offset;
+  // int table_offset = kernel_data.cam.camera_response_function_table_offset;
 
-  float position = lerp(0.0f,
-                        WAVELENGTH_CDF_TABLE_SIZE - 1.0f,
-                        inverse_lerp(MIN_WAVELENGTH, MAX_WAVELENGTH, wavelength));
+  // float position = lerp(0.0f,
+  //                       WAVELENGTH_CDF_TABLE_SIZE - 1.0f,
+  //                       inverse_lerp(MIN_WAVELENGTH, MAX_WAVELENGTH, wavelength));
 
-  int lower_bound = floor_to_int(position);
-  int upper_bound = min(lower_bound + 1, WAVELENGTH_CDF_TABLE_SIZE - 1);
-  float progress = position - lower_bound;
+  // int lower_bound = floor_to_int(position);
+  // int upper_bound = min(lower_bound + 1, WAVELENGTH_CDF_TABLE_SIZE - 1);
+  // float progress = position - lower_bound;
 
-  float3 lower_value = make_float3(
-      kernel_tex_fetch(__lookup_table, table_offset + 3 * lower_bound + 0),
-      kernel_tex_fetch(__lookup_table, table_offset + 3 * lower_bound + 1),
-      kernel_tex_fetch(__lookup_table, table_offset + 3 * lower_bound + 2));
-  float3 upper_value = make_float3(
-      kernel_tex_fetch(__lookup_table, table_offset + 3 * upper_bound + 0),
-      kernel_tex_fetch(__lookup_table, table_offset + 3 * upper_bound + 1),
-      kernel_tex_fetch(__lookup_table, table_offset + 3 * upper_bound + 2));
+  // float3 lower_value = make_float3(
+  //     kernel_tex_fetch(__lookup_table, table_offset + 3 * lower_bound + 0),
+  //     kernel_tex_fetch(__lookup_table, table_offset + 3 * lower_bound + 1),
+  //     kernel_tex_fetch(__lookup_table, table_offset + 3 * lower_bound + 2));
+  // float3 upper_value = make_float3(
+  //     kernel_tex_fetch(__lookup_table, table_offset + 3 * upper_bound + 0),
+  //     kernel_tex_fetch(__lookup_table, table_offset + 3 * upper_bound + 1),
+  //     kernel_tex_fetch(__lookup_table, table_offset + 3 * upper_bound + 2));
 
-  return lerp(lower_value, upper_value, progress);
+  // return lerp(lower_value, upper_value, progress);
+
+  return find_position_in_lookup_unit_step(wavelength_xyz_lookup, wavelength, 360, 830, 1);
 }
 
 ccl_device float3 spectrum_to_rgb(INTEGRATOR_STATE_CONST_ARGS, SpectralColor intensities)

@@ -519,7 +519,7 @@ class ConvertNode : public ShaderNode {
   };
   ustring value_string;
 
-  static const int MAX_TYPE = 12;
+  static const int MAX_TYPE = 13;
   static bool register_types();
   static Node *create(const NodeType *type);
   static const NodeType *node_types[MAX_TYPE][MAX_TYPE];
@@ -1762,6 +1762,17 @@ class VectorDisplacementNode : public ShaderNode {
   NODE_SOCKET_API(float3, vector)
   NODE_SOCKET_API(float, midlevel)
   NODE_SOCKET_API(float, scale)
+};
+
+class RGBToSpectrumNode : public ShaderNode {
+ public:
+  SHADER_NODE_CLASS(RGBToSpectrumNode)
+  virtual int get_group()
+  {
+    return NODE_GROUP_LEVEL_0;
+  }
+
+  NODE_SOCKET_API(float3, color)
 };
 
 CCL_NAMESPACE_END

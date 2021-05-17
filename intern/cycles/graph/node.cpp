@@ -55,8 +55,9 @@ Node::~Node()
 #ifndef NDEBUG
 static bool is_socket_float3(const SocketType &socket)
 {
-  return socket.type == SocketType::COLOR || socket.type == SocketType::POINT ||
-         socket.type == SocketType::VECTOR || socket.type == SocketType::NORMAL;
+  return socket.type == SocketType::COLOR || socket.type == SocketType::SPECTRAL ||
+         socket.type == SocketType::POINT || socket.type == SocketType::VECTOR ||
+         socket.type == SocketType::NORMAL;
 }
 
 static bool is_socket_array_float3(const SocketType &socket)
@@ -452,6 +453,7 @@ void Node::set_value(const SocketType &socket, const Node &other, const SocketTy
         set(socket, get_socket_value<uint>(&other, socket));
         break;
       case SocketType::COLOR:
+      case SocketType::SPECTRAL:
       case SocketType::VECTOR:
       case SocketType::POINT:
       case SocketType::NORMAL:
@@ -507,6 +509,8 @@ bool Node::equals_value(const Node &other, const SocketType &socket) const
     case SocketType::UINT:
       return is_value_equal<uint>(this, &other, socket);
     case SocketType::COLOR:
+      return is_value_equal<float3>(this, &other, socket);
+    case SocketType::SPECTRAL:
       return is_value_equal<float3>(this, &other, socket);
     case SocketType::VECTOR:
       return is_value_equal<float3>(this, &other, socket);
@@ -628,6 +632,9 @@ void Node::hash(MD5Hash &md5)
       case SocketType::COLOR:
         float3_hash(this, socket, md5);
         break;
+      case SocketType::SPECTRAL:
+        float3_hash(this, socket, md5);
+        break;
       case SocketType::VECTOR:
         float3_hash(this, socket, md5);
         break;
@@ -715,6 +722,7 @@ size_t Node::get_total_size_in_bytes() const
       case SocketType::INT:
       case SocketType::UINT:
       case SocketType::COLOR:
+      case SocketType::SPECTRAL:
       case SocketType::VECTOR:
       case SocketType::POINT:
       case SocketType::NORMAL:

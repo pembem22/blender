@@ -846,6 +846,18 @@ void ShaderGraph::default_inputs(bool do_osl)
 
   foreach (ShaderNode *node, nodes) {
     foreach (ShaderInput *input, node->inputs) {
+      /* Connect "RGB to Spectrum" node to unconnected spectral sockets to force color to spectrum
+       * conversion. */
+      if (input->type() == SocketType::SPECTRAL && !input->link) {
+        float3 color = input->parent->get_float3(input->socket_type);
+
+        RGBToSpectrumNode *node = create_node<RGBToSpectrumNode>();
+        node->set_color(color);
+
+        add(node);
+        connect(node->output("Spectrum"), input);
+      }
+
       if (!input->link && (!(input->flags() & SocketType::OSL_INTERNAL) || do_osl)) {
         if (input->flags() & SocketType::LINK_TEXTURE_GENERATED) {
           if (!texco)
