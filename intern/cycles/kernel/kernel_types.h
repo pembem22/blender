@@ -829,7 +829,7 @@ typedef ccl_addr_space struct ccl_align(16) ShaderClosure
 #ifdef __KERNEL_CPU__
   float pad[2];
 #endif
-  float data[10];
+  float data[14];
 }
 ShaderClosure;
 

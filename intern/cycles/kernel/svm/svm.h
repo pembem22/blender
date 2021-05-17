@@ -360,10 +360,11 @@ ccl_device_noinline void svm_eval_nodes(INTEGRATOR_STATE_CONST_ARGS,
           svm_node_vector_displacement(kg, sd, stack, node, &offset);
         }
         break;
-#endif /* NODES_FEATURE(NODE_FEATURE_BUMP) */
+#  ifdef __SPECTRAL_RENDERING__
       case NODE_RGB_TO_SPECTRUM:
         svm_node_rgb_to_spectrum(INTEGRATOR_STATE_PASS, sd, stack, node.y, node.z);
         break;
+#  endif
       case NODE_TEX_IMAGE:
         svm_node_tex_image(kg, sd, stack, node, &offset);
         break;
@@ -473,13 +474,13 @@ ccl_device_noinline void svm_eval_nodes(INTEGRATOR_STATE_CONST_ARGS,
       case NODE_PARTICLE_INFO:
         svm_node_particle_info(kg, sd, stack, node.y, node.z);
         break;
-#if defined(__HAIR__)
+#  if defined(__HAIR__)
       case NODE_HAIR_INFO:
         if (NODES_FEATURE(HAIR)) {
           svm_node_hair_info(kg, sd, stack, node.y, node.z);
         }
         break;
-#endif
+#  endif
 #endif /* NODES_GROUP(NODE_GROUP_LEVEL_1) */
 
 #if NODES_GROUP(NODE_GROUP_LEVEL_2)
@@ -586,15 +587,15 @@ ccl_device_noinline void svm_eval_nodes(INTEGRATOR_STATE_CONST_ARGS,
       case NODE_CLAMP:
         svm_node_clamp(kg, sd, stack, node.y, node.z, node.w, &offset);
         break;
-#ifdef __SHADER_RAYTRACE__
+#  ifdef __SHADER_RAYTRACE__
       case NODE_BEVEL:
         svm_node_bevel(INTEGRATOR_STATE_PASS, sd, stack, node);
         break;
       case NODE_AMBIENT_OCCLUSION:
         svm_node_ao(INTEGRATOR_STATE_PASS, sd, stack, node);
         break;
-#endif /* __SHADER_RAYTRACE__ */
-#endif /* NODES_GROUP(NODE_GROUP_LEVEL_3) */
+#  endif /* __SHADER_RAYTRACE__ */
+#endif   /* NODES_GROUP(NODE_GROUP_LEVEL_3) */
 
 #if NODES_GROUP(NODE_GROUP_LEVEL_4)
       case NODE_TEX_VOXEL:

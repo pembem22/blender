@@ -459,7 +459,7 @@ CCL_NAMESPACE_BEGIN
 #ifndef __KERNEL_OPENCL__
 /* Interpolation */
 
-template<class A, class B> A lerp(const A &a, const A &b, const B &t)
+template<class A, class B> ccl_device_inline A lerp(const A &a, const A &b, const B &t)
 {
   return (A)(a * ((B)1 - t) + b * t);
 }

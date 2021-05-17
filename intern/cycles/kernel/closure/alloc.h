@@ -62,7 +62,7 @@ ccl_device ccl_addr_space void *closure_alloc_extra(ShaderData *sd, int size)
 
 ccl_device_inline ShaderClosure *bsdf_alloc(ShaderData *sd, int size, SpectralColor weight)
 {
-  kernel_assert(isfinite3_safe(weight));
+  kernel_assert(is_finite(weight));
 
   const float sample_weight = fabsf(average(weight));
 
@@ -85,10 +85,10 @@ ccl_device_inline ShaderClosure *bsdf_alloc(ShaderData *sd, int size, SpectralCo
 #ifdef __OSL__
 ccl_device_inline ShaderClosure *bsdf_alloc_osl(ShaderData *sd,
                                                 int size,
-                                                float4 weight,
+                                                float3 weight,
                                                 void *data)
 {
-  kernel_assert(isfinite3_safe(weight));
+  kernel_assert(is_finite(weight));
 
   const float sample_weight = fabsf(average(weight));
 

@@ -375,7 +375,7 @@ ccl_device void kernel_accum_adaptive_buffer(INTEGRATOR_STATE_CONST_ARGS,
  * passes (like combined, adaptive sampling, denoising passes). */
 
 ccl_device bool kernel_accum_shadow_catcher(INTEGRATOR_STATE_CONST_ARGS,
-                                            const float3 contribution,
+                                            const SpectralColor contribution,
                                             ccl_global float *ccl_restrict buffer)
 {
   const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);

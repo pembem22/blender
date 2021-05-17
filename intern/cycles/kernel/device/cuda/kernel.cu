@@ -411,7 +411,7 @@ extern "C" __global__ void CUDA_LAUNCH_BOUNDS(CUDA_KERNEL_BLOCK_NUM_THREADS,
 {
   int i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < work_size) {
-    kernel_background_evaluate(NULL, NULL, input, output, offset + i);
+    kernel_background_evaluate(NULL, input, output, offset + i);
   }
 }
 

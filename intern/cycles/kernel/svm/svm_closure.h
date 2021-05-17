@@ -63,7 +63,6 @@ ccl_device void svm_node_closure_bsdf(INTEGRATOR_STATE_CONST_ARGS,
                                       ShaderData *sd,
                                       float *stack,
                                       uint4 node,
-                                      ShaderType shader_type,
                                       int path_flag,
                                       int *offset)
 {
@@ -961,7 +960,6 @@ ccl_device void svm_node_principled_volume(INTEGRATOR_STATE_CONST_ARGS,
                                            ShaderData *sd,
                                            float *stack,
                                            uint4 node,
-                                           ShaderType shader_type,
                                            int path_flag,
                                            int *offset)
 {
