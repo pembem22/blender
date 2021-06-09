@@ -34,6 +34,7 @@
                                                     ccl_global float *render_buffer)
 
 KERNEL_INTEGRATOR_INIT_FUNCTION(init_from_camera);
+KERNEL_INTEGRATOR_INIT_FUNCTION(init_from_bake);
 KERNEL_INTEGRATOR_FUNCTION(intersect_closest);
 KERNEL_INTEGRATOR_FUNCTION(intersect_shadow);
 KERNEL_INTEGRATOR_FUNCTION(intersect_subsurface);
@@ -47,17 +48,6 @@ KERNEL_INTEGRATOR_SHADE_FUNCTION(megakernel);
 #undef KERNEL_INTEGRATOR_FUNCTION
 #undef KERNEL_INTEGRATOR_INIT_FUNCTION
 #undef KERNEL_INTEGRATOR_SHADE_FUNCTION
-
-/* Film. */
-
-void KERNEL_FUNCTION_FULL_NAME(convert_to_half_float)(const KernelGlobals *kg,
-                                                      uchar4 *rgba,
-                                                      float *render_buffer,
-                                                      float sample_scale,
-                                                      int x,
-                                                      int y,
-                                                      int offset,
-                                                      int stride);
 
 /* Shader evaluation. */
 

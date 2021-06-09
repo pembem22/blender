@@ -141,8 +141,6 @@ class OpenCLInfo {
                                  int *minor,
                                  cl_int *error = NULL);
 
-  static int mem_sub_ptr_alignment(cl_device_id device_id);
-
   /* Get somewhat more readable device name.
    * Main difference is AMD OpenCL here which only gives code name
    * for the regular device name. This will give more sane device
@@ -268,7 +266,6 @@ class OpenCLDevice : public Device {
   cl_device_id cdDevice;
   cl_int ciErr;
   int device_num;
-  bool use_preview_kernels;
 
   class OpenCLProgram {
    public:
@@ -368,8 +365,7 @@ class OpenCLDevice : public Device {
     /* Load the kernels and put the created kernels in the given
      * `programs` parameter. */
     void load_kernels(vector<OpenCLProgram *> &programs,
-                      const DeviceRequestedFeatures &requested_features,
-                      bool is_preview = false);
+                      const DeviceRequestedFeatures &requested_features);
   };
 
   DeviceSplitKernel *split_kernel;
@@ -380,7 +376,6 @@ class OpenCLDevice : public Device {
   OpenCLProgram background_program;
 
   OpenCLSplitPrograms kernel_programs;
-  OpenCLSplitPrograms preview_programs;
 
   typedef map<string, device_vector<uchar> *> ConstMemMap;
   typedef map<string, device_ptr> MemMap;
@@ -410,7 +405,6 @@ class OpenCLDevice : public Device {
   string device_md5_hash(string kernel_custom_build_options = "");
   bool load_kernels(const DeviceRequestedFeatures &requested_features);
   void load_required_kernels(const DeviceRequestedFeatures &requested_features);
-  void load_preview_kernels();
 
   bool wait_for_availability(const DeviceRequestedFeatures &requested_features);
   DeviceKernelStatus get_active_kernel_switch_state();
@@ -420,8 +414,7 @@ class OpenCLDevice : public Device {
   /* Get the program file name to compile (*.cl) for the given kernel */
   const string get_opencl_program_filename(const string &kernel_name);
   string get_build_options(const DeviceRequestedFeatures &requested_features,
-                           const string &opencl_program_name,
-                           bool preview_kernel = false);
+                           const string &opencl_program_name);
   /* Enable the default features to reduce recompilation events */
   void enable_default_features(DeviceRequestedFeatures &features);
 
@@ -431,7 +424,6 @@ class OpenCLDevice : public Device {
   void mem_zero(device_memory &mem);
   void mem_free(device_memory &mem);
 
-  int mem_sub_ptr_alignment();
 
   void const_copy_to(const char *name, void *host, size_t size);
   void global_alloc(device_memory &mem);

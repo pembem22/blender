@@ -103,8 +103,7 @@ void OpenCLDevice::enable_default_features(DeviceRequestedFeatures &features)
 }
 
 string OpenCLDevice::get_build_options(const DeviceRequestedFeatures &requested_features,
-                                       const string &opencl_program_name,
-                                       bool preview_kernel)
+                                       const string &opencl_program_name)
 {
   /* first check for non-split kernel programs */
   if (opencl_program_name == "base") {
@@ -159,10 +158,9 @@ string OpenCLDevice::get_build_options(const DeviceRequestedFeatures &requested_
     /* NOTE: currently possible to use surface nodes like `Hair Info`, `Bump` node.
      * Perhaps we should remove them in UI as it does not make any sense when
      * rendering background. */
-    features.nodes_features &= ~NODE_FEATURE_VOLUME;
+    features.nodes_features &= ~(NODE_FEATURE_VOLUME | NODE_FEATURE_RAYTRACE);
     features.use_subsurface = false;
     features.use_volume = false;
-    features.use_shader_raytrace = false;
     features.use_patch_evaluation = false;
     features.use_integrator_branched = false;
     return features.get_build_options();
@@ -181,13 +179,7 @@ string OpenCLDevice::get_build_options(const DeviceRequestedFeatures &requested_
   enable_default_features(nofeatures);
 
   /* Add program specific optimized compile directives */
-  if (preview_kernel) {
-    DeviceRequestedFeatures preview_features;
-    preview_features.use_hair = true;
-    build_options += "-D__KERNEL_AO_PREVIEW__ ";
-    build_options += preview_features.get_build_options();
-  }
-  else if (opencl_program_name == "split_do_volume" && !requested_features.use_volume) {
+  if (opencl_program_name == "split_do_volume" && !requested_features.use_volume) {
     build_options += nofeatures.get_build_options();
   }
   else {
@@ -204,7 +196,6 @@ string OpenCLDevice::get_build_options(const DeviceRequestedFeatures &requested_
     if (opencl_program_name == "split_bundle") {
       features.max_nodes_group = 0;
       features.nodes_features = 0;
-      features.use_shader_raytrace = false;
     }
 
     /* No specific settings, just add the regular ones */
@@ -234,9 +225,7 @@ OpenCLDevice::OpenCLSplitPrograms::~OpenCLSplitPrograms()
 }
 
 void OpenCLDevice::OpenCLSplitPrograms::load_kernels(
-    vector<OpenCLProgram *> &programs,
-    const DeviceRequestedFeatures &requested_features,
-    bool is_preview)
+    vector<OpenCLProgram *> &programs, const DeviceRequestedFeatures &requested_features)
 {
   if (!requested_features.use_baking) {
 #  define ADD_SPLIT_KERNEL_BUNDLE_PROGRAM(kernel_name) \
@@ -247,7 +236,7 @@ void OpenCLDevice::OpenCLSplitPrograms::load_kernels(
         device, \
         program_name_##kernel_name, \
         "kernel_" #kernel_name ".cl", \
-        device->get_build_options(requested_features, program_name_##kernel_name, is_preview)); \
+        device->get_build_options(requested_features, program_name_##kernel_name)); \
     program_##kernel_name.add_kernel(ustring("path_trace_" #kernel_name)); \
     programs.push_back(&program_##kernel_name);
 
@@ -255,7 +244,7 @@ void OpenCLDevice::OpenCLSplitPrograms::load_kernels(
     ADD_SPLIT_KERNEL_PROGRAM(subsurface_scatter);
     ADD_SPLIT_KERNEL_PROGRAM(direct_lighting);
     ADD_SPLIT_KERNEL_PROGRAM(indirect_background);
-    if (requested_features.use_volume || is_preview) {
+    if (requested_features.use_volume) {
       ADD_SPLIT_KERNEL_PROGRAM(do_volume);
     }
     ADD_SPLIT_KERNEL_PROGRAM(shader_eval);
@@ -270,7 +259,7 @@ void OpenCLDevice::OpenCLSplitPrograms::load_kernels(
         device,
         "split_bundle",
         "kernel_split_bundle.cl",
-        device->get_build_options(requested_features, "split_bundle", is_preview));
+        device->get_build_options(requested_features, "split_bundle"));
 
     ADD_SPLIT_KERNEL_BUNDLE_PROGRAM(data_init);
     ADD_SPLIT_KERNEL_BUNDLE_PROGRAM(state_buffer_size);
@@ -397,7 +386,7 @@ class OpenCLSplitKernel : public DeviceSplitKernel {
         device,
         program_name,
         device->get_opencl_program_filename(kernel_name),
-        device->get_build_options(requested_features, program_name, device->use_preview_kernels));
+        device->get_build_options(requested_features, program_name));
 
     kernel->program.add_kernel(ustring("path_trace_" + kernel_name));
     kernel->program.load();
@@ -563,6 +552,11 @@ class OpenCLSplitKernel : public DeviceSplitKernel {
     size_t num_elements = max_elements_for_max_buffer_size(kg, data, max_buffer_size);
     int2 global_size = make_int2(max(round_down((int)sqrt(num_elements), 64), 64),
                                  (int)sqrt(num_elements));
+
+    if (device->info.description.find("Intel") != string::npos) {
+      global_size = make_int2(min(512, global_size.x), min(512, global_size.y));
+    }
+
     VLOG(1) << "Global size: " << global_size << ".";
     return global_size;
   }
@@ -606,7 +600,6 @@ OpenCLDevice::OpenCLDevice(const DeviceInfo &info, Stats &stats, Profiler &profi
     : Device(info, stats, profiler),
       load_kernel_num_compiling(0),
       kernel_programs(this),
-      preview_programs(this),
       memory_manager(this),
       texture_info(this, "__texture_info", MEM_GLOBAL)
 {
@@ -616,7 +609,6 @@ OpenCLDevice::OpenCLDevice(const DeviceInfo &info, Stats &stats, Profiler &profi
   cqCommandQueue = NULL;
   device_initialized = false;
   textures_need_update = true;
-  use_preview_kernels = !background;
 
   vector<OpenCLPlatformDevice> usable_devices;
   OpenCLInfo::get_usable_devices(&usable_devices);
@@ -672,9 +664,6 @@ OpenCLDevice::OpenCLDevice(const DeviceInfo &info, Stats &stats, Profiler &profi
   device_initialized = true;
 
   split_kernel = new OpenCLSplitKernel(this);
-  if (use_preview_kernels) {
-    load_preview_kernels();
-  }
 }
 
 OpenCLDevice::~OpenCLDevice()
@@ -764,7 +753,7 @@ bool OpenCLDevice::load_kernels(const DeviceRequestedFeatures &requested_feature
   load_required_kernels(requested_features);
 
   vector<OpenCLProgram *> programs;
-  kernel_programs.load_kernels(programs, requested_features, false);
+  kernel_programs.load_kernels(programs, requested_features);
 
   load_required_kernel_task_pool.wait_work();
 
@@ -822,19 +811,6 @@ void OpenCLDevice::load_required_kernels(const DeviceRequestedFeatures &requeste
   }
 }
 
-void OpenCLDevice::load_preview_kernels()
-{
-  DeviceRequestedFeatures no_features;
-  vector<OpenCLProgram *> programs;
-  preview_programs.load_kernels(programs, no_features, true);
-
-  foreach (OpenCLProgram *program, programs) {
-    if (!program->load()) {
-      load_required_kernel_task_pool.push(function_bind(&OpenCLProgram::compile, program));
-    }
-  }
-}
-
 bool OpenCLDevice::wait_for_availability(const DeviceRequestedFeatures &requested_features)
 {
   if (requested_features.use_baking) {
@@ -842,59 +818,18 @@ bool OpenCLDevice::wait_for_availability(const DeviceRequestedFeatures &requeste
     return true;
   }
 
-  if (background) {
-    load_kernel_task_pool.wait_work();
-    use_preview_kernels = false;
-  }
-  else {
-    /* We use a device setting to determine to load preview kernels or not
-     * Better to check on device level than per kernel as mixing preview and
-     * non-preview kernels does not work due to different data types */
-    if (use_preview_kernels) {
-      use_preview_kernels = load_kernel_num_compiling.load() > 0;
-    }
-  }
+  load_kernel_task_pool.wait_work();
   return split_kernel->load_kernels(requested_features);
 }
 
 OpenCLDevice::OpenCLSplitPrograms *OpenCLDevice::get_split_programs()
 {
-  return use_preview_kernels ? &preview_programs : &kernel_programs;
+  return &kernel_programs;
 }
 
 DeviceKernelStatus OpenCLDevice::get_active_kernel_switch_state()
 {
-  /* Do not switch kernels for background renderings
-   * We do foreground rendering but use the preview kernels
-   * Check for the optimized kernels
-   *
-   * This works also the other way around, where we are using
-   * optimized kernels but new ones are being compiled due
-   * to other features that are needed */
-  if (background) {
-    /* The if-statements below would find the same result,
-     * But as the `finished` method uses a mutex we added
-     * this as an early exit */
-    return DEVICE_KERNEL_USING_FEATURE_KERNEL;
-  }
-
-  bool other_kernels_finished = load_kernel_num_compiling.load() == 0;
-  if (use_preview_kernels) {
-    if (other_kernels_finished) {
-      return DEVICE_KERNEL_FEATURE_KERNEL_AVAILABLE;
-    }
-    else {
-      return DEVICE_KERNEL_WAITING_FOR_FEATURE_KERNEL;
-    }
-  }
-  else {
-    if (other_kernels_finished) {
-      return DEVICE_KERNEL_USING_FEATURE_KERNEL;
-    }
-    else {
-      return DEVICE_KERNEL_FEATURE_KERNEL_INVALID;
-    }
-  }
+  return DEVICE_KERNEL_USING_FEATURE_KERNEL;
 }
 
 void OpenCLDevice::mem_alloc(device_memory &mem)
@@ -1081,11 +1016,6 @@ void OpenCLDevice::mem_free(device_memory &mem)
       mem.device_size = 0;
     }
   }
-}
-
-int OpenCLDevice::mem_sub_ptr_alignment()
-{
-  return OpenCLInfo::mem_sub_ptr_alignment(cdDevice);
 }
 
 device_ptr OpenCLDevice::mem_alloc_sub_ptr(device_memory &mem, int offset, int size)
@@ -1528,10 +1458,6 @@ string OpenCLDevice::kernel_build_options(const string *debug_src)
   if (OpenCLInfo::use_debug()) {
     build_options += "-D__KERNEL_OPENCL_DEBUG__ ";
   }
-
-#  ifdef WITH_CYCLES_DEBUG
-  build_options += "-D__KERNEL_DEBUG__ ";
-#  endif
 
 #  ifdef WITH_NANOVDB
   if (info.has_nanovdb) {

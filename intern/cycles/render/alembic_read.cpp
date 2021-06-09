@@ -606,7 +606,8 @@ void read_geometry_data(AlembicProcedural *proc,
 
 template<typename T> struct value_type_converter {
   using cycles_type = float;
-  static constexpr TypeDesc type_desc = TypeFloat;
+  /* Use `TypeDesc::FLOAT` instead of `TypeFloat` to work around a compiler bug in gcc 11. */
+  static constexpr TypeDesc type_desc = TypeDesc::FLOAT;
   static constexpr const char *type_name = "float (default)";
 
   static cycles_type convert_value(T value)
@@ -894,6 +895,10 @@ static void parse_requested_attributes_recursive(const AttributeRequestSet &requ
                                                  const ICompoundProperty &arb_geom_params,
                                                  vector<PropHeaderAndParent> &requested_properties)
 {
+  if (!arb_geom_params.valid()) {
+    return;
+  }
+
   for (const AttributeRequest &req : requested_attributes.requests) {
     const PropertyHeader *property_header = arb_geom_params.getPropertyHeader(req.name.c_str());
 

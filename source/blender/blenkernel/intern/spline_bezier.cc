@@ -31,6 +31,14 @@ SplinePtr BezierSpline::copy() const
   return std::make_unique<BezierSpline>(*this);
 }
 
+SplinePtr BezierSpline::copy_settings() const
+{
+  std::unique_ptr<BezierSpline> copy = std::make_unique<BezierSpline>();
+  copy_base_settings(*this, *copy);
+  copy->resolution_ = resolution_;
+  return copy;
+}
+
 int BezierSpline::size() const
 {
   const int size = positions_.size();
@@ -55,19 +63,22 @@ void BezierSpline::set_resolution(const int value)
   this->mark_cache_invalid();
 }
 
+/**
+ * \warning Call #reallocate on the spline's attributes after adding all points.
+ */
 void BezierSpline::add_point(const float3 position,
-                             const HandleType handle_type_start,
-                             const float3 handle_position_start,
-                             const HandleType handle_type_end,
-                             const float3 handle_position_end,
+                             const HandleType handle_type_left,
+                             const float3 handle_position_left,
+                             const HandleType handle_type_right,
+                             const float3 handle_position_right,
                              const float radius,
                              const float tilt)
 {
-  handle_types_left_.append(handle_type_start);
-  handle_positions_left_.append(handle_position_start);
+  handle_types_left_.append(handle_type_left);
+  handle_positions_left_.append(handle_position_left);
   positions_.append(position);
-  handle_types_right_.append(handle_type_end);
-  handle_positions_right_.append(handle_position_end);
+  handle_types_right_.append(handle_type_right);
+  handle_positions_right_.append(handle_position_right);
   radii_.append(radius);
   tilts_.append(tilt);
   this->mark_cache_invalid();
@@ -83,6 +94,7 @@ void BezierSpline::resize(const int size)
   radii_.resize(size);
   tilts_.resize(size);
   this->mark_cache_invalid();
+  attributes.reallocate(size);
 }
 
 MutableSpan<float3> BezierSpline::positions()
@@ -555,6 +567,10 @@ blender::fn::GVArrayPtr BezierSpline::interpolate_to_evaluated_points(
     const blender::fn::GVArray &source_data) const
 {
   BLI_assert(source_data.size() == this->size());
+
+  if (source_data.is_single()) {
+    return source_data.shallow_copy();
+  }
 
   const int eval_size = this->evaluated_points_size();
   if (eval_size == 1) {

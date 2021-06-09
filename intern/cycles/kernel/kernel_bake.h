@@ -27,7 +27,7 @@ CCL_NAMESPACE_BEGIN
 #if 0
 #  ifdef __BAKING__
 
-ccl_device_noinline void compute_light_pass(const KernelGlobals *kg,
+ccl_device void compute_light_pass(const KernelGlobals *kg,
                                             ShaderData *sd,
                                             PathRadiance *L,
                                             uint rng_hash,
@@ -452,11 +452,12 @@ ccl_device void kernel_background_evaluate(const KernelGlobals *kg,
   ShaderData sd;
   shader_setup_from_background(kg, &sd, ray_P, ray_D, ray_time);
 
-  // /* Evaluate shader.
-  //  * This is being evaluated for all BSDFs, so path flag does not contain a specific type. */
-  // const int path_flag = PATH_RAY_EMISSION;
-  // shader_eval_surface<NODE_FEATURE_MASK_LIGHT>(INTEGRATOR_STATE_PASS_NULL, &sd, NULL,
-  // path_flag); const SpectralColor color = shader_background_eval(&sd);
+  /* Evaluate shader.
+   * This is being evaluated for all BSDFs, so path flag does not contain a specific type. */
+  const int path_flag = PATH_RAY_EMISSION;
+  shader_eval_surface<NODE_FEATURE_MASK_SURFACE_LIGHT>(
+      INTEGRATOR_STATE_PASS_NULL, &sd, NULL, path_flag);
+  const SpectralColor color = shader_background_eval(&sd);
 
   // const float3 color_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, color);
 

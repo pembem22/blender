@@ -34,6 +34,7 @@
 #    include "kernel/integrator/integrator_state_util.h"
 
 #    include "kernel/integrator/integrator_init_from_camera.h"
+#    include "kernel/integrator/integrator_init_from_bake.h"
 #    include "kernel/integrator/integrator_intersect_closest.h"
 #    include "kernel/integrator/integrator_intersect_shadow.h"
 #    include "kernel/integrator/integrator_intersect_subsurface.h"
@@ -97,6 +98,7 @@ CCL_NAMESPACE_BEGIN
   }
 
 DEFINE_INTEGRATOR_INIT_KERNEL(init_from_camera)
+DEFINE_INTEGRATOR_INIT_KERNEL(init_from_bake)
 DEFINE_INTEGRATOR_KERNEL(intersect_closest)
 DEFINE_INTEGRATOR_KERNEL(intersect_shadow)
 DEFINE_INTEGRATOR_KERNEL(intersect_subsurface)
@@ -106,24 +108,6 @@ DEFINE_INTEGRATOR_SHADE_KERNEL(shade_shadow)
 DEFINE_INTEGRATOR_SHADE_KERNEL(shade_surface)
 DEFINE_INTEGRATOR_SHADE_KERNEL(shade_volume)
 DEFINE_INTEGRATOR_SHADE_KERNEL(megakernel)
-
-/* Film. */
-
-void KERNEL_FUNCTION_FULL_NAME(convert_to_half_float)(const KernelGlobals *kg,
-                                                      uchar4 *rgba,
-                                                      float *render_buffer,
-                                                      float sample_scale,
-                                                      int x,
-                                                      int y,
-                                                      int offset,
-                                                      int stride)
-{
-#ifdef KERNEL_STUB
-  STUB_ASSERT(KERNEL_ARCH, convert_to_half_float);
-#else
-  kernel_film_convert_to_half_float(kg, rgba, render_buffer, sample_scale, x, y, offset, stride);
-#endif /* KERNEL_STUB */
-}
 
 /* Shader evaluation. */
 

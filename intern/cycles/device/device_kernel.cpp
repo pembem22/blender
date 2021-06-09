@@ -26,6 +26,8 @@ const char *device_kernel_as_string(DeviceKernel kernel)
     /* Integrator. */
     case DEVICE_KERNEL_INTEGRATOR_INIT_FROM_CAMERA:
       return "integrator_init_from_camera";
+    case DEVICE_KERNEL_INTEGRATOR_INIT_FROM_BAKE:
+      return "integrator_init_from_bake";
     case DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST:
       return "integrator_intersect_closest";
     case DEVICE_KERNEL_INTEGRATOR_INTERSECT_SHADOW:
@@ -40,6 +42,8 @@ const char *device_kernel_as_string(DeviceKernel kernel)
       return "integrator_shade_shadow";
     case DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE:
       return "integrator_shade_surface";
+    case DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE:
+      return "integrator_shade_surface_raytrace";
     case DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME:
       return "integrator_shade_volume";
     case DEVICE_KERNEL_INTEGRATOR_MEGAKERNEL:
@@ -54,6 +58,12 @@ const char *device_kernel_as_string(DeviceKernel kernel)
       return "integrator_terminated_paths_array";
     case DEVICE_KERNEL_INTEGRATOR_SORTED_PATHS_ARRAY:
       return "integrator_sorted_paths_array";
+    case DEVICE_KERNEL_INTEGRATOR_COMPACT_PATHS_ARRAY:
+      return "integrator_compact_paths_array";
+    case DEVICE_KERNEL_INTEGRATOR_COMPACT_STATES:
+      return "integrator_compact_states";
+    case DEVICE_KERNEL_INTEGRATOR_RESET:
+      return "integrator_reset";
 
     /* Shader evaluation. */
     case DEVICE_KERNEL_SHADER_EVAL_DISPLACE:
@@ -62,8 +72,34 @@ const char *device_kernel_as_string(DeviceKernel kernel)
       return "shader_eval_background";
 
     /* Film. */
-    case DEVICE_KERNEL_CONVERT_TO_HALF_FLOAT:
-      return "convert_to_half_float";
+    case DEVICE_KERNEL_FILM_CONVERT_DEPTH_HALF_RGBA:
+      return "film_convert_depth_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_MIST_HALF_RGBA:
+      return "film_convert_mist_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_SAMPLE_COUNT_HALF_RGBA:
+      return "film_convert_sample_count_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_FLOAT_HALF_RGBA:
+      return "film_convert_float_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_SHADOW3_HALF_RGBA:
+      return "film_convert_shadow3_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_DIVIDE_EVEN_COLOR_HALF_RGBA:
+      return "film_convert_divide_even_color_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_FLOAT3_HALF_RGBA:
+      return "film_convert_float3_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_SHADOW4_HALF_RGBA:
+      return "film_convert_shadow4_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_MOTION_HALF_RGBA:
+      return "film_convert_motion_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_CRYPTOMATTE_HALF_RGBA:
+      return "film_convert_cryptomatte_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_DENOISING_COLOR_HALF_RGBA:
+      return "film_convert_denoising_color_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_SHADOW_CATCHER_HALF_RGBA:
+      return "film_convert_shadow_catcher_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_SHADOW_CATCHER_MATTE_WITH_SHADOW_HALF_RGBA:
+      return "film_convert_shadow_catcher_matte_with_shadow_half_rgba";
+    case DEVICE_KERNEL_FILM_CONVERT_FLOAT4_HALF_RGBA:
+      return "film_convert_float4_half_rgba";
 
     /* Adaptive sampling. */
     case DEVICE_KERNEL_ADAPTIVE_SAMPLING_CONVERGENCE_CHECK:

@@ -30,7 +30,6 @@
 #include "kernel/integrator/integrator_intersect_closest.h"
 #include "kernel/integrator/integrator_intersect_shadow.h"
 #include "kernel/integrator/integrator_intersect_subsurface.h"
-#include "kernel/integrator/integrator_megakernel.h"
 
 #include "kernel/kernel_adaptive_sampling.h"
 #include "kernel/kernel_bake.h"
@@ -65,44 +64,28 @@ template<bool always = false> ccl_device_forceinline uint get_object_id()
     return OBJECT_NONE;
 }
 
-extern "C" __global__ void __raygen__kernel_optix_integrator_megakernel()
-{
-  const int global_index = optixGetLaunchIndex().x;
-
-  KernelGlobals kg;
-  const int path_index = (__params.path_index_array) ? __params.path_index_array[global_index] :
-                                                       global_index;
-  integrator_megakernel(&kg, path_index, __params.render_buffer);
-}
-
 extern "C" __global__ void __raygen__kernel_optix_integrator_intersect_closest()
 {
   const int global_index = optixGetLaunchIndex().x;
-
-  KernelGlobals kg;
   const int path_index = (__params.path_index_array) ? __params.path_index_array[global_index] :
                                                        global_index;
-  integrator_intersect_closest(&kg, path_index);
+  integrator_intersect_closest(nullptr, path_index);
 }
 
 extern "C" __global__ void __raygen__kernel_optix_integrator_intersect_shadow()
 {
   const int global_index = optixGetLaunchIndex().x;
-
-  KernelGlobals kg;
   const int path_index = (__params.path_index_array) ? __params.path_index_array[global_index] :
                                                        global_index;
-  integrator_intersect_shadow(&kg, path_index);
+  integrator_intersect_shadow(nullptr, path_index);
 }
 
 extern "C" __global__ void __raygen__kernel_optix_integrator_intersect_subsurface()
 {
   const int global_index = optixGetLaunchIndex().x;
-
-  KernelGlobals kg;
   const int path_index = (__params.path_index_array) ? __params.path_index_array[global_index] :
                                                        global_index;
-  integrator_intersect_subsurface(&kg, path_index);
+  integrator_intersect_subsurface(nullptr, path_index);
 }
 
 extern "C" __global__ void __miss__kernel_optix_miss()

@@ -37,10 +37,15 @@
 struct AttributeMetaData {
   AttributeDomain domain;
   CustomDataType data_type;
+
+  constexpr friend bool operator==(AttributeMetaData a, AttributeMetaData b)
+  {
+    return (a.domain == b.domain) && (a.data_type == b.data_type);
+  }
 };
 
 /**
- * Base class for the attribute intializer types described below.
+ * Base class for the attribute initializer types described below.
  */
 struct AttributeInit {
   enum class Type {
@@ -303,6 +308,53 @@ template<typename T> class OutputAttribute_Typed {
   {
     attribute_.save();
   }
+};
+
+/**
+ * A basic container around DNA CustomData so that its users
+ * don't have to implement special copy and move constructors.
+ */
+class CustomDataAttributes {
+  /**
+   * #CustomData needs a size to be freed, and unfortunately it isn't stored in the struct
+   * itself, so keep track of the size here so this class can implement its own destructor.
+   * If the implementation of the attribute storage changes, this could be removed.
+   */
+  int size_;
+
+ public:
+  CustomData data;
+
+  CustomDataAttributes();
+  ~CustomDataAttributes();
+  CustomDataAttributes(const CustomDataAttributes &other);
+  CustomDataAttributes(CustomDataAttributes &&other);
+
+  void reallocate(const int size);
+
+  std::optional<blender::fn::GSpan> get_for_read(const blender::StringRef name) const;
+
+  blender::fn::GVArrayPtr get_for_read(const StringRef name,
+                                       const CustomDataType data_type,
+                                       const void *default_value) const;
+
+  template<typename T>
+  blender::fn::GVArray_Typed<T> get_for_read(const blender::StringRef name,
+                                             const T &default_value) const
+  {
+    const blender::fn::CPPType &cpp_type = blender::fn::CPPType::get<T>();
+    const CustomDataType type = blender::bke::cpp_type_to_custom_data_type(cpp_type);
+    GVArrayPtr varray = this->get_for_read(name, type, &default_value);
+    return blender::fn::GVArray_Typed<T>(std::move(varray));
+  }
+
+  std::optional<blender::fn::GMutableSpan> get_for_write(const blender::StringRef name);
+  bool create(const blender::StringRef name, const CustomDataType data_type);
+  bool create_by_move(const blender::StringRef name, const CustomDataType data_type, void *buffer);
+  bool remove(const blender::StringRef name);
+
+  bool foreach_attribute(const AttributeForeachCallback callback,
+                         const AttributeDomain domain) const;
 };
 
 }  // namespace blender::bke

@@ -28,16 +28,27 @@ void CUDADeviceKernels::load(CUDADevice *device)
   for (int i = 0; i < (int)DEVICE_KERNEL_NUM; i++) {
     CUDADeviceKernel &kernel = kernels_[i];
 
+    /* No megakernel used for GPU. */
+    if (i == DEVICE_KERNEL_INTEGRATOR_MEGAKERNEL) {
+      continue;
+    }
+
     const std::string function_name = std::string("kernel_cuda_") +
                                       device_kernel_as_string((DeviceKernel)i);
     cuda_device_assert(device,
                        cuModuleGetFunction(&kernel.function, cuModule, function_name.c_str()));
-    cuda_device_assert(device, cuFuncSetCacheConfig(kernel.function, CU_FUNC_CACHE_PREFER_L1));
 
-    cuda_device_assert(
-        device,
-        cuOccupancyMaxPotentialBlockSize(
-            &kernel.min_blocks, &kernel.num_threads_per_block, kernel.function, NULL, 0, 0));
+    if (kernel.function) {
+      cuda_device_assert(device, cuFuncSetCacheConfig(kernel.function, CU_FUNC_CACHE_PREFER_L1));
+
+      cuda_device_assert(
+          device,
+          cuOccupancyMaxPotentialBlockSize(
+              &kernel.min_blocks, &kernel.num_threads_per_block, kernel.function, NULL, 0, 0));
+    }
+    else {
+      LOG(ERROR) << "Unable to load kernel " << function_name;
+    }
   }
 
   loaded = true;

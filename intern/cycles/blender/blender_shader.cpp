@@ -17,6 +17,7 @@
 #include "render/background.h"
 #include "render/colorspace.h"
 #include "render/graph.h"
+#include "render/integrator.h"
 #include "render/light.h"
 #include "render/nodes.h"
 #include "render/osl.h"
@@ -1367,13 +1368,14 @@ void BlenderSync::sync_materials(BL::Depsgraph &b_depsgraph, bool update_all)
 void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d, bool update_all)
 {
   Background *background = scene->background;
+  Integrator *integrator = scene->integrator;
 
   BL::World b_world = b_scene.world();
 
-  BlenderViewportParameters new_viewport_parameters(b_v3d);
+  BlenderViewportParameters new_viewport_parameters(b_v3d, use_developer_ui);
 
   if (world_recalc || update_all || b_world.ptr.data != world_map ||
-      viewport_parameters.modified(new_viewport_parameters)) {
+      viewport_parameters.shader_modified(new_viewport_parameters)) {
     Shader *shader = scene->default_background;
     ShaderGraph *graph = new ShaderGraph();
 
@@ -1462,9 +1464,8 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
       /* AO */
       BL::WorldLighting b_light = b_world.light_settings();
 
-      background->set_use_ao(b_light.use_ambient_occlusion());
-      background->set_ao_factor(b_light.ao_factor());
-      background->set_ao_distance(b_light.distance());
+      integrator->set_ao_factor(b_light.ao_factor());
+      integrator->set_ao_distance(b_light.distance());
 
       /* visibility */
       PointerRNA cvisibility = RNA_pointer_get(&b_world.ptr, "cycles_visibility");
@@ -1479,9 +1480,8 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
       background->set_visibility(visibility);
     }
     else {
-      background->set_use_ao(false);
-      background->set_ao_factor(0.0f);
-      background->set_ao_distance(FLT_MAX);
+      integrator->set_ao_factor(1.0f);
+      integrator->set_ao_distance(10.0f);
     }
 
     shader->set_graph(graph);
@@ -1501,9 +1501,8 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
     background->set_transparent_roughness_threshold(0.0f);
   }
 
-  background->set_use_shader(view_layer.use_background_shader |
-                             viewport_parameters.custom_viewport_parameters());
-  background->set_use_ao(background->get_use_ao() && view_layer.use_background_ao);
+  background->set_use_shader(view_layer.use_background_shader ||
+                             viewport_parameters.use_custom_shader());
 
   background->tag_update(scene);
 }
@@ -1553,13 +1552,9 @@ void BlenderSync::sync_lights(BL::Depsgraph &b_depsgraph, bool update_all)
 void BlenderSync::sync_shaders(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d)
 {
   /* for auto refresh images */
-  bool auto_refresh_update = false;
-
-  if (preview) {
-    ImageManager *image_manager = scene->image_manager;
-    int frame = b_scene.frame_current();
-    auto_refresh_update = image_manager->set_animation_frame_update(frame);
-  }
+  ImageManager *image_manager = scene->image_manager;
+  const int frame = b_scene.frame_current();
+  const bool auto_refresh_update = image_manager->set_animation_frame_update(frame);
 
   shader_map.pre_sync();
 

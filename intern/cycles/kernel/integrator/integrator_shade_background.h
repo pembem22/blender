@@ -23,7 +23,7 @@
 
 CCL_NAMESPACE_BEGIN
 
-ccl_device_noinline_cpu SpectralColor integrator_eval_background_shader(
+ccl_device SpectralColor integrator_eval_background_shader(
     INTEGRATOR_STATE_ARGS, ccl_global float *ccl_restrict render_buffer)
 {
 #ifdef __BACKGROUND__
@@ -59,7 +59,7 @@ ccl_device_noinline_cpu SpectralColor integrator_eval_background_shader(
                                  INTEGRATOR_STATE(ray, P),
                                  INTEGRATOR_STATE(ray, D),
                                  INTEGRATOR_STATE(ray, time));
-    shader_eval_surface<NODE_FEATURE_MASK_LIGHT>(
+    shader_eval_surface<NODE_FEATURE_MASK_SURFACE_LIGHT>(
         INTEGRATOR_STATE_PASS, emission_sd, render_buffer, path_flag | PATH_RAY_EMISSION);
 
     L = shader_background_eval(emission_sd);
@@ -116,7 +116,7 @@ ccl_device_inline void integrate_background(INTEGRATOR_STATE_ARGS,
   /* When using the ao bounces approximation, adjust background
    * shader intensity with ao factor. */
   if (path_state_ao_bounce(INTEGRATOR_STATE_PASS)) {
-    L *= kernel_data.background.ao_bounces_factor;
+    L *= kernel_data.integrator.ao_bounces_factor;
   }
 
   /* Write to render buffer. */
@@ -179,7 +179,7 @@ ccl_device void integrator_shade_background(INTEGRATOR_STATE_ARGS,
   integrate_background(INTEGRATOR_STATE_PASS, render_buffer);
 
   /* Path ends here. */
-  INTEGRATOR_PATH_TERMINATE(SHADE_BACKGROUND);
+  INTEGRATOR_PATH_TERMINATE(DEVICE_KERNEL_INTEGRATOR_SHADE_BACKGROUND);
 }
 
 CCL_NAMESPACE_END

@@ -30,6 +30,7 @@ CCL_NAMESPACE_BEGIN
 CPUKernels::CPUKernels()
     : /* Integrator. */
       REGISTER_KERNEL(integrator_init_from_camera),
+      REGISTER_KERNEL(integrator_init_from_bake),
       REGISTER_KERNEL(integrator_intersect_closest),
       REGISTER_KERNEL(integrator_intersect_shadow),
       REGISTER_KERNEL(integrator_intersect_subsurface),
@@ -39,8 +40,6 @@ CPUKernels::CPUKernels()
       REGISTER_KERNEL(integrator_shade_surface),
       REGISTER_KERNEL(integrator_shade_volume),
       REGISTER_KERNEL(integrator_megakernel),
-      /* Film. */
-      REGISTER_KERNEL(convert_to_half_float),
       /* Shader evaluation. */
       REGISTER_KERNEL(shader_eval_displace),
       REGISTER_KERNEL(shader_eval_background),

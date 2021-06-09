@@ -28,6 +28,13 @@ SplinePtr PolySpline::copy() const
   return std::make_unique<PolySpline>(*this);
 }
 
+SplinePtr PolySpline::copy_settings() const
+{
+  std::unique_ptr<PolySpline> copy = std::make_unique<PolySpline>();
+  copy_base_settings(*this, *copy);
+  return copy;
+}
+
 int PolySpline::size() const
 {
   const int size = positions_.size();
@@ -36,6 +43,9 @@ int PolySpline::size() const
   return size;
 }
 
+/**
+ * \warning Call #reallocate on the spline's attributes after adding all points.
+ */
 void PolySpline::add_point(const float3 position, const float radius, const float tilt)
 {
   positions_.append(position);
@@ -50,6 +60,7 @@ void PolySpline::resize(const int size)
   radii_.resize(size);
   tilts_.resize(size);
   this->mark_cache_invalid();
+  attributes.reallocate(size);
 }
 
 MutableSpan<float3> PolySpline::positions()

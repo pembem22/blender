@@ -90,7 +90,8 @@ bool debug_flags_sync_from_scene(BL::Scene b_scene)
   /* Synchronize CUDA flags. */
   flags.cuda.adaptive_compile = get_boolean(cscene, "debug_use_cuda_adaptive_compile");
   /* Synchronize OptiX flags. */
-  flags.optix.curves_api = get_boolean(cscene, "debug_optix_curves_api");
+  flags.optix.use_curves_api = get_boolean(cscene, "debug_use_optix_curves_api");
+  flags.optix.use_debug = get_boolean(cscene, "debug_use_optix_debug");
   /* Synchronize OpenCL device type. */
   switch (get_enum(cscene, "debug_opencl_device_type")) {
     case 0:
@@ -1100,14 +1101,6 @@ void *CCL_python_module_init()
   Py_INCREF(Py_False);
   PyModule_AddStringConstant(mod, "osl_version", "unknown");
   PyModule_AddStringConstant(mod, "osl_version_string", "unknown");
-#endif
-
-#ifdef WITH_CYCLES_DEBUG
-  PyModule_AddObject(mod, "with_cycles_debug", Py_True);
-  Py_INCREF(Py_True);
-#else
-  PyModule_AddObject(mod, "with_cycles_debug", Py_False);
-  Py_INCREF(Py_False);
 #endif
 
 #ifdef WITH_EMBREE

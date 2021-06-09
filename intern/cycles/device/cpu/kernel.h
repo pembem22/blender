@@ -39,6 +39,7 @@ class CPUKernels {
                                                             ccl_global float *render_buffer)>;
 
   IntegratorInitFunction integrator_init_from_camera;
+  IntegratorInitFunction integrator_init_from_bake;
   IntegratorFunction integrator_intersect_closest;
   IntegratorFunction integrator_intersect_shadow;
   IntegratorFunction integrator_intersect_subsurface;
@@ -48,19 +49,6 @@ class CPUKernels {
   IntegratorShadeFunction integrator_shade_surface;
   IntegratorShadeFunction integrator_shade_volume;
   IntegratorShadeFunction integrator_megakernel;
-
-  /* Film. */
-
-  using ConvertToHalfFloatFunction = CPUKernelFunction<void (*)(const KernelGlobals *kg,
-                                                                uchar4 *rgba,
-                                                                float *buffer,
-                                                                float sample_scale,
-                                                                int x,
-                                                                int y,
-                                                                int offset,
-                                                                int stride)>;
-
-  ConvertToHalfFloatFunction convert_to_half_float;
 
   /* Shader evaluation. */
 

@@ -24,7 +24,6 @@ ccl_device void integrator_intersect_subsurface(INTEGRATOR_STATE_ARGS)
 {
 #ifdef __SUBSURFACE__
   if (subsurface_random_walk(INTEGRATOR_STATE_PASS)) {
-    INTEGRATOR_PATH_NEXT(INTERSECT_SUBSURFACE, SHADE_SURFACE);
     return;
   }
 #endif
@@ -48,7 +47,7 @@ ccl_device void integrator_intersect_subsurface(INTEGRATOR_STATE_ARGS)
 #  endif /* __VOLUME__ */
 #endif
 
-  INTEGRATOR_PATH_TERMINATE(INTERSECT_SUBSURFACE);
+  INTEGRATOR_PATH_TERMINATE(DEVICE_KERNEL_INTEGRATOR_INTERSECT_SUBSURFACE);
 }
 
 CCL_NAMESPACE_END

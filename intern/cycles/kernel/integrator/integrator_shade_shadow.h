@@ -41,7 +41,7 @@ ccl_device_inline SpectralColor integrate_transparent_shadow_shader_eval(INTEGRA
 
   /* Evaluate shader. */
   if (!(shadow_sd->flag & SD_HAS_ONLY_VOLUME)) {
-    shader_eval_surface<NODE_FEATURE_MASK_SURFACE>(
+    shader_eval_surface<NODE_FEATURE_MASK_SURFACE_SHADOW>(
         INTEGRATOR_STATE_PASS, shadow_sd, NULL, PATH_RAY_SHADOW);
   }
 
@@ -93,19 +93,20 @@ ccl_device void integrator_shade_shadow(INTEGRATOR_STATE_ARGS,
   /* Evaluate transparent shadows. */
   const bool opaque = integrate_transparent_shadow(INTEGRATOR_STATE_PASS, num_hits);
   if (opaque) {
-    INTEGRATOR_SHADOW_PATH_TERMINATE(SHADE_SHADOW);
+    INTEGRATOR_SHADOW_PATH_TERMINATE(DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW);
     return;
   }
 #endif
 
   if (num_hits >= INTEGRATOR_SHADOW_ISECT_SIZE) {
     /* More intersections to find, continue shadow ray. */
-    INTEGRATOR_SHADOW_PATH_NEXT(SHADE_SHADOW, INTERSECT_SHADOW);
+    INTEGRATOR_SHADOW_PATH_NEXT(DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW,
+                                DEVICE_KERNEL_INTEGRATOR_INTERSECT_SHADOW);
     return;
   }
   else {
     kernel_accum_light(INTEGRATOR_STATE_PASS, render_buffer);
-    INTEGRATOR_SHADOW_PATH_TERMINATE(SHADE_SHADOW);
+    INTEGRATOR_SHADOW_PATH_TERMINATE(DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW);
     return;
   }
 }

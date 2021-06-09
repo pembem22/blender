@@ -241,9 +241,6 @@ string CUDADevice::compile_kernel_get_common_cflags(
   if (extra_cflags) {
     cflags += string(" ") + string(extra_cflags);
   }
-#  ifdef WITH_CYCLES_DEBUG
-  cflags += " -D__KERNEL_DEBUG__";
-#  endif
 
 #  ifdef WITH_NANOVDB
   cflags += " -DWITH_NANOVDB";
@@ -354,7 +351,8 @@ string CUDADevice::compile_kernel(const DeviceRequestedFeatures &requested_featu
         nvcc_cuda_version % 10);
     return string();
   }
-  else if (!(nvcc_cuda_version == 101 || nvcc_cuda_version == 102)) {
+  else if (!(nvcc_cuda_version == 101 || nvcc_cuda_version == 102 || nvcc_cuda_version == 111 ||
+             nvcc_cuda_version == 112 || nvcc_cuda_version == 113)) {
     printf(
         "CUDA version %d.%d detected, build may succeed but only "
         "CUDA 10.1 and 10.2 are officially supported.\n",
@@ -458,7 +456,7 @@ bool CUDADevice::load_kernels(const DeviceRequestedFeatures &requested_features)
   return (result == CUDA_SUCCESS);
 }
 
-void CUDADevice::reserve_local_memory(const DeviceRequestedFeatures &requested_features)
+void CUDADevice::reserve_local_memory(const DeviceRequestedFeatures & /* requested_features */)
 {
   /* Together with CU_CTX_LMEM_RESIZE_TO_MAX, this reserves local memory
    * needed for kernel launches, so that we can reliably figure out when
@@ -1443,6 +1441,32 @@ bool CUDADevice::should_use_graphics_interop()
 unique_ptr<DeviceGraphicsInterop> CUDADevice::graphics_interop_create()
 {
   return make_unique<CUDADeviceGraphicsInterop>(this);
+}
+
+int CUDADevice::get_num_multiprocessors()
+{
+  return get_device_default_attribute(CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, 0);
+}
+
+int CUDADevice::get_max_num_threads_per_multiprocessor()
+{
+  return get_device_default_attribute(CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR, 0);
+}
+
+bool CUDADevice::get_device_attribute(CUdevice_attribute attribute, int *value)
+{
+  CUDAContextScope scope(this);
+
+  return cuDeviceGetAttribute(value, attribute, cuDevice) == CUDA_SUCCESS;
+}
+
+int CUDADevice::get_device_default_attribute(CUdevice_attribute attribute, int default_value)
+{
+  int value = 0;
+  if (!get_device_attribute(attribute, &value)) {
+    return default_value;
+  }
+  return value;
 }
 
 CCL_NAMESPACE_END

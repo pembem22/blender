@@ -103,26 +103,24 @@ CCL_NAMESPACE_BEGIN
 #define __AO__
 #define __PASSES__
 #define __HAIR__
+#define __SVM__
+#define __EMISSION__
+#define __HOLDOUT__
+#define __MULTI_CLOSURE__
+#define __TRANSPARENT_SHADOWS__
+#define __BACKGROUND_MIS__
+#define __LAMP_MIS__
+#define __CAMERA_MOTION__
+#define __OBJECT_MOTION__
+#define __BAKING__
+#define __PRINCIPLED__
+#define __SUBSURFACE__
+#define __VOLUME__
+#define __VOLUME_SCATTER__
+#define __CMJ__
+#define __SHADOW_RECORD_ALL__
+#define __BRANCHED_PATH__
 #define __SPECTRAL_RENDERING__
-
-/* Without these we get an AO render, used by OpenCL preview kernel. */
-#ifndef __KERNEL_AO_PREVIEW__
-#  define __SVM__
-#  define __EMISSION__
-#  define __HOLDOUT__
-#  define __MULTI_CLOSURE__
-#  define __TRANSPARENT_SHADOWS__
-#  define __BACKGROUND_MIS__
-#  define __LAMP_MIS__
-#  define __CAMERA_MOTION__
-#  define __OBJECT_MOTION__
-#  define __BAKING__
-#  define __PRINCIPLED__
-#  define __SUBSURFACE__
-#  define __VOLUME__
-#  define __VOLUME_SCATTER__
-#  define __SHADOW_RECORD_ALL__
-#endif
 
 /* Device specific features */
 #ifdef __KERNEL_CPU__
@@ -175,14 +173,8 @@ CCL_NAMESPACE_BEGIN
 #ifdef __NO_DENOISING__
 #  undef __DENOISING_FEATURES__
 #endif
-#ifdef __NO_SHADER_RAYTRACE__
-#  undef __SHADER_RAYTRACE__
-#endif
 
 /* Features that enable others */
-#ifdef WITH_CYCLES_DEBUG
-#  define __KERNEL_DEBUG__
-#endif
 
 #if defined(__SUBSURFACE__) || defined(__SHADER_RAYTRACE__)
 #  define __BVH_LOCAL__
@@ -434,17 +426,13 @@ typedef enum PassType {
   PASS_SHADOW_CATCHER,
   PASS_SHADOW_CATCHER_MATTE,
 
-#ifdef __KERNEL_DEBUG__
-  PASS_BVH_TRAVERSED_NODES,
-  PASS_BVH_TRAVERSED_INSTANCES,
-  PASS_BVH_INTERSECTIONS,
-  PASS_RAY_BOUNCES,
-#endif
   PASS_CATEGORY_DATA_END = 63,
 
   PASS_BAKE_PRIMITIVE,
   PASS_BAKE_DIFFERENTIAL,
-  PASS_CATEGORY_BAKE_END = 95
+  PASS_CATEGORY_BAKE_END = 95,
+
+  PASS_NUM,
 } PassType;
 
 #define PASS_ANY (~0)
@@ -480,18 +468,6 @@ typedef enum BakePassFilterCombos {
   BAKE_FILTER_GLOSSY_INDIRECT = (BAKE_FILTER_INDIRECT | BAKE_FILTER_GLOSSY),
   BAKE_FILTER_TRANSMISSION_INDIRECT = (BAKE_FILTER_INDIRECT | BAKE_FILTER_TRANSMISSION),
 } BakePassFilterCombos;
-
-#ifdef __KERNEL_DEBUG__
-/* NOTE: This is a runtime-only struct, alignment is not
- * really important here.
- */
-typedef struct DebugData {
-  int num_bvh_traversed_nodes;
-  int num_bvh_traversed_instances;
-  int num_bvh_intersections;
-  int num_ray_bounces;
-} DebugData;
-#endif
 
 typedef ccl_addr_space struct PathRadianceState {
 #ifdef __PASSES__
@@ -567,10 +543,6 @@ typedef ccl_addr_space struct PathRadiance {
   float3 denoising_normal;
   float3 denoising_albedo;
 #endif /* __DENOISING_FEATURES__ */
-
-#ifdef __KERNEL_DEBUG__
-  DebugData debug_data;
-#endif /* __KERNEL_DEBUG__ */
 } PathRadiance;
 
 typedef struct BsdfEval {
@@ -674,12 +646,6 @@ typedef struct Intersection {
   int prim;
   int object;
   int type;
-
-#ifdef __KERNEL_DEBUG__
-  int num_traversed_nodes;
-  int num_traversed_instances;
-  int num_intersections;
-#endif
 } Intersection;
 
 /* Primitives */
@@ -896,11 +862,14 @@ enum ShaderDataFlag {
   SD_NEED_VOLUME_ATTRIBUTES = (1 << 28),
   /* Shader has emission */
   SD_HAS_EMISSION = (1 << 29),
+  /* Shader has raytracing */
+  SD_HAS_RAYTRACE = (1 << 30),
 
   SD_SHADER_FLAGS = (SD_USE_MIS | SD_HAS_TRANSPARENT_SHADOW | SD_HAS_VOLUME | SD_HAS_ONLY_VOLUME |
                      SD_HETEROGENEOUS_VOLUME | SD_HAS_BSSRDF_BUMP | SD_VOLUME_EQUIANGULAR |
                      SD_VOLUME_MIS | SD_VOLUME_CUBIC | SD_HAS_BUMP | SD_HAS_DISPLACEMENT |
-                     SD_HAS_CONSTANT_EMISSION | SD_NEED_VOLUME_ATTRIBUTES)
+                     SD_HAS_CONSTANT_EMISSION | SD_NEED_VOLUME_ATTRIBUTES | SD_HAS_EMISSION |
+                     SD_HAS_RAYTRACE)
 };
 
 /* Object flags. */
@@ -1257,8 +1226,6 @@ typedef struct KernelFilm {
   /* Set to 1 if any of the above denoising passes present. */
   int have_denoising_passes;
 
-  int denoising_flags;
-
   int pass_aov_color;
   int pass_aov_value;
   int pass_aov_color_num;
@@ -1273,26 +1240,42 @@ typedef struct KernelFilm {
 
   int pass_bake_primitive;
   int pass_bake_differential;
-  int pad;
-
-#ifdef __KERNEL_DEBUG__
-  int pass_bvh_traversed_nodes;
-  int pass_bvh_traversed_instances;
-  int pass_bvh_intersections;
-  int pass_ray_bounces;
-#endif
 
   /* viewport rendering options */
+  int display_pass_type;
   int display_pass_offset;
-  int display_pass_components;
-  int display_divide_pass_offset;
-  int use_display_exposure;
-  int use_display_pass_alpha;
   int show_active_pixels;
+  int use_approximate_shadow_catcher;
 
-  int pad4, pad5, pad6;
+  /* deprecated */
+  int pad1, pad2, pad3;
 } KernelFilm;
 static_assert_align(KernelFilm, 16);
+
+typedef struct KernelFilmConvert {
+  int pass_offset;
+  int pass_stride;
+
+  int pass_use_exposure;
+  int pass_use_filter;
+
+  int pass_divide;
+
+  int pass_combined;
+  int pass_sample_count;
+  int pass_adaptive_aux_buffer;
+  int pass_motion_weight;
+  int pass_shadow_catcher;
+  int pass_shadow_catcher_matte;
+
+  float scale;
+  float exposure;
+  float scale_exposure;
+
+  int use_approximate_shadow_catcher;
+  int show_active_pixels;
+} KernelFilmConvert;
+static_assert_align(KernelFilmConvert, 16);
 
 typedef struct KernelBackground {
   /* only shader index */
@@ -1301,11 +1284,6 @@ typedef struct KernelBackground {
   float volume_step_size;
   int transparent;
   float transparent_roughness_squared_threshold;
-
-  /* ambient occlusion */
-  float ao_factor;
-  float ao_distance;
-  float ao_bounces_factor;
 
   /* portal sampling */
   float portal_weight;
@@ -1324,13 +1302,15 @@ typedef struct KernelBackground {
   int map_res_y;
 
   int use_mis;
+
+  /* Padding */
+  int pad1, pad2, pad3;
 } KernelBackground;
 static_assert_align(KernelBackground, 16);
 
 typedef struct KernelIntegrator {
   /* emission */
   int use_direct_light;
-  int use_ambient_occlusion;
   int num_distribution;
   int num_all_lights;
   float pdf_triangles;
@@ -1346,7 +1326,10 @@ typedef struct KernelIntegrator {
   int max_transmission_bounce;
   int max_volume_bounce;
 
+  /* AO bounces */
   int ao_bounces;
+  float ao_bounces_distance;
+  float ao_bounces_factor;
 
   /* transparent */
   int transparent_min_bounce;
@@ -1380,7 +1363,8 @@ typedef struct KernelIntegrator {
 
   int has_shadow_catcher;
 
-  int pad1, pad2;
+  /* padding */
+  int pad1;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 
@@ -1430,6 +1414,9 @@ typedef struct KernelTables {
 static_assert_align(KernelTables, 16);
 
 typedef struct KernelBake {
+  int use;
+  int pad1, pad2, pad3;
+
   int object_index;
   int tri_offset;
   int type;
@@ -1583,6 +1570,10 @@ typedef struct KernelWorkTile {
 
   int offset;
   uint stride;
+
+  /* Precalculated parameters used by init_from_camera kernel on GPU. */
+  int path_index_offset;
+  int work_size;
 } KernelWorkTile;
 
 /* Shader Evaluation.
@@ -1608,12 +1599,14 @@ static_assert_align(KernelShaderEvalInput, 16);
 
 typedef enum DeviceKernel {
   DEVICE_KERNEL_INTEGRATOR_INIT_FROM_CAMERA = 0,
+  DEVICE_KERNEL_INTEGRATOR_INIT_FROM_BAKE,
   DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST,
   DEVICE_KERNEL_INTEGRATOR_INTERSECT_SHADOW,
   DEVICE_KERNEL_INTEGRATOR_INTERSECT_SUBSURFACE,
   DEVICE_KERNEL_INTEGRATOR_SHADE_BACKGROUND,
   DEVICE_KERNEL_INTEGRATOR_SHADE_LIGHT,
   DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE,
+  DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE,
   DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME,
   DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW,
   DEVICE_KERNEL_INTEGRATOR_MEGAKERNEL,
@@ -1623,11 +1616,27 @@ typedef enum DeviceKernel {
   DEVICE_KERNEL_INTEGRATOR_ACTIVE_PATHS_ARRAY,
   DEVICE_KERNEL_INTEGRATOR_TERMINATED_PATHS_ARRAY,
   DEVICE_KERNEL_INTEGRATOR_SORTED_PATHS_ARRAY,
+  DEVICE_KERNEL_INTEGRATOR_COMPACT_PATHS_ARRAY,
+  DEVICE_KERNEL_INTEGRATOR_COMPACT_STATES,
+  DEVICE_KERNEL_INTEGRATOR_RESET,
 
   DEVICE_KERNEL_SHADER_EVAL_DISPLACE,
   DEVICE_KERNEL_SHADER_EVAL_BACKGROUND,
 
-  DEVICE_KERNEL_CONVERT_TO_HALF_FLOAT,
+  DEVICE_KERNEL_FILM_CONVERT_DEPTH_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_MIST_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_SAMPLE_COUNT_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_FLOAT_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_SHADOW3_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_DIVIDE_EVEN_COLOR_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_FLOAT3_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_SHADOW4_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_MOTION_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_CRYPTOMATTE_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_DENOISING_COLOR_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_SHADOW_CATCHER_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_SHADOW_CATCHER_MATTE_WITH_SHADOW_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_FLOAT4_HALF_RGBA,
 
   DEVICE_KERNEL_ADAPTIVE_SAMPLING_CONVERGENCE_CHECK,
   DEVICE_KERNEL_ADAPTIVE_SAMPLING_CONVERGENCE_FILTER_X,

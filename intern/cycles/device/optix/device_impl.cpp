@@ -87,8 +87,10 @@ OptiXDevice::OptiXDevice(const DeviceInfo &info, Stats &stats, Profiler &profile
     }
   };
 #  endif
-#  if OPTIX_ABI_VERSION >= 41 && defined(WITH_CYCLES_DEBUG)
-  options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
+#  if OPTIX_ABI_VERSION >= 41
+  if (DebugFlags().optix.use_debug) {
+    options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
+  }
 #  endif
   optix_assert(optixDeviceContextCreate(cuContext, &options, &context));
 #  ifdef WITH_CYCLES_LOGGING
@@ -107,6 +109,8 @@ OptiXDevice::~OptiXDevice()
 {
   /* Make CUDA context current. */
   const CUDAContextScope scope(this);
+
+  free_bvh_memory_delayed();
 
   sbt_data.free();
   texture_info.free();
@@ -137,11 +141,6 @@ unique_ptr<DeviceQueue> OptiXDevice::gpu_queue_create()
 
 BVHLayoutMask OptiXDevice::get_bvh_layout_mask() const
 {
-  /* CUDA kernels are used when doing baking, so need to build a BVH those can understand too! */
-  if (optix_module == NULL) {
-    return CUDADevice::get_bvh_layout_mask();
-  }
-
   /* OptiX has its own internal acceleration structure format. */
   return BVH_LAYOUT_OPTIX;
 }
@@ -158,11 +157,8 @@ string OptiXDevice::compile_kernel_get_common_cflags(
   }
 
   /* Specialization for shader raytracing. */
-  if (requested_features.use_shader_raytrace) {
+  if (requested_features.nodes_features & NODE_FEATURE_RAYTRACE) {
     common_cflags += " --keep-device-functions";
-  }
-  else {
-    common_cflags += " -D __NO_SHADER_RAYTRACE__";
   }
 
   return common_cflags;
@@ -180,17 +176,9 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
     return false;
   }
 
-  /* Baking is currently performed using CUDA, so no need to load OptiX kernels.
-   * Can also skip creating OptiX module if only doing denoising (no path tracing).
-   */
-  if (requested_features.use_baking || !requested_features.use_path_tracing) {
+  /* Skip creating OptiX module if only doing denoising. */
+  if (!(requested_features.use_path_tracing || requested_features.use_baking)) {
     return true;
-  }
-
-  /* TODO: Shader raytracing requires OptiX to overwrite the shading kernels too! */
-  if (requested_features.use_shader_raytrace) {
-    set_error("AO and Bevel shader nodes are not currently supported with OptiX");
-    return false;
   }
 
   const CUDAContextScope scope(this);
@@ -215,13 +203,15 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
 
   OptixModuleCompileOptions module_options = {};
   module_options.maxRegisterCount = 0; /* Do not set an explicit register limit. */
-#  ifdef WITH_CYCLES_DEBUG
-  module_options.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
-  module_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
-#  else
-  module_options.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
-  module_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
-#  endif
+
+  if (DebugFlags().optix.use_debug) {
+    module_options.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
+    module_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
+  }
+  else {
+    module_options.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
+    module_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
+  }
 
 #  if OPTIX_ABI_VERSION >= 41
   module_options.boundValues = nullptr;
@@ -241,7 +231,7 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
 #  if OPTIX_ABI_VERSION >= 36
   pipeline_options.usesPrimitiveTypeFlags = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
   if (requested_features.use_hair) {
-    if (DebugFlags().optix.curves_api && requested_features.use_hair_thick) {
+    if (DebugFlags().optix.use_curves_api && requested_features.use_hair_thick) {
       pipeline_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_ROUND_CUBIC_BSPLINE;
     }
     else {
@@ -263,9 +253,10 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
   }
 
   { /* Load and compile PTX module with OptiX kernels. */
-    string ptx_data, ptx_filename = path_get(requested_features.use_shader_raytrace ?
-                                                 "lib/kernel_optix_shader_raytrace.ptx" :
-                                                 "lib/kernel_optix.ptx");
+    string ptx_data,
+        ptx_filename = path_get((requested_features.nodes_features & NODE_FEATURE_RAYTRACE) ?
+                                    "lib/kernel_optix_shader_raytrace.ptx" :
+                                    "lib/kernel_optix.ptx");
     if (use_adaptive_compilation() || path_file_size(ptx_filename) == -1) {
       if (!getenv("OPTIX_ROOT_DIR")) {
         set_error(
@@ -273,7 +264,12 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
             "the Optix SDK to be able to compile Optix kernels on demand).");
         return false;
       }
-      ptx_filename = compile_kernel(requested_features, "kernel", "optix", true);
+      ptx_filename = compile_kernel(requested_features,
+                                    (requested_features.nodes_features & NODE_FEATURE_RAYTRACE) ?
+                                        "kernel_shader_raytrace" :
+                                        "kernel",
+                                    "optix",
+                                    true);
     }
     if (ptx_filename.empty() || !path_read_text(ptx_filename, ptx_data)) {
       set_error(string_printf("Failed to load OptiX kernel from '%s'", ptx_filename.c_str()));
@@ -300,10 +296,6 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
   OptixProgramGroup groups[NUM_PROGRAM_GROUPS] = {};
   OptixProgramGroupDesc group_descs[NUM_PROGRAM_GROUPS] = {};
   OptixProgramGroupOptions group_options = {}; /* There are no options currently. */
-  group_descs[PG_RGEN_MEGAKERNEL].kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-  group_descs[PG_RGEN_MEGAKERNEL].raygen.module = optix_module;
-  group_descs[PG_RGEN_MEGAKERNEL].raygen.entryFunctionName =
-      "__raygen__kernel_optix_integrator_megakernel";
   group_descs[PG_RGEN_INTERSECT_CLOSEST].kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
   group_descs[PG_RGEN_INTERSECT_CLOSEST].raygen.module = optix_module;
   group_descs[PG_RGEN_INTERSECT_CLOSEST].raygen.entryFunctionName =
@@ -345,7 +337,7 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
     }
 
 #  if OPTIX_ABI_VERSION >= 36
-    if (DebugFlags().optix.curves_api && requested_features.use_hair_thick) {
+    if (DebugFlags().optix.use_curves_api && requested_features.use_hair_thick) {
       OptixBuiltinISOptions builtin_options = {};
       builtin_options.builtinISModuleType = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE;
       builtin_options.usesMotionBlur = false;
@@ -373,7 +365,8 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
 #  endif
   }
 
-  if (requested_features.use_subsurface || requested_features.use_shader_raytrace) {
+  if (requested_features.use_subsurface ||
+      (requested_features.nodes_features & NODE_FEATURE_RAYTRACE)) {
     /* Add hit group for local intersections. */
     group_descs[PG_HITL].kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
     group_descs[PG_HITL].hitgroup.moduleAH = optix_module;
@@ -381,18 +374,18 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
   }
 
   /* Shader raytracing replaces some functions with direct callables. */
-  if (requested_features.use_shader_raytrace) {
-    group_descs[PG_CALL + 0].kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
-    group_descs[PG_CALL + 0].callables.moduleDC = optix_module;
-    group_descs[PG_CALL + 0].callables.entryFunctionNameDC = "__direct_callable__svm_eval_nodes";
-    group_descs[PG_CALL + 1].kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
-    group_descs[PG_CALL + 1].callables.moduleDC = optix_module;
-    group_descs[PG_CALL + 1].callables.entryFunctionNameDC =
-        "__direct_callable__kernel_volume_shadow";
-    group_descs[PG_CALL + 2].kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
-    group_descs[PG_CALL + 2].callables.moduleDC = optix_module;
-    group_descs[PG_CALL + 2].callables.entryFunctionNameDC =
-        "__direct_callable__subsurface_scatter_multi_setup";
+  if (requested_features.nodes_features & NODE_FEATURE_RAYTRACE) {
+    group_descs[PG_RGEN_SHADE_SURFACE_RAYTRACE].kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+    group_descs[PG_RGEN_SHADE_SURFACE_RAYTRACE].raygen.module = optix_module;
+    group_descs[PG_RGEN_SHADE_SURFACE_RAYTRACE].raygen.entryFunctionName =
+        "__raygen__kernel_optix_integrator_shade_surface_raytrace";
+    group_descs[PG_CALL_SVM_AO].kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
+    group_descs[PG_CALL_SVM_AO].callables.moduleDC = optix_module;
+    group_descs[PG_CALL_SVM_AO].callables.entryFunctionNameDC = "__direct_callable__svm_node_ao";
+    group_descs[PG_CALL_SVM_BEVEL].kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
+    group_descs[PG_CALL_SVM_BEVEL].callables.moduleDC = optix_module;
+    group_descs[PG_CALL_SVM_BEVEL].callables.entryFunctionNameDC =
+        "__direct_callable__svm_node_bevel";
   }
 
   optix_assert(optixProgramGroupCreate(
@@ -424,19 +417,23 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
 
   OptixPipelineLinkOptions link_options = {};
   link_options.maxTraceDepth = 1;
-#  ifdef WITH_CYCLES_DEBUG
-  link_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
-#  else
-  link_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
-#  endif
+
+  if (DebugFlags().optix.use_debug) {
+    link_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
+  }
+  else {
+    link_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
+  }
+
 #  if OPTIX_ABI_VERSION < 24
   link_options.overrideUsesMotionBlur = motion_blur;
 #  endif
 
-  { /* Create megakernel pipeline. */
+  if (requested_features.nodes_features & NODE_FEATURE_RAYTRACE) {
+    /* Create shader raytracing pipeline. */
     vector<OptixProgramGroup> pipeline_groups;
     pipeline_groups.reserve(NUM_PROGRAM_GROUPS);
-    pipeline_groups.push_back(groups[PG_RGEN_MEGAKERNEL]);
+    pipeline_groups.push_back(groups[PG_RGEN_SHADE_SURFACE_RAYTRACE]);
     pipeline_groups.push_back(groups[PG_MISS]);
     pipeline_groups.push_back(groups[PG_HITD]);
     pipeline_groups.push_back(groups[PG_HITS]);
@@ -447,11 +444,8 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
       pipeline_groups.push_back(groups[PG_HITS_MOTION]);
     }
 #  endif
-    if (requested_features.use_shader_raytrace) {
-      pipeline_groups.push_back(groups[PG_CALL + 0]);
-      pipeline_groups.push_back(groups[PG_CALL + 1]);
-      pipeline_groups.push_back(groups[PG_CALL + 2]);
-    }
+    pipeline_groups.push_back(groups[PG_CALL_SVM_AO]);
+    pipeline_groups.push_back(groups[PG_CALL_SVM_BEVEL]);
 
     optix_assert(optixPipelineCreate(context,
                                      &pipeline_options,
@@ -460,25 +454,17 @@ bool OptiXDevice::load_kernels(const DeviceRequestedFeatures &requested_features
                                      pipeline_groups.size(),
                                      nullptr,
                                      0,
-                                     &pipelines[PIP_MEGAKERNEL]));
+                                     &pipelines[PIP_SHADE_RAYTRACE]));
 
     /* Combine ray generation and trace continuation stack size. */
-    const unsigned int css = stack_size[PG_RGEN_MEGAKERNEL].cssRG +
+    const unsigned int css = stack_size[PG_RGEN_SHADE_SURFACE_RAYTRACE].cssRG +
                              link_options.maxTraceDepth * trace_css;
-    /* Max direct callable depth is one of the following, so combine accordingly
-     * - __raygen__ -> svm_eval_nodes
-     * - __raygen__ -> kernel_volume_shadow -> svm_eval_nodes
-     * - __raygen__ -> subsurface_scatter_multi_setup -> svm_eval_nodes */
-    const unsigned int dss = stack_size[PG_CALL + 0].dssDC +
-                             std::max(stack_size[PG_CALL + 1].dssDC,
-                                      stack_size[PG_CALL + 2].dssDC);
+    const unsigned int dss = std::max(stack_size[PG_CALL_SVM_AO].dssDC,
+                                      stack_size[PG_CALL_SVM_BEVEL].dssDC);
 
     /* Set stack size depending on pipeline options. */
-    optix_assert(optixPipelineSetStackSize(pipelines[PIP_MEGAKERNEL],
-                                           0,
-                                           requested_features.use_shader_raytrace ? dss : 0,
-                                           css,
-                                           motion_blur ? 3 : 2));
+    optix_assert(optixPipelineSetStackSize(
+        pipelines[PIP_SHADE_RAYTRACE], 0, dss, css, motion_blur ? 3 : 2));
   }
 
   { /* Create intersection-only pipeline. */
@@ -562,7 +548,8 @@ void OptiXDevice::denoise_buffer(const DeviceDenoiseTask &task)
   const int input_pass_stride = denoise_buffer_pass_stride(task.params);
 
   device_only_memory<float> input_rgb(this, "denoiser input rgb");
-  input_rgb.alloc_to_device(task.width * task.height * input_pass_stride);
+  input_rgb.alloc_to_device(task.buffer_params.width * task.buffer_params.height *
+                            input_pass_stride);
 
   OptiXDeviceQueue queue(this);
 
@@ -596,26 +583,29 @@ bool OptiXDevice::denoise_filter_convert_to_rgb(OptiXDeviceQueue *queue,
                                                 const DeviceDenoiseTask &task,
                                                 const device_ptr d_input_rgb)
 {
-  const int work_size = task.width * task.height;
+  const int work_size = task.buffer_params.width * task.buffer_params.height;
 
-  const int pass_offset[3] = {
-      task.pass_denoising_color, task.pass_denoising_albedo, task.pass_denoising_normal};
+  const int pass_offset[3] = {task.buffer_params.get_pass_offset(PASS_DENOISING_COLOR),
+                              task.buffer_params.get_pass_offset(PASS_DENOISING_ALBEDO),
+                              task.buffer_params.get_pass_offset(PASS_DENOISING_NORMAL)};
 
   const int input_passes = denoise_buffer_num_passes(task.params);
 
+  const int pass_sample_count = task.buffer_params.get_pass_offset(PASS_SAMPLE_COUNT);
+
   void *args[] = {const_cast<device_ptr *>(&d_input_rgb),
                   const_cast<device_ptr *>(&task.buffer),
-                  const_cast<int *>(&task.x),
-                  const_cast<int *>(&task.y),
-                  const_cast<int *>(&task.width),
-                  const_cast<int *>(&task.height),
-                  const_cast<int *>(&task.offset),
-                  const_cast<int *>(&task.stride),
-                  const_cast<int *>(&task.pass_stride),
+                  const_cast<int *>(&task.buffer_params.full_x),
+                  const_cast<int *>(&task.buffer_params.full_y),
+                  const_cast<int *>(&task.buffer_params.width),
+                  const_cast<int *>(&task.buffer_params.height),
+                  const_cast<int *>(&task.buffer_params.offset),
+                  const_cast<int *>(&task.buffer_params.stride),
+                  const_cast<int *>(&task.buffer_params.pass_stride),
                   const_cast<int *>(pass_offset),
                   const_cast<int *>(&input_passes),
                   const_cast<int *>(&task.num_samples),
-                  const_cast<int *>(&task.pass_sample_count)};
+                  const_cast<int *>(&pass_sample_count)};
 
   return queue->enqueue(DEVICE_KERNEL_FILTER_CONVERT_TO_RGB, work_size, args);
 }
@@ -624,19 +614,21 @@ bool OptiXDevice::denoise_filter_convert_from_rgb(OptiXDeviceQueue *queue,
                                                   const DeviceDenoiseTask &task,
                                                   const device_ptr d_input_rgb)
 {
-  const int work_size = task.width * task.height;
+  const int work_size = task.buffer_params.width * task.buffer_params.height;
+
+  const int pass_sample_count = task.buffer_params.get_pass_offset(PASS_SAMPLE_COUNT);
 
   void *args[] = {const_cast<device_ptr *>(&d_input_rgb),
                   const_cast<device_ptr *>(&task.buffer),
-                  const_cast<int *>(&task.x),
-                  const_cast<int *>(&task.y),
-                  const_cast<int *>(&task.width),
-                  const_cast<int *>(&task.height),
-                  const_cast<int *>(&task.offset),
-                  const_cast<int *>(&task.stride),
-                  const_cast<int *>(&task.pass_stride),
+                  const_cast<int *>(&task.buffer_params.full_x),
+                  const_cast<int *>(&task.buffer_params.full_y),
+                  const_cast<int *>(&task.buffer_params.width),
+                  const_cast<int *>(&task.buffer_params.height),
+                  const_cast<int *>(&task.buffer_params.offset),
+                  const_cast<int *>(&task.buffer_params.stride),
+                  const_cast<int *>(&task.buffer_params.pass_stride),
                   const_cast<int *>(&task.num_samples),
-                  const_cast<int *>(&task.pass_sample_count)};
+                  const_cast<int *>(&pass_sample_count)};
 
   return queue->enqueue(DEVICE_KERNEL_FILTER_CONVERT_FROM_RGB, work_size, args);
 }
@@ -710,14 +702,14 @@ bool OptiXDevice::denoise_create_if_needed(const DenoiseParams &params)
 
 bool OptiXDevice::denoise_configure_if_needed(const DeviceDenoiseTask &task)
 {
-  if (denoiser_.is_configured &&
-      (denoiser_.configured_size.x == task.width && denoiser_.configured_size.y == task.height)) {
+  if (denoiser_.is_configured && (denoiser_.configured_size.x == task.buffer_params.width &&
+                                  denoiser_.configured_size.y == task.buffer_params.height)) {
     return true;
   }
 
   OptixDenoiserSizes sizes = {};
   optix_assert(optixDenoiserComputeMemoryResources(
-      denoiser_.optix_denoiser, task.width, task.height, &sizes));
+      denoiser_.optix_denoiser, task.buffer_params.width, task.buffer_params.height, &sizes));
 
 #  if OPTIX_ABI_VERSION < 28
   denoiser_.scratch_size = sizes.recommendedScratchSizeInBytes;
@@ -732,8 +724,8 @@ bool OptiXDevice::denoise_configure_if_needed(const DeviceDenoiseTask &task)
   /* Initialize denoiser state for the current tile size. */
   const OptixResult result = optixDenoiserSetup(denoiser_.optix_denoiser,
                                                 0,
-                                                task.width,
-                                                task.height,
+                                                task.buffer_params.width,
+                                                task.buffer_params.height,
                                                 denoiser_.state.device_pointer,
                                                 denoiser_.scratch_offset,
                                                 denoiser_.state.device_pointer +
@@ -745,8 +737,8 @@ bool OptiXDevice::denoise_configure_if_needed(const DeviceDenoiseTask &task)
   }
 
   denoiser_.is_configured = true;
-  denoiser_.configured_size.x = task.width;
-  denoiser_.configured_size.y = task.height;
+  denoiser_.configured_size.x = task.buffer_params.width;
+  denoiser_.configured_size.y = task.buffer_params.height;
 
   return true;
 }
@@ -756,24 +748,25 @@ bool OptiXDevice::denoise_run(OptiXDeviceQueue *queue,
                               const device_ptr d_input_rgb)
 {
   const int pixel_stride = 3 * sizeof(float);
-  const int input_stride = task.width * pixel_stride;
+  const int input_stride = task.buffer_params.width * pixel_stride;
 
   /* Set up input and output layer information. */
   OptixImage2D input_layers[3] = {};
   OptixImage2D output_layers[1] = {};
 
   for (int i = 0; i < 3; ++i) {
-    input_layers[i].data = d_input_rgb + (task.width * task.height * pixel_stride * i);
-    input_layers[i].width = task.width;
-    input_layers[i].height = task.height;
+    input_layers[i].data = d_input_rgb + (task.buffer_params.width * task.buffer_params.height *
+                                          pixel_stride * i);
+    input_layers[i].width = task.buffer_params.width;
+    input_layers[i].height = task.buffer_params.height;
     input_layers[i].rowStrideInBytes = input_stride;
     input_layers[i].pixelStrideInBytes = pixel_stride;
     input_layers[i].format = OPTIX_PIXEL_FORMAT_FLOAT3;
   }
 
   output_layers[0].data = d_input_rgb;
-  output_layers[0].width = task.width;
-  output_layers[0].height = task.height;
+  output_layers[0].width = task.buffer_params.width;
+  output_layers[0].height = task.buffer_params.height;
   output_layers[0].rowStrideInBytes = input_stride;
   output_layers[0].pixelStrideInBytes = pixel_stride;
   output_layers[0].format = OPTIX_PIXEL_FORMAT_FLOAT3;
@@ -930,13 +923,9 @@ bool OptiXDevice::build_optix_bvh(BVHOptiX *bvh,
 
 void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
 {
-  if (bvh->params.bvh_layout == BVH_LAYOUT_BVH2) {
-    /* For baking CUDA is used, build appropriate BVH for that. */
-    Device::build_bvh(bvh, progress, refit);
-    return;
-  }
-
   const bool use_fast_trace_bvh = (bvh->params.bvh_type == BVH_TYPE_STATIC);
+
+  free_bvh_memory_delayed();
 
   BVHOptiX *const bvh_optix = static_cast<BVHOptiX *>(bvh);
 
@@ -980,7 +969,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
       device_vector<float4> vertex_data(this, "optix temp vertex data", MEM_READ_ONLY);
       /* Four control points for each curve segment. */
       const size_t num_vertices = num_segments * 4;
-      if (DebugFlags().optix.curves_api && hair->curve_shape == CURVE_THICK) {
+      if (DebugFlags().optix.use_curves_api && hair->curve_shape == CURVE_THICK) {
         index_data.alloc(num_segments);
         vertex_data.alloc(num_vertices * num_motion_steps);
       }
@@ -1007,7 +996,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
 
           for (int segment = 0; segment < curve.num_segments(); ++segment, ++i) {
 #  if OPTIX_ABI_VERSION >= 36
-            if (DebugFlags().optix.curves_api && hair->curve_shape == CURVE_THICK) {
+            if (DebugFlags().optix.use_curves_api && hair->curve_shape == CURVE_THICK) {
               int k0 = curve.first_key + segment;
               int k1 = k0 + 1;
               int ka = max(k0 - 1, curve.first_key);
@@ -1083,7 +1072,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
       unsigned int build_flags = OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL;
       OptixBuildInput build_input = {};
 #  if OPTIX_ABI_VERSION >= 36
-      if (DebugFlags().optix.curves_api && hair->curve_shape == CURVE_THICK) {
+      if (DebugFlags().optix.use_curves_api && hair->curve_shape == CURVE_THICK) {
         build_input.type = OPTIX_BUILD_INPUT_TYPE_CURVES;
         build_input.curveArray.curveType = OPTIX_PRIMITIVE_TYPE_ROUND_CUBIC_BSPLINE;
         build_input.curveArray.numPrimitives = num_segments;
@@ -1287,7 +1276,7 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
 
 #  if OPTIX_ABI_VERSION >= 36
         if (motion_blur && ob->get_geometry()->has_motion_blur() &&
-            DebugFlags().optix.curves_api &&
+            DebugFlags().optix.use_curves_api &&
             static_cast<const Hair *>(ob->get_geometry())->curve_shape == CURVE_THICK) {
           /* Select between motion blur and non-motion blur built-in intersection module. */
           instance.sbtOffset = PG_HITD_MOTION - PG_HITD;
@@ -1407,6 +1396,24 @@ void OptiXDevice::build_bvh(BVH *bvh, Progress &progress, bool refit)
     }
     tlas_handle = bvh_optix->traversable_handle;
   }
+}
+
+void OptiXDevice::release_optix_bvh(BVH *bvh)
+{
+  thread_scoped_lock lock(delayed_free_bvh_mutex);
+  /* Do delayed free of BVH memory, since geometry holding BVH might be deleted
+   * while GPU is still rendering. */
+  BVHOptiX *const bvh_optix = static_cast<BVHOptiX *>(bvh);
+
+  delayed_free_bvh_memory.emplace_back(std::move(bvh_optix->as_data));
+  delayed_free_bvh_memory.emplace_back(std::move(bvh_optix->motion_transform_data));
+  bvh_optix->traversable_handle = 0;
+}
+
+void OptiXDevice::free_bvh_memory_delayed()
+{
+  thread_scoped_lock lock(delayed_free_bvh_mutex);
+  delayed_free_bvh_memory.free_memory();
 }
 
 void OptiXDevice::const_copy_to(const char *name, void *host, size_t size)

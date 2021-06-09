@@ -361,7 +361,7 @@ static void seq_disk_cache_get_project_dir(SeqDiskCache *disk_cache, char *path,
   BLI_split_file_part(BKE_main_blendfile_path(disk_cache->bmain), cache_dir, sizeof(cache_dir));
   /* Use suffix, so that the cache directory name does not conflict with the bmain's blend file. */
   const char *suffix = "_seq_cache";
-  strncat(cache_dir, suffix, sizeof(cache_dir) - strlen(cache_dir));
+  strncat(cache_dir, suffix, sizeof(cache_dir) - strlen(cache_dir) - 1);
   BLI_strncpy(path, seq_disk_cache_base_dir(), path_len);
   BLI_path_append(path, path_len, cache_dir);
 }
@@ -518,7 +518,7 @@ static size_t inflate_file_to_imbuf(ImBuf *ibuf, FILE *file, DiskCacheHeaderEntr
 
 static bool seq_disk_cache_read_header(FILE *file, DiskCacheHeader *header)
 {
-  fseek(file, 0, 0);
+  BLI_fseek(file, 0LL, SEEK_SET);
   const size_t num_items_read = fread(header, sizeof(*header), 1, file);
   if (num_items_read < 1) {
     BLI_assert(!"unable to read disk cache header");
@@ -540,7 +540,7 @@ static bool seq_disk_cache_read_header(FILE *file, DiskCacheHeader *header)
 
 static size_t seq_disk_cache_write_header(FILE *file, DiskCacheHeader *header)
 {
-  fseek(file, 0, 0);
+  BLI_fseek(file, 0LL, SEEK_SET);
   return fwrite(header, sizeof(*header), 1, file);
 }
 

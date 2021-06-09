@@ -36,6 +36,7 @@
 
 #include "IMB_imbuf.h"
 
+#include "SEQ_iterator.h"
 #include "SEQ_render.h"
 #include "SEQ_sequencer.h"
 #include "SEQ_time.h"
@@ -404,6 +405,17 @@ void SEQ_timeline_boundbox(const Scene *scene, const ListBase *seqbase, rctf *re
   }
 }
 
+static bool strip_exists_at_frame(SeqCollection *all_strips, const int timeline_frame)
+{
+  Sequence *seq;
+  SEQ_ITERATOR_FOREACH (seq, all_strips) {
+    if (SEQ_time_strip_intersects_frame(seq, timeline_frame)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Find first gap between strips after initial_frame and describe it by filling data of r_gap_info
  *
@@ -425,10 +437,12 @@ void seq_time_gap_info_get(const Scene *scene,
   int timeline_frame = initial_frame;
   r_gap_info->gap_exists = false;
 
-  if (SEQ_render_evaluate_frame(seqbase, initial_frame) == 0) {
+  SeqCollection *collection = SEQ_query_all_strips(seqbase);
+
+  if (!strip_exists_at_frame(collection, initial_frame)) {
     /* Search backward for gap_start_frame. */
     for (; timeline_frame >= sfra; timeline_frame--) {
-      if (SEQ_render_evaluate_frame(seqbase, timeline_frame) != 0) {
+      if (strip_exists_at_frame(collection, timeline_frame)) {
         break;
       }
     }
@@ -438,7 +452,7 @@ void seq_time_gap_info_get(const Scene *scene,
   else {
     /* Search forward for gap_start_frame. */
     for (; timeline_frame <= efra; timeline_frame++) {
-      if (SEQ_render_evaluate_frame(seqbase, timeline_frame) == 0) {
+      if (!strip_exists_at_frame(collection, timeline_frame)) {
         r_gap_info->gap_start_frame = timeline_frame;
         break;
       }
@@ -446,11 +460,25 @@ void seq_time_gap_info_get(const Scene *scene,
   }
   /* Search forward for gap_end_frame. */
   for (; timeline_frame <= efra; timeline_frame++) {
-    if (SEQ_render_evaluate_frame(seqbase, timeline_frame) != 0) {
+    if (strip_exists_at_frame(collection, timeline_frame)) {
       const int gap_end_frame = timeline_frame;
       r_gap_info->gap_length = gap_end_frame - r_gap_info->gap_start_frame;
       r_gap_info->gap_exists = true;
       break;
     }
   }
+}
+
+/**
+ * Test if strip intersects with timeline frame.
+ * Note: This checks if strip would be rendered at this frame. For rendering it is assumed, that
+ * timeline frame has width of 1 frame and therefore ends at timeline_frame + 1
+ *
+ * \param seq: Sequence to be checked
+ * \param timeline_frame: absolute frame position
+ * \return true if strip intersects with timeline frame.
+ */
+bool SEQ_time_strip_intersects_frame(const Sequence *seq, const int timeline_frame)
+{
+  return (seq->startdisp <= timeline_frame) && (seq->enddisp > timeline_frame);
 }

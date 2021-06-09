@@ -42,6 +42,7 @@
 #include "SEQ_iterator.h"
 #include "SEQ_select.h"
 #include "SEQ_sequencer.h"
+#include "SEQ_time.h"
 #include "SEQ_transform.h"
 
 /* For menu, popup, icons, etc. */
@@ -807,7 +808,7 @@ static bool select_linked_internal(Scene *scene)
   bool changed = false;
 
   LISTBASE_FOREACH (Sequence *, seq, SEQ_active_seqbase_get(ed)) {
-    if ((seq->flag & SELECT) != 0) {
+    if ((seq->flag & SELECT) == 0) {
       continue;
     }
     /* Only get unselected neighbors. */
@@ -1186,8 +1187,8 @@ static int sequencer_select_side_of_frame_exec(bContext *C, wmOperator *op)
       case 1:
         test = (timeline_frame <= seq->startdisp);
         break;
-      case 0:
-        test = (timeline_frame <= seq->enddisp) && (timeline_frame >= seq->startdisp);
+      case 2:
+        test = SEQ_time_strip_intersects_frame(seq, timeline_frame);
         break;
     }
 
@@ -1209,6 +1210,7 @@ void SEQUENCER_OT_select_side_of_frame(wmOperatorType *ot)
   static const EnumPropertyItem sequencer_select_left_right_types[] = {
       {-1, "LEFT", 0, "Left", "Select to the left of the current frame"},
       {1, "RIGHT", 0, "Right", "Select to the right of the current frame"},
+      {2, "CURRENT", 0, "Current Frame", "Select intersecting with the current frame"},
       {0, NULL, 0, NULL, NULL},
   };
 
@@ -1621,37 +1623,6 @@ static bool select_grouped_time_overlap(Editing *ed, Sequence *actseq)
   return changed;
 }
 
-/* Query all effect strips that are directly or indirectly connected to seq_reference. */
-static void query_strip_effect_chain(Sequence *seq_reference,
-                                     ListBase *seqbase,
-                                     SeqCollection *collection)
-{
-  if (!SEQ_collection_append_strip(seq_reference, collection)) {
-    return; /* Strip is already in set, so all effects connected to it are as well. */
-  }
-
-  /* Find all strips that seq_reference is connected to. */
-  if (seq_reference->type & SEQ_TYPE_EFFECT) {
-    if (seq_reference->seq1) {
-      query_strip_effect_chain(seq_reference->seq1, seqbase, collection);
-    }
-    if (seq_reference->seq2) {
-      query_strip_effect_chain(seq_reference->seq2, seqbase, collection);
-    }
-    if (seq_reference->seq3) {
-      query_strip_effect_chain(seq_reference->seq3, seqbase, collection);
-    }
-  }
-
-  /* Find all strips connected to seq_reference. */
-  LISTBASE_FOREACH (Sequence *, seq_test, seqbase) {
-    if (seq_test->seq1 == seq_reference || seq_test->seq2 == seq_reference ||
-        seq_test->seq3 == seq_reference) {
-      query_strip_effect_chain(seq_test, seqbase, collection);
-    }
-  }
-}
-
 /* Query strips that are in lower channel and intersect in time with seq_reference. */
 static void query_lower_channel_strips(Sequence *seq_reference,
                                        ListBase *seqbase,
@@ -1681,7 +1652,7 @@ static bool select_grouped_effect_link(Editing *ed,
   SeqCollection *collection = SEQ_query_selected_strips(seqbase);
   const int selected_strip_count = BLI_gset_len(collection->set);
   SEQ_collection_expand(seqbase, collection, query_lower_channel_strips);
-  SEQ_collection_expand(seqbase, collection, query_strip_effect_chain);
+  SEQ_collection_expand(seqbase, collection, SEQ_query_strip_effect_chain);
 
   /* Check if other strips will be affected. */
   const bool changed = BLI_gset_len(collection->set) > selected_strip_count;

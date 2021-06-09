@@ -261,10 +261,8 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
   }
 
   /* test if we need to sync */
-  bool object_updated = false;
-
-  if (object_map.add_or_update(&object, b_ob, b_parent, key))
-    object_updated = true;
+  bool object_updated = object_map.add_or_update(&object, b_ob, b_parent, key) ||
+                        (tfm != object->get_tfm());
 
   /* mesh sync */
   /* b_ob is owned by the iterator and will go out of scope at the end of the block.
@@ -313,8 +311,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
    * transform comparison should not be needed, but duplis don't work perfect
    * in the depsgraph and may not signal changes, so this is a workaround */
   if (object->is_modified() || object_updated ||
-      (object->get_geometry() && object->get_geometry()->is_modified()) ||
-      tfm != object->get_tfm()) {
+      (object->get_geometry() && object->get_geometry()->is_modified())) {
     object->name = b_ob.name().c_str();
     object->set_pass_id(b_ob.pass_index());
     object->set_color(get_float3(b_ob.color()));
@@ -506,7 +503,7 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
   /* object loop */
   bool cancel = false;
   bool use_portal = false;
-  const bool show_lights = BlenderViewportParameters(b_v3d).use_scene_lights;
+  const bool show_lights = BlenderViewportParameters(b_v3d, use_developer_ui).use_scene_lights;
 
   BL::ViewLayer b_view_layer = b_depsgraph.view_layer_eval();
   BL::Depsgraph::object_instances_iterator b_instance_iter;

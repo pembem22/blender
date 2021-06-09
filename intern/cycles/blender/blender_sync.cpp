@@ -71,7 +71,8 @@ BlenderSync::BlenderSync(BL::RenderEngine &b_engine,
       use_developer_ui(use_developer_ui),
       dicing_rate(1.0f),
       max_subdivisions(12),
-      progress(progress)
+      progress(progress),
+      has_updates_(true)
 {
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
   dicing_rate = preview ? RNA_float_get(&cscene, "preview_dicing_rate") :
@@ -86,7 +87,9 @@ BlenderSync::~BlenderSync()
 void BlenderSync::reset(BL::BlendData &b_data, BL::Scene &b_scene)
 {
   /* Update data and scene pointers in case they change in session reset,
-   * for example after undo. */
+   * for example after undo.
+   * Note that we do not modify the `has_updates_` flag here because the sync
+   * reset is also used during viewport navigation. */
   this->b_data = b_data;
   this->b_scene = b_scene;
 }
@@ -119,6 +122,8 @@ void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d
     }
 
     if (dicing_prop_changed) {
+      has_updates_ = true;
+
       for (const pair<const GeometryKey, Geometry *> &iter : geometry_map.key_to_scene_data()) {
         Geometry *geom = iter.second;
         if (geom->is_mesh()) {
@@ -135,6 +140,12 @@ void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d
 
   /* Iterate over all IDs in this depsgraph. */
   for (BL::DepsgraphUpdate &b_update : b_depsgraph.updates) {
+    /* TODO(sergey): Can do more selective filter here. For example, ignore changes made to
+     * screen datablock. Note that sync_data() needs to be called after object deletion, and
+     * currently this is ensured by the scene ID tagged for update, which sets the `has_updates_`
+     * flag. */
+    has_updates_ = true;
+
     BL::ID b_id(b_update.id());
 
     /* Material */
@@ -214,10 +225,14 @@ void BlenderSync::sync_recalc(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d
   }
 
   if (b_v3d) {
-    BlenderViewportParameters new_viewport_parameters(b_v3d);
-    if (viewport_parameters.modified(new_viewport_parameters)) {
+    BlenderViewportParameters new_viewport_parameters(b_v3d, use_developer_ui);
+
+    if (viewport_parameters.shader_modified(new_viewport_parameters)) {
       world_recalc = true;
+      has_updates_ = true;
     }
+
+    has_updates_ |= viewport_parameters.modified(new_viewport_parameters);
   }
 }
 
@@ -229,6 +244,10 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
                             int height,
                             void **python_thread_state)
 {
+  if (!has_updates_) {
+    return;
+  }
+
   scoped_timer timer;
 
   BL::ViewLayer b_view_layer = b_depsgraph.view_layer_eval();
@@ -237,9 +256,9 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
    * implicit check on whether it is a background render or not. What is the nicer thing here? */
   const bool background = !b_v3d;
 
-  sync_view_layer(b_v3d, b_view_layer);
+  sync_view_layer(b_view_layer);
   sync_integrator(b_view_layer, background);
-  sync_film(b_v3d);
+  sync_film(b_view_layer, b_v3d);
   sync_shaders(b_depsgraph, b_v3d);
   sync_images();
 
@@ -260,6 +279,8 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
   free_data_after_sync(b_depsgraph);
 
   VLOG(1) << "Total time spent synchronizing data: " << timer.get_time();
+
+  has_updates_ = false;
 }
 
 /* Integrator */
@@ -366,21 +387,17 @@ void BlenderSync::sync_integrator(BL::ViewLayer &b_view_layer, bool background)
 
 /* Film */
 
-void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
+void BlenderSync::sync_film(BL::ViewLayer &b_view_layer, BL::SpaceView3D &b_v3d)
 {
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
+  PointerRNA crl = RNA_pointer_get(&b_view_layer.ptr, "cycles");
 
   Film *film = scene->film;
 
   if (b_v3d) {
-    film->set_display_pass(BlenderViewportParameters::get_render_pass(b_v3d));
-
-    if (use_developer_ui) {
-      film->set_show_active_pixels(BlenderViewportParameters::get_show_active_pixels(b_v3d));
-    }
-    else {
-      film->set_show_active_pixels(false);
-    }
+    const BlenderViewportParameters new_viewport_parameters(b_v3d, use_developer_ui);
+    film->set_display_pass(new_viewport_parameters.display_pass);
+    film->set_show_active_pixels(new_viewport_parameters.show_active_pixels);
   }
 
   film->set_exposure(get_float(cscene, "film_exposure"));
@@ -408,17 +425,25 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
         break;
     }
   }
+
+  /* Blender viewport does not support proper shadow catcher compositing, so force an approximate
+   * mode to improve visual feedback. */
+  if (b_v3d) {
+    film->set_use_approximate_shadow_catcher(true);
+  }
+  else {
+    film->set_use_approximate_shadow_catcher(!get_boolean(crl, "use_pass_shadow_catcher"));
+  }
 }
 
 /* Render Layer */
 
-void BlenderSync::sync_view_layer(BL::SpaceView3D & /*b_v3d*/, BL::ViewLayer &b_view_layer)
+void BlenderSync::sync_view_layer(BL::ViewLayer &b_view_layer)
 {
   view_layer.name = b_view_layer.name();
 
   /* Filter. */
   view_layer.use_background_shader = b_view_layer.use_sky();
-  view_layer.use_background_ao = b_view_layer.use_ao();
   /* Always enable surfaces for baking, otherwise there is nothing to bake to. */
   view_layer.use_surfaces = b_view_layer.use_solid() || scene->bake_manager->get_baking();
   view_layer.use_hair = b_view_layer.use_strand();
@@ -511,13 +536,6 @@ PassType BlenderSync::get_pass_type(BL::RenderPass &b_pass)
   MAP_PASS("BakePrimitive", PASS_BAKE_PRIMITIVE);
   MAP_PASS("BakeDifferential", PASS_BAKE_DIFFERENTIAL);
 
-#ifdef __KERNEL_DEBUG__
-  MAP_PASS("Debug BVH Traversed Nodes", PASS_BVH_TRAVERSED_NODES);
-  MAP_PASS("Debug BVH Traversed Instances", PASS_BVH_TRAVERSED_INSTANCES);
-  MAP_PASS("Debug BVH Intersections", PASS_BVH_INTERSECTIONS);
-  MAP_PASS("Debug Ray Bounces", PASS_RAY_BOUNCES);
-#endif
-
   MAP_PASS("Noisy Image", PASS_DENOISING_COLOR);
   MAP_PASS("Denoising Normal", PASS_DENOISING_NORMAL);
   MAP_PASS("Denoising Albedo", PASS_DENOISING_ALBEDO);
@@ -571,24 +589,6 @@ void BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay, BL::ViewLayer &b_v
     Pass::add(PASS_DENOISING_COLOR, passes, "Noisy Image");
   }
 
-#ifdef __KERNEL_DEBUG__
-  if (get_boolean(crl, "pass_debug_bvh_traversed_nodes")) {
-    b_engine.add_pass("Debug BVH Traversed Nodes", 1, "X", b_view_layer.name().c_str());
-    Pass::add(PASS_BVH_TRAVERSED_NODES, passes, "Debug BVH Traversed Nodes");
-  }
-  if (get_boolean(crl, "pass_debug_bvh_traversed_instances")) {
-    b_engine.add_pass("Debug BVH Traversed Instances", 1, "X", b_view_layer.name().c_str());
-    Pass::add(PASS_BVH_TRAVERSED_INSTANCES, passes, "Debug BVH Traversed Instances");
-  }
-  if (get_boolean(crl, "pass_debug_bvh_intersections")) {
-    b_engine.add_pass("Debug BVH Intersections", 1, "X", b_view_layer.name().c_str());
-    Pass::add(PASS_BVH_INTERSECTIONS, passes, "Debug BVH Intersections");
-  }
-  if (get_boolean(crl, "pass_debug_ray_bounces")) {
-    b_engine.add_pass("Debug Ray Bounces", 1, "X", b_view_layer.name().c_str());
-    Pass::add(PASS_RAY_BOUNCES, passes, "Debug Ray Bounces");
-  }
-#endif
   if (get_boolean(crl, "pass_debug_render_time")) {
     b_engine.add_pass("Debug Render Time", 1, "X", b_view_layer.name().c_str());
     Pass::add(PASS_RENDER_TIME, passes, "Debug Render Time");

@@ -30,10 +30,10 @@ struct KernelParamsOptiX;
 
 /* List of OptiX program groups. */
 enum {
-  PG_RGEN_MEGAKERNEL,
   PG_RGEN_INTERSECT_CLOSEST,
   PG_RGEN_INTERSECT_SHADOW,
   PG_RGEN_INTERSECT_SUBSURFACE,
+  PG_RGEN_SHADE_SURFACE_RAYTRACE,
   PG_MISS,
   PG_HITD, /* Default hit group. */
   PG_HITS, /* __SHADOW_RECORD_ALL__ hit group. */
@@ -42,12 +42,24 @@ enum {
   PG_HITD_MOTION,
   PG_HITS_MOTION,
 #  endif
-  PG_CALL,
-  NUM_PROGRAM_GROUPS = PG_CALL + 3
+  PG_CALL_SVM_AO,
+  PG_CALL_SVM_BEVEL,
+  NUM_PROGRAM_GROUPS
 };
 
+static const int MISS_PROGRAM_GROUP_OFFSET = PG_MISS;
+static const int NUM_MIS_PROGRAM_GROUPS = 1;
+static const int HIT_PROGAM_GROUP_OFFSET = PG_HITD;
+#  if OPTIX_ABI_VERSION >= 36
+static const int NUM_HIT_PROGRAM_GROUPS = 5;
+#  else
+static const int NUM_HIT_PROGRAM_GROUPS = 3;
+#  endif
+static const int CALLABLE_PROGRAM_GROUPS_BASE = PG_CALL_SVM_AO;
+static const int NUM_CALLABLE_PROGRAM_GROUPS = 2;
+
 /* List of OptiX pipelines. */
-enum { PIP_MEGAKERNEL, PIP_INTERSECT, NUM_PIPELINES };
+enum { PIP_SHADE_RAYTRACE, PIP_INTERSECT, NUM_PIPELINES };
 
 /* A single shader binding table entry. */
 struct SbtRecord {
@@ -66,6 +78,9 @@ class OptiXDevice : public CUDADevice {
   device_vector<SbtRecord> sbt_data;
   device_only_memory<KernelParamsOptiX> launch_params;
   OptixTraversableHandle tlas_handle = 0;
+
+  vector<device_only_memory<char>> delayed_free_bvh_memory;
+  thread_mutex delayed_free_bvh_mutex;
 
   class Denoiser {
    public:
@@ -110,6 +125,9 @@ class OptiXDevice : public CUDADevice {
                        uint16_t num_motion_steps);
 
   void build_bvh(BVH *bvh, Progress &progress, bool refit) override;
+
+  void release_optix_bvh(BVH *bvh) override;
+  void free_bvh_memory_delayed();
 
   void const_copy_to(const char *name, void *host, size_t size) override;
 

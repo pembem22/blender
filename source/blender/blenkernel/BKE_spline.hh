@@ -28,6 +28,7 @@
 #include "BLI_float4x4.hh"
 #include "BLI_vector.hh"
 
+#include "BKE_attribute_access.hh"
 #include "BKE_attribute_math.hh"
 
 struct Curve;
@@ -74,6 +75,8 @@ class Spline {
   /* Only #Zup is supported at the moment. */
   NormalCalculationMode normal_mode;
 
+  blender::bke::CustomDataAttributes attributes;
+
  protected:
   Type type_;
   bool is_cyclic_ = false;
@@ -98,12 +101,14 @@ class Spline {
   Spline(const Type type) : type_(type)
   {
   }
-  Spline(Spline &other)
-      : normal_mode(other.normal_mode), type_(other.type_), is_cyclic_(other.is_cyclic_)
+  Spline(Spline &other) : attributes(other.attributes), type_(other.type_)
   {
+    copy_base_settings(other, *this);
   }
 
   virtual SplinePtr copy() const = 0;
+  /** Return a new spline with the same type and settings like "cyclic", but without any data. */
+  virtual SplinePtr copy_settings() const = 0;
 
   Spline::Type type() const;
 
@@ -177,6 +182,12 @@ class Spline {
 
  protected:
   virtual void correct_end_tangents() const = 0;
+  /** Copy settings stored in the base spline class. */
+  static void copy_base_settings(const Spline &src, Spline &dst)
+  {
+    dst.normal_mode = src.normal_mode;
+    dst.is_cyclic_ = src.is_cyclic_;
+  }
 };
 
 /**
@@ -230,6 +241,7 @@ class BezierSpline final : public Spline {
 
  public:
   virtual SplinePtr copy() const final;
+  SplinePtr copy_settings() const final;
   BezierSpline() : Spline(Type::Bezier)
   {
   }
@@ -251,10 +263,10 @@ class BezierSpline final : public Spline {
   void set_resolution(const int value);
 
   void add_point(const blender::float3 position,
-                 const HandleType handle_type_start,
-                 const blender::float3 handle_position_start,
-                 const HandleType handle_type_end,
-                 const blender::float3 handle_position_end,
+                 const HandleType handle_type_left,
+                 const blender::float3 handle_position_left,
+                 const HandleType handle_type_right,
+                 const blender::float3 handle_position_right,
                  const float radius,
                  const float tilt);
 
@@ -371,6 +383,7 @@ class NURBSpline final : public Spline {
 
  public:
   SplinePtr copy() const final;
+  SplinePtr copy_settings() const final;
   NURBSpline() : Spline(Type::NURBS)
   {
   }
@@ -438,6 +451,7 @@ class PolySpline final : public Spline {
 
  public:
   SplinePtr copy() const final;
+  SplinePtr copy_settings() const final;
   PolySpline() : Spline(Type::Poly)
   {
   }
@@ -477,18 +491,26 @@ class PolySpline final : public Spline {
  * A #CurveEval corresponds to the #Curve object data. The name is different for clarity, since
  * more of the data is stored in the splines, but also just to be different than the name in DNA.
  */
-class CurveEval {
+struct CurveEval {
  private:
   blender::Vector<SplinePtr> splines_;
 
  public:
+  blender::bke::CustomDataAttributes attributes;
+
+  CurveEval() = default;
+  CurveEval(const CurveEval &other) : attributes(other.attributes)
+  {
+    for (const SplinePtr &spline : other.splines()) {
+      this->add_spline(spline->copy());
+    }
+  }
+
   blender::Span<SplinePtr> splines() const;
   blender::MutableSpan<SplinePtr> splines();
 
   void add_spline(SplinePtr spline);
   void remove_splines(blender::IndexMask mask);
-
-  CurveEval *copy();
 
   void translate(const blender::float3 &translation);
   void transform(const blender::float4x4 &matrix);
@@ -496,6 +518,8 @@ class CurveEval {
 
   blender::Array<int> control_point_offsets() const;
   blender::Array<int> evaluated_point_offsets() const;
+
+  void assert_valid_point_attributes() const;
 };
 
 std::unique_ptr<CurveEval> curve_eval_from_dna_curve(const Curve &curve);

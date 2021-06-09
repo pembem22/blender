@@ -17,9 +17,9 @@
 #include "integrator/path_trace.h"
 
 #include "device/device.h"
+#include "integrator/pass_accessor.h"
 #include "integrator/render_scheduler.h"
 #include "render/gpu_display.h"
-#include "render/pass_accessor.h"
 #include "util/util_algorithm.h"
 #include "util/util_logging.h"
 #include "util/util_progress.h"
@@ -134,6 +134,7 @@ void PathTrace::render_pipeline(RenderWork render_work)
   /* TODO(sergey): For truly resumable render might need to avoid zero-ing. */
   if (render_work.path_trace.start_sample == render_scheduler_.get_start_sample()) {
     full_render_buffers_->zero();
+    buffer_read();
   }
 
   render_init_kernel_execution();
@@ -342,7 +343,7 @@ void PathTrace::update_display(const RenderWork &render_work)
 
   const double start_time = time_dt();
 
-  const float sample_scale = 1.0f / get_num_samples_in_buffer();
+  const int num_samples = get_num_samples_in_buffer();
 
   if (!gpu_display_->update_begin(width, height)) {
     LOG(ERROR) << "Error beginning GPUDisplay update.";
@@ -354,7 +355,7 @@ void PathTrace::update_display(const RenderWork &render_work)
    * on an implementation of GPUDisplay it might not be possible to map GPUBuffer in a way that the
    * PathTraceWork expects it in a threaded environment. */
   for (auto &&path_trace_work : path_trace_works_) {
-    path_trace_work->copy_to_gpu_display(gpu_display_.get(), sample_scale);
+    path_trace_work->copy_to_gpu_display(gpu_display_.get(), num_samples);
   }
 
   gpu_display_->update_end();
@@ -429,6 +430,16 @@ void PathTrace::buffer_write()
   buffer_write_cb();
 }
 
+void PathTrace::buffer_read()
+{
+  if (!buffer_read_cb) {
+    return;
+  }
+
+  buffer_read_cb();
+  full_render_buffers_->copy_to_device();
+}
+
 void PathTrace::progress_update_if_needed()
 {
   if (progress_ != nullptr) {
@@ -440,13 +451,20 @@ void PathTrace::progress_update_if_needed()
   }
 }
 
-bool PathTrace::get_render_tile_pixels(PassAccessor &pass_accessor, float *pixels)
+bool PathTrace::get_render_tile_pixels(const PassAccessor &pass_accessor,
+                                       const PassAccessor::Destination &destination)
 {
   if (!full_render_buffers_->copy_from_device()) {
     return false;
   }
 
-  return pass_accessor.get_render_tile_pixels(full_render_buffers_.get(), pixels);
+  return pass_accessor.get_render_tile_pixels(full_render_buffers_.get(), destination);
+}
+
+bool PathTrace::set_render_tile_pixels(PassAccessor &pass_accessor,
+                                       const PassAccessor::Source &source)
+{
+  return pass_accessor.set_render_tile_pixels(full_render_buffers_.get(), source);
 }
 
 /* --------------------------------------------------------------------

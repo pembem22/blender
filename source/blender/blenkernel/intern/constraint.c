@@ -1473,8 +1473,12 @@ static void followpath_get_tarmat(struct Depsgraph *UNUSED(depsgraph),
          * that's animated, but this will only work if it actually is animated...
          *
          * we divide the curvetime calculated in the previous step by the length of the path,
-         * to get a time factor, which then gets clamped to lie within 0.0 - 1.0 range. */
+         * to get a time factor. */
         curvetime /= cu->pathlen;
+
+        if (cu->flag & CU_PATH_CLAMP) {
+          CLAMP(curvetime, 0.0f, 1.0f);
+        }
       }
       else {
         /* fixed position along curve */
@@ -1631,10 +1635,28 @@ static void rotlimit_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *UN
   float eul[3];
   float size[3];
 
+  /* This constraint is based on euler rotation math, which doesn't work well with shear.
+   * The Y axis is chosen as the main one because constraints are most commonly used on bones.
+   * This also allows using the constraint to simply remove shear. */
+  orthogonalize_m4_stable(cob->matrix, 1, false);
+
+  /* Only do the complex processing if some limits are actually enabled. */
+  if (!(data->flag & (LIMIT_XROT | LIMIT_YROT | LIMIT_ZROT))) {
+    return;
+  }
+
+  /* Select the Euler rotation order, defaulting to the owner value. */
+  short rot_order = cob->rotOrder;
+
+  if (data->euler_order != CONSTRAINT_EULER_AUTO) {
+    rot_order = data->euler_order;
+  }
+
+  /* Decompose the matrix using the specified order. */
   copy_v3_v3(loc, cob->matrix[3]);
   mat4_to_size(size, cob->matrix);
 
-  mat4_to_eulO(eul, cob->rotOrder, cob->matrix);
+  mat4_to_eulO(eul, rot_order, cob->matrix);
 
   /* constraint data uses radians internally */
 
@@ -1667,7 +1689,7 @@ static void rotlimit_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *UN
     }
   }
 
-  loc_eulO_size_to_mat4(cob->matrix, loc, eul, size, cob->rotOrder);
+  loc_eulO_size_to_mat4(cob->matrix, loc, eul, size, rot_order);
 }
 
 static bConstraintTypeInfo CTI_ROTLIMIT = {

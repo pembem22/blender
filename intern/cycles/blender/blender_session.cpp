@@ -156,7 +156,7 @@ void BlenderSession::create_session()
 
   /* set buffer parameters */
   BufferParams buffer_params = BlenderSync::get_buffer_params(
-      b_render, b_v3d, b_rv3d, scene->camera, width, height);
+      b_v3d, b_rv3d, scene->camera, width, height);
   session->reset(buffer_params, session_params.samples);
 
   /* Create GPU display. */
@@ -251,7 +251,7 @@ void BlenderSession::reset_session(BL::BlendData &b_data, BL::Depsgraph &b_depsg
   BL::SpaceView3D b_null_space_view3d(PointerRNA_NULL);
   BL::RegionView3D b_null_region_view3d(PointerRNA_NULL);
   BufferParams buffer_params = BlenderSync::get_buffer_params(
-      b_render, b_null_space_view3d, b_null_region_view3d, scene->camera, width, height);
+      b_null_space_view3d, b_null_region_view3d, scene->camera, width, height);
   session->reset(buffer_params, session_params.samples);
 
   /* TODO(sergey): Decice on what is to be communicated to the engine here. There is no tiled
@@ -352,6 +352,44 @@ void BlenderSession::do_write_update_render_tile(bool do_update_only)
   b_engine.end_result(b_rr, true, false, true);
 }
 
+void BlenderSession::read_render_tile()
+{
+  const int2 tile_offset = session->get_render_tile_offset();
+  const int2 tile_size = session->get_render_tile_size();
+
+  /* get render result */
+  BL::RenderResult b_rr = b_engine.begin_result(tile_offset.x,
+                                                tile_offset.y,
+                                                tile_size.x,
+                                                tile_size.y,
+                                                b_rlay_name.c_str(),
+                                                b_rview_name.c_str());
+
+  /* can happen if the intersected rectangle gives 0 width or height */
+  if (b_rr.ptr.data == NULL) {
+    return;
+  }
+
+  BL::RenderResult::layers_iterator b_single_rlay;
+  b_rr.layers.begin(b_single_rlay);
+
+  /* layer will be missing if it was disabled in the UI */
+  if (b_single_rlay == b_rr.layers.end())
+    return;
+
+  BL::RenderLayer b_rlay = *b_single_rlay;
+
+  vector<float> pixels(tile_size.x * tile_size.y * 4);
+
+  /* Copy each pass.
+   * TODO:copy only the required ones for better performance? */
+  for (BL::RenderPass &b_pass : b_rlay.passes) {
+    session->set_render_tile_pixels(b_pass.name(), b_pass.channels(), (float *)b_pass.rect());
+  }
+
+  b_engine.end_result(b_rr, false, false, false);
+}
+
 void BlenderSession::write_render_tile()
 {
   do_write_update_render_tile(false);
@@ -447,7 +485,7 @@ void BlenderSession::render(BL::Depsgraph &b_depsgraph_)
   SessionParams session_params = BlenderSync::get_session_params(
       b_engine, b_userpref, b_scene, background);
   BufferParams buffer_params = BlenderSync::get_buffer_params(
-      b_render, b_v3d, b_rv3d, scene->camera, width, height);
+      b_v3d, b_rv3d, scene->camera, width, height);
 
   /* temporary render result to find needed passes and views */
   BL::RenderResult b_rr = b_engine.begin_result(0, 0, 1, 1, b_view_layer.name().c_str(), NULL);
@@ -569,8 +607,6 @@ static int bake_pass_filter_get(const int pass_filter)
 
   if ((pass_filter & BL::BakeSettings::pass_filter_EMIT) != 0)
     flag |= BAKE_FILTER_EMISSION;
-  if ((pass_filter & BL::BakeSettings::pass_filter_AO) != 0)
-    flag |= BAKE_FILTER_AO;
 
   return flag;
 }
@@ -594,6 +630,7 @@ void BlenderSession::bake(BL::Depsgraph &b_depsgraph_,
    * name. */
   Pass::add(PASS_COMBINED, scene->passes, "Combined");
 
+  session->read_render_tile_cb = [&]() { read_render_tile(); };
   session->write_render_tile_cb = [&]() { write_render_tile(); };
 
   if (!session->progress.get_cancel()) {
@@ -637,6 +674,7 @@ void BlenderSession::bake(BL::Depsgraph &b_depsgraph_,
     session->wait();
   }
 
+  session->read_render_tile_cb = function_null;
   session->write_render_tile_cb = function_null;
 }
 
@@ -718,7 +756,7 @@ void BlenderSession::synchronize(BL::Depsgraph &b_depsgraph_)
 
   /* get buffer parameters */
   BufferParams buffer_params = BlenderSync::get_buffer_params(
-      b_render, b_v3d, b_rv3d, scene->camera, width, height);
+      b_v3d, b_rv3d, scene->camera, width, height);
 
   /* reset if needed */
   if (scene->need_reset()) {
@@ -788,7 +826,7 @@ void BlenderSession::draw(int w, int h)
       SessionParams session_params = BlenderSync::get_session_params(
           b_engine, b_userpref, b_scene, background);
       BufferParams buffer_params = BlenderSync::get_buffer_params(
-          b_render, b_v3d, b_rv3d, scene->camera, width, height);
+          b_v3d, b_rv3d, scene->camera, width, height);
       bool session_pause = BlenderSync::get_session_pause(b_scene, background);
 
       if (session_pause == false) {

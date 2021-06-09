@@ -20,15 +20,15 @@ CCL_NAMESPACE_BEGIN
 
 #ifdef __SHADER_RAYTRACE__
 
-ccl_device_noinline float svm_ao(INTEGRATOR_STATE_CONST_ARGS,
-                                 ShaderData *sd,
-                                 float3 N,
-                                 float max_dist,
-                                 int num_samples,
-                                 int flags)
+ccl_device float svm_ao(INTEGRATOR_STATE_CONST_ARGS,
+                        ShaderData *sd,
+                        float3 N,
+                        float max_dist,
+                        int num_samples,
+                        int flags)
 {
   if (flags & NODE_AO_GLOBAL_RADIUS) {
-    max_dist = kernel_data.background.ao_distance;
+    max_dist = kernel_data.integrator.ao_bounces_distance;
   }
 
   /* Early out if no sampling needed. */
@@ -48,13 +48,14 @@ ccl_device_noinline float svm_ao(INTEGRATOR_STATE_CONST_ARGS,
   float3 T, B;
   make_orthonormals(N, &T, &B);
 
+  /* TODO: support ray-tracing in shadow shader evaluation? */
+  RNGState rng_state;
+  path_state_rng_load(INTEGRATOR_STATE_PASS, &rng_state);
+
   int unoccluded = 0;
   for (int sample = 0; sample < num_samples; sample++) {
-    /* TODO */
-#  if 0
     float disk_u, disk_v;
-    path_branched_rng_2D(
-        kg, state->rng_hash, state, sample, num_samples, PRNG_BEVEL_U, &disk_u, &disk_v);
+    path_branched_rng_2D(kg, &rng_state, sample, num_samples, PRNG_BEVEL_U, &disk_u, &disk_v);
 
     float2 d = concentric_sample_disk(disk_u, disk_v);
     float3 D = make_float3(d.x, d.y, safe_sqrtf(1.0f - dot(d, d)));
@@ -65,8 +66,8 @@ ccl_device_noinline float svm_ao(INTEGRATOR_STATE_CONST_ARGS,
     ray.D = D.x * T + D.y * B + D.z * N;
     ray.t = max_dist;
     ray.time = sd->time;
-    ray.dP = sd->dP;
-    ray.dD = differential3_zero();
+    ray.dP = differential_zero_compact();
+    ray.dD = differential_zero_compact();
 
     if (flags & NODE_AO_ONLY_LOCAL) {
       if (!scene_intersect_local(kg, &ray, NULL, sd->object, NULL, 0)) {
@@ -79,7 +80,6 @@ ccl_device_noinline float svm_ao(INTEGRATOR_STATE_CONST_ARGS,
         unoccluded++;
       }
     }
-#  endif
   }
 
   return ((float)unoccluded) / num_samples;
@@ -87,6 +87,16 @@ ccl_device_noinline float svm_ao(INTEGRATOR_STATE_CONST_ARGS,
 
 ccl_device void svm_node_ao(INTEGRATOR_STATE_CONST_ARGS, ShaderData *sd, float *stack, uint4 node)
 {
+#  if defined(__KERNEL_OPTIX__)
+  optixDirectCall<void>(0, INTEGRATOR_STATE_PASS, sd, stack, node);
+}
+
+extern "C" __device__ void __direct_callable__svm_node_ao(INTEGRATOR_STATE_CONST_ARGS,
+                                                          ShaderData *sd,
+                                                          float *stack,
+                                                          uint4 node)
+{
+#  endif
   uint flags, dist_offset, normal_offset, out_ao_offset;
   svm_unpack_node_uchar4(node.y, &flags, &dist_offset, &normal_offset, &out_ao_offset);
 

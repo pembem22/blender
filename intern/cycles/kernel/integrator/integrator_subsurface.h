@@ -328,9 +328,17 @@ ccl_device_inline bool subsurface_random_walk(INTEGRATOR_STATE_ARGS)
    * Since the strength of the guided sampling increases as alpha gets lower, using a value that
    * is too low results in fireflies while one that's too high just gives a bit more noise.
    * Therefore, the code here uses the highest of the three albedos to be safe. */
-  float diffusion_length = diffusion_length_dwivedi(reduce_max_f(alpha));
+  const float diffusion_length = diffusion_length_dwivedi(reduce_max_f(alpha));
+
+  if (diffusion_length == 1.0f) {
+    /* With specific values of alpha the length might become 1, which in asymptotic makes phase to
+     * be infinite. After first bounce it will cause throughput to be 0. Do early output, avoiding
+     * numerical issues and extra unneeded work. */
+    return false;
+  }
+
   /* Precompute term for phase sampling. */
-  float phase_log = logf((diffusion_length + 1) / (diffusion_length - 1));
+  const float phase_log = logf((diffusion_length + 1) / (diffusion_length - 1));
 
   /* Modify state for RNGs, decorrelated from other paths. */
   rng_state.rng_hash = cmj_hash(rng_state.rng_hash + rng_state.rng_offset, 0xdeadbeef);
@@ -522,7 +530,18 @@ ccl_device_inline bool subsurface_random_walk(INTEGRATOR_STATE_ARGS)
   integrator_state_write_ray(INTEGRATOR_STATE_PASS, &ray);
   INTEGRATOR_STATE_WRITE(path, throughput) = throughput;
 
-  INTEGRATOR_PATH_SET_SORT_KEY(intersection_get_shader(kg, &ss_isect.hits[0]));
+  const int shader = intersection_get_shader(kg, &ss_isect.hits[0]);
+  const int flags = kernel_tex_fetch(__shaders, shader).flags;
+  if (flags & SD_HAS_RAYTRACE) {
+    INTEGRATOR_PATH_NEXT_SORTED(DEVICE_KERNEL_INTEGRATOR_INTERSECT_SUBSURFACE,
+                                DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE,
+                                shader);
+  }
+  else {
+    INTEGRATOR_PATH_NEXT_SORTED(DEVICE_KERNEL_INTEGRATOR_INTERSECT_SUBSURFACE,
+                                DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE,
+                                shader);
+  }
 
   return true;
 }

@@ -47,6 +47,7 @@ set(SRC_DEVICE_OPENCL
 
 set(SRC_DEVICE_OPTIX
   device/optix/kernel.cu
+  device/optix/kernel_shader_raytrace.cu
 )
 
 set(SRC_BVH_HEADERS
@@ -231,6 +232,7 @@ set(SRC_GEOM_HEADERS
 )
 
 set(SRC_INTEGRATOR_HEADERS
+  integrator/integrator_init_from_bake.h
   integrator/integrator_init_from_camera.h
   integrator/integrator_intersect_closest.h
   integrator/integrator_intersect_shadow.h
@@ -318,11 +320,15 @@ if(WITH_CYCLES_CUDA_BINARIES)
   set(CUDA_VERSION "${CUDA_VERSION_MAJOR}${CUDA_VERSION_MINOR}")
 
   # warn for other versions
-  if((CUDA_VERSION MATCHES "101") OR (CUDA_VERSION MATCHES "102") OR (CUDA_VERSION MATCHES "111"))
+  if((CUDA_VERSION MATCHES "101") OR
+     (CUDA_VERSION MATCHES "102") OR
+     (CUDA_VERSION MATCHES "111") OR
+     (CUDA_VERSION MATCHES "112") OR
+     (CUDA_VERSION MATCHES "113"))
   else()
     message(WARNING
       "CUDA version ${CUDA_VERSION_MAJOR}.${CUDA_VERSION_MINOR} detected, "
-      "build may succeed but only CUDA 10.1, 10.2 and 11.1 are officially supported")
+      "build may succeed but only CUDA 10.1 to 11.3 are officially supported")
   endif()
 
   # build for each arch
@@ -370,10 +376,6 @@ if(WITH_CYCLES_CUDA_BINARIES)
     if(${experimental})
       set(cuda_flags ${cuda_flags} -D __KERNEL_EXPERIMENTAL__)
       set(name ${name}_experimental)
-    endif()
-
-    if(WITH_CYCLES_DEBUG)
-      set(cuda_flags ${cuda_flags} -D __KERNEL_DEBUG__)
     endif()
 
     if(WITH_NANOVDB)
@@ -473,8 +475,7 @@ endif()
 # OptiX PTX modules
 
 if(WITH_CYCLES_DEVICE_OPTIX AND WITH_CYCLES_CUDA_BINARIES)
-  macro(CYCLES_OPTIX_KERNEL_ADD name flags)
-    set(input "device/optix/kernel.cu")
+  macro(CYCLES_OPTIX_KERNEL_ADD name input flags)
     set(output "${CMAKE_CURRENT_BINARY_DIR}/${name}.ptx")
 
     set(cuda_flags ${flags}
@@ -482,12 +483,8 @@ if(WITH_CYCLES_DEVICE_OPTIX AND WITH_CYCLES_CUDA_BINARIES)
       -I "${CMAKE_CURRENT_SOURCE_DIR}/.."
       -I "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda"
       --use_fast_math
+      -Wno-deprecated-gpu-targets
       -o ${output})
-
-    if(WITH_CYCLES_DEBUG)
-      set(cuda_flags ${cuda_flags}
-        -D __KERNEL_DEBUG__)
-    endif()
 
     if(WITH_NANOVDB)
       set(cuda_flags ${cuda_flags}
@@ -557,8 +554,14 @@ if(WITH_CYCLES_DEVICE_OPTIX AND WITH_CYCLES_CUDA_BINARIES)
     delayed_install("${CMAKE_CURRENT_BINARY_DIR}" "${output}" ${CYCLES_INSTALL_PATH}/lib)
   endmacro()
 
-  CYCLES_OPTIX_KERNEL_ADD(kernel_optix "-D __NO_SHADER_RAYTRACE__")
-  CYCLES_OPTIX_KERNEL_ADD(kernel_optix_shader_raytrace "--keep-device-functions")
+  CYCLES_OPTIX_KERNEL_ADD(
+    kernel_optix
+    "device/optix/kernel.cu"
+    "")
+  CYCLES_OPTIX_KERNEL_ADD(
+    kernel_optix_shader_raytrace
+    "device/optix/kernel_shader_raytrace.cu"
+    "--keep-device-functions")
 
   add_custom_target(cycles_kernel_optix ALL DEPENDS ${optix_ptx})
   cycles_set_solution_folder(cycles_kernel_optix)

@@ -15,6 +15,7 @@
  */
 
 #include "BKE_geometry_set_instances.hh"
+#include "BKE_material.h"
 #include "BKE_mesh.h"
 #include "BKE_mesh_wrapper.h"
 #include "BKE_modifier.h"
@@ -361,6 +362,8 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
   int64_t cd_dirty_poly = 0;
   int64_t cd_dirty_edge = 0;
   int64_t cd_dirty_loop = 0;
+  VectorSet<Material *> materials;
+
   for (const GeometryInstanceGroup &set_group : set_groups) {
     const GeometrySet &set = set_group.geometry_set;
     const int tot_transforms = set_group.transforms.size();
@@ -374,6 +377,10 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
       cd_dirty_poly |= mesh.runtime.cd_dirty_poly;
       cd_dirty_edge |= mesh.runtime.cd_dirty_edge;
       cd_dirty_loop |= mesh.runtime.cd_dirty_loop;
+      for (const int slot_index : IndexRange(mesh.totcol)) {
+        Material *material = mesh.mat[slot_index];
+        materials.add(material);
+      }
     }
     if (convert_points_to_vertices && set.has_pointcloud()) {
       const PointCloud &pointcloud = *set.get_pointcloud_for_read();
@@ -396,6 +403,10 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
       break;
     }
   }
+  for (const int i : IndexRange(materials.size())) {
+    Material *material = materials[i];
+    BKE_id_material_eval_assign(&new_mesh->id, i + 1, material);
+  }
   new_mesh->runtime.cd_dirty_vert = cd_dirty_vert;
   new_mesh->runtime.cd_dirty_poly = cd_dirty_poly;
   new_mesh->runtime.cd_dirty_edge = cd_dirty_edge;
@@ -409,6 +420,14 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
     const GeometrySet &set = set_group.geometry_set;
     if (set.has_mesh()) {
       const Mesh &mesh = *set.get_mesh_for_read();
+
+      Array<int> material_index_map(mesh.totcol);
+      for (const int i : IndexRange(mesh.totcol)) {
+        Material *material = mesh.mat[i];
+        const int new_material_index = materials.index_of(material);
+        material_index_map[i] = new_material_index;
+      }
+
       for (const float4x4 &transform : set_group.transforms) {
         for (const int i : IndexRange(mesh.totvert)) {
           const MVert &old_vert = mesh.mvert[i];
@@ -438,6 +457,13 @@ static Mesh *join_mesh_topology_and_builtin_attributes(Span<GeometryInstanceGrou
           MPoly &new_poly = new_mesh->mpoly[poly_offset + i];
           new_poly = old_poly;
           new_poly.loopstart += loop_offset;
+          if (old_poly.mat_nr >= 0 && old_poly.mat_nr < mesh.totcol) {
+            new_poly.mat_nr = material_index_map[new_poly.mat_nr];
+          }
+          else {
+            /* The material index was invalid before. */
+            new_poly.mat_nr = 0;
+          }
         }
 
         vert_offset += mesh.totvert;
@@ -518,9 +544,9 @@ static void join_attributes(Span<GeometryInstanceGroup> set_groups,
   }
 }
 
-static void join_curve_splines(Span<GeometryInstanceGroup> set_groups, CurveComponent &result)
+static CurveEval *join_curve_splines(Span<GeometryInstanceGroup> set_groups)
 {
-  CurveEval *new_curve = new CurveEval();
+  Vector<SplinePtr> new_splines;
   for (const GeometryInstanceGroup &set_group : set_groups) {
     const GeometrySet &set = set_group.geometry_set;
     if (!set.has_curve()) {
@@ -532,12 +558,30 @@ static void join_curve_splines(Span<GeometryInstanceGroup> set_groups, CurveComp
       for (const float4x4 &transform : set_group.transforms) {
         SplinePtr new_spline = source_spline->copy();
         new_spline->transform(transform);
-        new_curve->add_spline(std::move(new_spline));
+        new_splines.append(std::move(new_spline));
       }
     }
   }
+  if (new_splines.is_empty()) {
+    return nullptr;
+  }
 
-  result.replace(new_curve);
+  CurveEval *new_curve = new CurveEval();
+  for (SplinePtr &new_spline : new_splines) {
+    new_curve->add_spline(std::move(new_spline));
+  }
+
+  for (SplinePtr &spline : new_curve->splines()) {
+    /* Spline instances should have no custom attributes, since they always come
+     * from original objects which currently do not support custom attributes.
+     *
+     * This is only true as long as a #GeometrySet cannot be instanced directly. */
+    BLI_assert(spline->attributes.data.totlayer == 0);
+    UNUSED_VARS_NDEBUG(spline);
+  }
+
+  new_curve->attributes.reallocate(new_curve->splines().size());
+  return new_curve;
 }
 
 static void join_instance_groups_mesh(Span<GeometryInstanceGroup> set_groups,
@@ -602,14 +646,17 @@ static void join_instance_groups_volume(Span<GeometryInstanceGroup> set_groups,
 {
   /* Not yet supported. Joining volume grids with the same name requires resampling of at least
    * one of the grids. The cell size of the resulting volume has to be determined somehow. */
-  VolumeComponent &dst_component = result.get_component_for_write<VolumeComponent>();
-  UNUSED_VARS(set_groups, dst_component);
+  UNUSED_VARS(set_groups, result);
 }
 
 static void join_instance_groups_curve(Span<GeometryInstanceGroup> set_groups, GeometrySet &result)
 {
+  CurveEval *curve = join_curve_splines(set_groups);
+  if (curve == nullptr) {
+    return;
+  }
   CurveComponent &dst_component = result.get_component_for_write<CurveComponent>();
-  join_curve_splines(set_groups, dst_component);
+  dst_component.replace(curve);
 }
 
 GeometrySet geometry_set_realize_mesh_for_modifier(const GeometrySet &geometry_set)
