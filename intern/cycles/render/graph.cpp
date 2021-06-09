@@ -851,11 +851,11 @@ void ShaderGraph::default_inputs(bool do_osl)
       if (input->type() == SocketType::SPECTRAL && !input->link) {
         float3 color = input->parent->get_float3(input->socket_type);
 
-        RGBToSpectrumNode *node = create_node<RGBToSpectrumNode>();
-        node->set_color(color);
+        RGBToSpectrumNode *spectrum_node = create_node<RGBToSpectrumNode>();
+        spectrum_node->set_color(color);
 
-        add(node);
-        connect(node->output("Spectrum"), input);
+        add(spectrum_node);
+        connect(spectrum_node->output("Spectrum"), input);
       }
 
       if (!input->link && (!(input->flags() & SocketType::OSL_INTERNAL) || do_osl)) {
