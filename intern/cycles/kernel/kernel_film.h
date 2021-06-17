@@ -162,23 +162,6 @@ ccl_device_inline void film_get_pass_pixel_float(const KernelFilmConvert *ccl_re
  * Float 3 passes.
  */
 
-ccl_device_inline void film_get_pass_pixel_shadow3(const KernelFilmConvert *ccl_restrict
-                                                       kfilm_convert,
-                                                   ccl_global const float *ccl_restrict buffer,
-                                                   float *ccl_restrict pixel)
-{
-  const float *in = buffer + kfilm_convert->pass_offset;
-
-  const float weight = in[3];
-  const float weight_inv = (weight > 0.0f) ? 1.0f / weight : 1.0f;
-
-  const float3 shadow = make_float3(in[0], in[1], in[2]) * weight_inv;
-
-  pixel[0] = shadow.x;
-  pixel[1] = shadow.y;
-  pixel[2] = shadow.z;
-}
-
 ccl_device_inline void film_get_pass_pixel_divide_even_color(
     const KernelFilmConvert *ccl_restrict kfilm_convert,
     ccl_global const float *ccl_restrict buffer,
@@ -218,17 +201,8 @@ ccl_device_inline void film_get_pass_pixel_float3(const KernelFilmConvert *ccl_r
 }
 
 /* --------------------------------------------------------------------
- * Float 4 passes.
+ * Float4 passes.
  */
-
-ccl_device_inline void film_get_pass_pixel_shadow4(const KernelFilmConvert *ccl_restrict
-                                                       kfilm_convert,
-                                                   ccl_global const float *ccl_restrict buffer,
-                                                   float *ccl_restrict pixel)
-{
-  film_get_pass_pixel_shadow3(kfilm_convert, buffer, pixel);
-  pixel[0] = 1.0f;
-}
 
 ccl_device_inline void film_get_pass_pixel_motion(const KernelFilmConvert *ccl_restrict
                                                       kfilm_convert,
@@ -273,31 +247,6 @@ ccl_device_inline void film_get_pass_pixel_cryptomatte(const KernelFilmConvert *
   pixel[3] = f.w * scale;
 }
 
-/* Special code which converts noisy image pass from RGB to RGBA using alpha from the combined
- * pass. */
-ccl_device_inline void film_get_pass_pixel_denoising_color(
-    const KernelFilmConvert *ccl_restrict kfilm_convert,
-    ccl_global const float *ccl_restrict buffer,
-    float *ccl_restrict pixel)
-{
-  kernel_assert(kfilm_convert->pass_offset != PASS_UNUSED);
-  kernel_assert(kfilm_convert->pass_combined != PASS_UNUSED);
-
-  float scale, scale_exposure;
-  film_get_scale_and_scale_exposure(kfilm_convert, buffer, &scale, &scale_exposure);
-
-  const float *in = buffer + kfilm_convert->pass_offset;
-  const float *in_combined = buffer + kfilm_convert->pass_combined;
-
-  const float3 color = make_float3(in[0], in[1], in[2]) * scale_exposure;
-  const float transparency = in_combined[3] * scale;
-
-  pixel[0] = color.x;
-  pixel[1] = color.y;
-  pixel[2] = color.z;
-  pixel[3] = film_transparency_to_alpha(transparency);
-}
-
 ccl_device_inline void film_get_pass_pixel_float4(const KernelFilmConvert *ccl_restrict
                                                       kfilm_convert,
                                                   ccl_global const float *ccl_restrict buffer,
@@ -321,6 +270,31 @@ ccl_device_inline void film_get_pass_pixel_float4(const KernelFilmConvert *ccl_r
 }
 
 /* --------------------------------------------------------------------
+ * Float3 or Float4 passes.
+ */
+
+ccl_device_inline void film_get_pass_pixel_shadow(const KernelFilmConvert *ccl_restrict
+                                                      kfilm_convert,
+                                                  ccl_global const float *ccl_restrict buffer,
+                                                  float *ccl_restrict pixel)
+{
+  const float *in = buffer + kfilm_convert->pass_offset;
+
+  const float weight = in[3];
+  const float weight_inv = (weight > 0.0f) ? 1.0f / weight : 1.0f;
+
+  const float3 shadow = make_float3(in[0], in[1], in[2]) * weight_inv;
+
+  pixel[0] = shadow.x;
+  pixel[1] = shadow.y;
+  pixel[2] = shadow.z;
+
+  if (kfilm_convert->num_components == 4) {
+    pixel[3] = 1.0f;
+  }
+}
+
+/* --------------------------------------------------------------------
  * Shadow catcher.
  */
 
@@ -337,13 +311,20 @@ film_calculate_shadow_catcher(const KernelFilmConvert *ccl_restrict kfilm_conver
    * This way using transparent film to render artificial objects will be easy to be combined
    * with a backdrop. */
 
+  float scale, scale_exposure;
+  film_get_scale_and_scale_exposure(kfilm_convert, buffer, &scale, &scale_exposure);
+
+  if (kfilm_convert->is_denoised) {
+    kernel_assert(kfilm_convert->pass_shadow_catcher != PASS_UNUSED);
+    ccl_global const float *in_catcher = buffer + kfilm_convert->pass_shadow_catcher;
+    const float3 pixel = make_float3(in_catcher[0], in_catcher[1], in_catcher[2]) * scale_exposure;
+    return make_float4(pixel.x, pixel.y, pixel.z, 1.0f);
+  }
+
   kernel_assert(kfilm_convert->pass_offset != PASS_UNUSED);
   kernel_assert(kfilm_convert->pass_combined != PASS_UNUSED);
   kernel_assert(kfilm_convert->pass_shadow_catcher != PASS_UNUSED);
   kernel_assert(kfilm_convert->pass_shadow_catcher_matte != PASS_UNUSED);
-
-  float scale, scale_exposure;
-  film_get_scale_and_scale_exposure(kfilm_convert, buffer, &scale, &scale_exposure);
 
   ccl_global const float *in_combined = buffer + kfilm_convert->pass_combined;
   ccl_global const float *in_catcher = buffer + kfilm_convert->pass_shadow_catcher;
@@ -412,7 +393,9 @@ ccl_device_inline void film_get_pass_pixel_shadow_catcher(
   pixel[0] = pixel_value.x;
   pixel[1] = pixel_value.y;
   pixel[2] = pixel_value.z;
-  pixel[3] = pixel_value.w;
+  if (kfilm_convert->num_components == 4) {
+    pixel[3] = pixel_value.w;
+  }
 }
 
 ccl_device_inline void film_get_pass_pixel_shadow_catcher_matte_with_shadow(

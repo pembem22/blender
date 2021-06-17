@@ -40,6 +40,7 @@ class PassAccessor {
     PassAccessInfo(const Pass &pass, const Film &film, const vector<Pass> &passes);
 
     PassType type = PASS_NONE;
+    PassMode mode = PassMode::NOISY;
     int offset = -1;
 
     /* For the shadow catcher matte pass: whether to approximate shadow catcher pass into its
@@ -101,7 +102,8 @@ class PassAccessor {
 
  protected:
   virtual void init_kernel_film_convert(KernelFilmConvert *kfilm_convert,
-                                        const BufferParams &buffer_params) const;
+                                        const BufferParams &buffer_params,
+                                        const Destination &destination) const;
 
 #define DECLARE_PASS_ACCESSOR(pass) \
   virtual void get_pass_##pass(const RenderBuffers *render_buffers, \
@@ -115,18 +117,18 @@ class PassAccessor {
   DECLARE_PASS_ACCESSOR(float)
 
   /* Float3 passes. */
-  DECLARE_PASS_ACCESSOR(shadow3)
   DECLARE_PASS_ACCESSOR(divide_even_color)
   DECLARE_PASS_ACCESSOR(float3)
 
   /* Float4 passes. */
-  DECLARE_PASS_ACCESSOR(shadow4)
   DECLARE_PASS_ACCESSOR(motion)
   DECLARE_PASS_ACCESSOR(cryptomatte)
-  DECLARE_PASS_ACCESSOR(denoising_color)
   DECLARE_PASS_ACCESSOR(shadow_catcher)
   DECLARE_PASS_ACCESSOR(shadow_catcher_matte_with_shadow)
   DECLARE_PASS_ACCESSOR(float4)
+
+  /* Float3 or Float4 passes. */
+  DECLARE_PASS_ACCESSOR(shadow)
 
 #undef DECLARE_PASS_ACCESSOR
 

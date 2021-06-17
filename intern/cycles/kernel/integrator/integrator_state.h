@@ -59,7 +59,7 @@ CCL_NAMESPACE_BEGIN
  *
  * TODO: these could be made dynamic depending on the features used in the scene. */
 
-#define INTEGRATOR_VOLUME_STACK_SIZE 4
+#define INTEGRATOR_VOLUME_STACK_SIZE VOLUME_STACK_SIZE
 #define INTEGRATOR_SHADOW_ISECT_SIZE 4
 
 /* Data structures */
@@ -143,7 +143,7 @@ typedef struct IntegratorStateGPU {
 #  define INTEGRATOR_STATE_PASS kg, state
 
 #  define INTEGRATOR_STATE_PASS_NULL kg, NULL
-#  define INTEGRATOR_STATE_IS_NULL state == NULL
+#  define INTEGRATOR_STATE_IS_NULL (state == NULL)
 
 #  define INTEGRATOR_STATE(nested_struct, member) \
     (((const IntegratorState *)state)->nested_struct.member)

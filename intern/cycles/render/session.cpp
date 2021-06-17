@@ -75,11 +75,12 @@ Session::Session(const SessionParams &params_, const SceneParams &scene_params)
     }
     write_render_tile_cb();
   };
-  path_trace_->buffer_read_cb = [&]() {
+  path_trace_->buffer_read_cb = [&]() -> bool {
     if (!read_render_tile_cb) {
-      return;
+      return false;
     }
     read_render_tile_cb();
+    return true;
   };
   path_trace_->progress_update_cb = [&]() { update_status_time(); };
 }
@@ -565,10 +566,17 @@ int2 Session::get_render_tile_offset() const
 
 bool Session::get_render_tile_pixels(const string &pass_name, int num_components, float *pixels)
 {
-  const Pass *pass = Film::get_actual_display_pass(scene->passes, pass_name);
-  if (!pass) {
+  const Pass *pass = Pass::find(scene->passes, pass_name);
+  if (pass == nullptr) {
     return false;
   }
+
+  const bool has_denoised_result = path_trace_->has_denoised_result();
+  if (pass->mode == PassMode::DENOISED && !has_denoised_result) {
+    pass = Pass::find(scene->passes, pass->type);
+  }
+
+  pass = Film::get_actual_display_pass(scene->passes, pass);
 
   const float exposure = scene->film->get_exposure();
   const int num_samples = render_scheduler_.get_num_rendered_samples();
@@ -584,7 +592,8 @@ bool Session::set_render_tile_pixels(const string &pass_name,
                                      int num_components,
                                      const float *pixels)
 {
-  const Pass *pass = Film::get_actual_display_pass(scene->passes, pass_name);
+  /* TODO(sergey): Do we write to alias? */
+  const Pass *pass = Pass::find(scene->passes, pass_name);
   if (!pass) {
     return false;
   }

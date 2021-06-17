@@ -62,7 +62,7 @@ CCL_NAMESPACE_BEGIN
 #define ID_NONE (0.0f)
 #define PASS_UNUSED (~0)
 
-#define VOLUME_STACK_SIZE 32
+#define VOLUME_STACK_SIZE 4
 
 #define MIN_WAVELENGTH 380.0f
 #define MAX_WAVELENGTH 730.0f
@@ -179,38 +179,6 @@ CCL_NAMESPACE_BEGIN
 #if defined(__SUBSURFACE__) || defined(__SHADER_RAYTRACE__)
 #  define __BVH_LOCAL__
 #endif
-
-/* Shader Evaluation */
-
-typedef enum ShaderEvalType {
-  SHADER_EVAL_DISPLACE,
-  SHADER_EVAL_BACKGROUND,
-  /* bake types */
-  SHADER_EVAL_BAKE, /* no real shade, it's used in the code to
-                     * differentiate the type of shader eval from the above
-                     */
-  /* data passes */
-  SHADER_EVAL_NORMAL,
-  SHADER_EVAL_UV,
-  SHADER_EVAL_ROUGHNESS,
-  SHADER_EVAL_DIFFUSE_COLOR,
-  SHADER_EVAL_GLOSSY_COLOR,
-  SHADER_EVAL_TRANSMISSION_COLOR,
-  SHADER_EVAL_EMISSION,
-  SHADER_EVAL_AOV_COLOR,
-  SHADER_EVAL_AOV_VALUE,
-
-  /* light passes */
-  SHADER_EVAL_AO,
-  SHADER_EVAL_COMBINED,
-  SHADER_EVAL_SHADOW,
-  SHADER_EVAL_DIFFUSE,
-  SHADER_EVAL_GLOSSY,
-  SHADER_EVAL_TRANSMISSION,
-
-  /* extra */
-  SHADER_EVAL_ENVIRONMENT,
-} ShaderEvalType;
 
 /* Path Tracing
  * note we need to keep the u/v pairs at even values */
@@ -383,7 +351,6 @@ typedef enum PassType {
   PASS_BACKGROUND,
   PASS_AO,
   PASS_SHADOW,
-  PASS_LIGHT, /* no real pass, used to force use_light_pass */
   PASS_DIFFUSE_DIRECT,
   PASS_DIFFUSE_INDIRECT,
   PASS_GLOSSY_DIRECT,
@@ -397,6 +364,7 @@ typedef enum PassType {
   /* Data passes */
   PASS_DEPTH = 32,
   PASS_NORMAL,
+  PASS_ROUGHNESS,
   PASS_UV,
   PASS_OBJECT_ID,
   PASS_MATERIAL_ID,
@@ -413,7 +381,6 @@ typedef enum PassType {
   PASS_TRANSMISSION_COLOR,
   /* No Scatter color since it's tricky to define what it would even mean. */
   PASS_MIST,
-  PASS_DENOISING_COLOR,
   PASS_DENOISING_NORMAL,
   PASS_DENOISING_ALBEDO,
 
@@ -444,106 +411,6 @@ typedef enum CryptomatteType {
   CRYPT_ASSET = (1 << 2),
   CRYPT_ACCURATE = (1 << 3),
 } CryptomatteType;
-
-typedef enum eBakePassFilter {
-  BAKE_FILTER_NONE = 0,
-  BAKE_FILTER_DIRECT = (1 << 0),
-  BAKE_FILTER_INDIRECT = (1 << 1),
-  BAKE_FILTER_COLOR = (1 << 2),
-  BAKE_FILTER_DIFFUSE = (1 << 3),
-  BAKE_FILTER_GLOSSY = (1 << 4),
-  BAKE_FILTER_TRANSMISSION = (1 << 5),
-  BAKE_FILTER_EMISSION = (1 << 6),
-  BAKE_FILTER_AO = (1 << 7),
-} eBakePassFilter;
-
-typedef enum BakePassFilterCombos {
-  BAKE_FILTER_COMBINED = (BAKE_FILTER_DIRECT | BAKE_FILTER_INDIRECT | BAKE_FILTER_DIFFUSE |
-                          BAKE_FILTER_GLOSSY | BAKE_FILTER_TRANSMISSION | BAKE_FILTER_EMISSION |
-                          BAKE_FILTER_AO),
-  BAKE_FILTER_DIFFUSE_DIRECT = (BAKE_FILTER_DIRECT | BAKE_FILTER_DIFFUSE),
-  BAKE_FILTER_GLOSSY_DIRECT = (BAKE_FILTER_DIRECT | BAKE_FILTER_GLOSSY),
-  BAKE_FILTER_TRANSMISSION_DIRECT = (BAKE_FILTER_DIRECT | BAKE_FILTER_TRANSMISSION),
-  BAKE_FILTER_DIFFUSE_INDIRECT = (BAKE_FILTER_INDIRECT | BAKE_FILTER_DIFFUSE),
-  BAKE_FILTER_GLOSSY_INDIRECT = (BAKE_FILTER_INDIRECT | BAKE_FILTER_GLOSSY),
-  BAKE_FILTER_TRANSMISSION_INDIRECT = (BAKE_FILTER_INDIRECT | BAKE_FILTER_TRANSMISSION),
-} BakePassFilterCombos;
-
-typedef ccl_addr_space struct PathRadianceState {
-#ifdef __PASSES__
-  float3 diffuse;
-  float3 glossy;
-  float3 transmission;
-  float3 volume;
-
-  float3 direct;
-#endif
-} PathRadianceState;
-
-typedef ccl_addr_space struct PathRadiance {
-#ifdef __PASSES__
-  int use_light_pass;
-#endif
-
-  float transparent;
-  float3 emission;
-#ifdef __PASSES__
-  float3 background;
-  float3 ao;
-
-  float3 indirect;
-  float3 direct_emission;
-
-  float3 color_diffuse;
-  float3 color_glossy;
-  float3 color_transmission;
-
-  float3 direct_diffuse;
-  float3 direct_glossy;
-  float3 direct_transmission;
-  float3 direct_volume;
-
-  float3 indirect_diffuse;
-  float3 indirect_glossy;
-  float3 indirect_transmission;
-  float3 indirect_volume;
-
-  float3 shadow;
-  float mist;
-#endif
-
-  struct PathRadianceState state;
-
-#ifdef __SHADOW_TRICKS__
-  /* Total light reachable across the path, ignoring shadow blocked queries. */
-  float3 path_total;
-  /* Total light reachable across the path with shadow blocked queries
-   * applied here.
-   *
-   * Dividing this figure by path_total will give estimate of shadow pass.
-   */
-  float3 path_total_shaded;
-
-  /* Color of the background on which shadow is alpha-overed. */
-  float3 shadow_background_color;
-
-  /* Path radiance sum and throughput at the moment when ray hits shadow
-   * catcher object.
-   */
-  float shadow_throughput;
-
-  /* Accumulated transparency along the path after shadow catcher bounce. */
-  float shadow_transparency;
-
-  /* Indicate if any shadow catcher data is set. */
-  int has_shadow_catcher;
-#endif
-
-#ifdef __DENOISING_FEATURES__
-  float3 denoising_normal;
-  float3 denoising_albedo;
-#endif /* __DENOISING_FEATURES__ */
-} PathRadiance;
 
 typedef struct BsdfEval {
   SpectralColor diffuse;
@@ -966,7 +833,6 @@ typedef ccl_addr_space struct ccl_align(16) ShaderData
 
 #ifdef __OSL__
   const struct KernelGlobals *osl_globals;
-  struct PathState *osl_path_state;
 #endif
 
   /* LCG state for closures that require additional random numbers. */
@@ -997,60 +863,13 @@ typedef ccl_addr_space struct ccl_align(16) ShaderDataTinyStorage
 ShaderDataTinyStorage;
 #define AS_SHADER_DATA(shader_data_tiny_storage) ((ShaderData *)shader_data_tiny_storage)
 
-/* Path State */
+/* Volume Stack */
 
 #ifdef __VOLUME__
 typedef struct VolumeStack {
   int object;
   int shader;
 } VolumeStack;
-#endif
-
-typedef struct PathState {
-  /* see enum PathRayFlag */
-  int flag;
-
-  /* random number generator state */
-  uint rng_hash;       /* per pixel hash */
-  int rng_offset;      /* dimension offset */
-  int sample;          /* path sample number */
-  int num_samples;     /* total number of times this path will be sampled */
-  float branch_factor; /* number of branches in indirect paths */
-
-  /* bounce counting */
-  int bounce;
-  int diffuse_bounce;
-  int glossy_bounce;
-  int transmission_bounce;
-  int transparent_bounce;
-
-#ifdef __DENOISING_FEATURES__
-  float denoising_feature_weight;
-  float3 denoising_feature_throughput;
-#endif /* __DENOISING_FEATURES__ */
-
-  /* multiple importance sampling */
-  float min_ray_pdf; /* smallest bounce pdf over entire path up to now */
-  float ray_pdf;     /* last bounce pdf */
-#ifdef __LAMP_MIS__
-  float ray_t; /* accumulated distance through transparent surfaces */
-#endif
-
-  /* volume rendering */
-#ifdef __VOLUME__
-  int volume_bounce;
-  int volume_bounds_bounce;
-  VolumeStack volume_stack[VOLUME_STACK_SIZE];
-#endif
-} PathState;
-
-#ifdef __VOLUME__
-typedef struct VolumeState {
-#  ifdef __SPLIT_KERNEL__
-#  else
-  PathState ps;
-#  endif
-} VolumeState;
 #endif
 
 /* Struct to gather multiple nearby intersections. */
@@ -1062,20 +881,6 @@ typedef struct LocalIntersection {
   struct Intersection hits[LOCAL_MAX_HITS];
   float3 Ng[LOCAL_MAX_HITS];
 } LocalIntersection;
-
-/* Subsurface */
-
-/* Struct to gather SSS indirect rays and delay tracing them. */
-typedef struct SubsurfaceIndirectRays {
-  PathState state[BSSRDF_MAX_HITS];
-
-  int num_rays;
-
-  struct Ray rays[BSSRDF_MAX_HITS];
-  float3 throughputs[BSSRDF_MAX_HITS];
-  struct PathRadianceState L_state[BSSRDF_MAX_HITS];
-} SubsurfaceIndirectRays;
-static_assert(BSSRDF_MAX_HITS <= LOCAL_MAX_HITS, "BSSRDF hits too high.");
 
 /* Constant Kernel Data
  *
@@ -1174,6 +979,7 @@ typedef struct KernelFilm {
   int pass_combined;
   int pass_depth;
   int pass_normal;
+  int pass_roughness;
   int pass_motion;
 
   int pass_motion_weight;
@@ -1220,7 +1026,6 @@ typedef struct KernelFilm {
   float mist_inv_depth;
   float mist_falloff;
 
-  int pass_denoising_color;
   int pass_denoising_normal;
   int pass_denoising_albedo;
   /* Set to 1 if any of the above denoising passes present. */
@@ -1244,11 +1049,12 @@ typedef struct KernelFilm {
   /* viewport rendering options */
   int display_pass_type;
   int display_pass_offset;
+  int display_pass_denoised_offset;
   int show_active_pixels;
   int use_approximate_shadow_catcher;
 
-  /* deprecated */
-  int pad1, pad2, pad3;
+  /* padding */
+  int pad1, pad2;
 } KernelFilm;
 static_assert_align(KernelFilm, 16);
 
@@ -1274,6 +1080,13 @@ typedef struct KernelFilmConvert {
 
   int use_approximate_shadow_catcher;
   int show_active_pixels;
+
+  /* Number of components to write to. */
+  int num_components;
+
+  int is_denoised;
+
+  int pad1, pad2;
 } KernelFilmConvert;
 static_assert_align(KernelFilmConvert, 16);
 
@@ -1415,12 +1228,9 @@ static_assert_align(KernelTables, 16);
 
 typedef struct KernelBake {
   int use;
-  int pad1, pad2, pad3;
-
   int object_index;
   int tri_offset;
-  int type;
-  int pass_filter;
+  int pad1;
 } KernelBake;
 static_assert_align(KernelBake, 16);
 
@@ -1595,7 +1405,12 @@ static_assert_align(KernelShaderEvalInput, 16);
 
 /* Device kernels.
  *
- * Identifier for kernels that can be executed in device queues. */
+ * Identifier for kernels that can be executed in device queues.
+ *
+ * Some implementation details.
+ *
+ * If the kernel uses shared CUDA memory, `CUDADeviceQueue::enqueue` is to be modified.
+ * The path iteration kernels are handled in `PathTraceWorkGPU::enqueue_path_iteration`. */
 
 typedef enum DeviceKernel {
   DEVICE_KERNEL_INTEGRATOR_INIT_FROM_CAMERA = 0,
@@ -1627,13 +1442,11 @@ typedef enum DeviceKernel {
   DEVICE_KERNEL_FILM_CONVERT_MIST_HALF_RGBA,
   DEVICE_KERNEL_FILM_CONVERT_SAMPLE_COUNT_HALF_RGBA,
   DEVICE_KERNEL_FILM_CONVERT_FLOAT_HALF_RGBA,
-  DEVICE_KERNEL_FILM_CONVERT_SHADOW3_HALF_RGBA,
+  DEVICE_KERNEL_FILM_CONVERT_SHADOW_HALF_RGBA,
   DEVICE_KERNEL_FILM_CONVERT_DIVIDE_EVEN_COLOR_HALF_RGBA,
   DEVICE_KERNEL_FILM_CONVERT_FLOAT3_HALF_RGBA,
-  DEVICE_KERNEL_FILM_CONVERT_SHADOW4_HALF_RGBA,
   DEVICE_KERNEL_FILM_CONVERT_MOTION_HALF_RGBA,
   DEVICE_KERNEL_FILM_CONVERT_CRYPTOMATTE_HALF_RGBA,
-  DEVICE_KERNEL_FILM_CONVERT_DENOISING_COLOR_HALF_RGBA,
   DEVICE_KERNEL_FILM_CONVERT_SHADOW_CATCHER_HALF_RGBA,
   DEVICE_KERNEL_FILM_CONVERT_SHADOW_CATCHER_MATTE_WITH_SHADOW_HALF_RGBA,
   DEVICE_KERNEL_FILM_CONVERT_FLOAT4_HALF_RGBA,
