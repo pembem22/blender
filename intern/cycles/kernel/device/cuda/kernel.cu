@@ -441,6 +441,28 @@ extern "C" __global__ void CUDA_LAUNCH_BOUNDS(CUDA_KERNEL_BLOCK_NUM_THREADS,
  * Film.
  */
 
+/* Common implementation for float destination. */
+template<typename Processor>
+ccl_device_inline void kernel_cuda_film_convert_common(const KernelFilmConvert *kfilm_convert,
+                                                       float *pixels,
+                                                       float *render_buffer,
+                                                       int num_pixels,
+                                                       int offset,
+                                                       int stride,
+                                                       const Processor &processor)
+{
+  const int render_pixel_index = ccl_global_id(0);
+  if (render_pixel_index >= num_pixels) {
+    return;
+  }
+
+  const uint64_t render_buffer_offset = (uint64_t)render_pixel_index * kfilm_convert->pass_stride;
+  ccl_global const float *buffer = render_buffer + render_buffer_offset;
+  ccl_global float *pixel = pixels + render_pixel_index * kfilm_convert->num_components;
+
+  processor(kfilm_convert, buffer, pixel);
+}
+
 /* Common implementation for half4 destination and 4-channel input pass. */
 template<typename Processor>
 ccl_device_inline void kernel_cuda_film_convert_half_rgba_common_rgba(
@@ -531,6 +553,22 @@ ccl_device_inline void kernel_cuda_film_convert_half_rgba_common_value(
                                                   CUDA_KERNEL_MAX_REGISTERS) name
 
 #  define KERNEL_FILM_CONVERT_DEFINE_HALF_RGBA(variant, channels) \
+    KERNEL_FILM_CONVERT_PROC(kernel_cuda_film_convert_##variant) \
+    (const KernelFilmConvert kfilm_convert, \
+     float *pixels, \
+     float *render_buffer, \
+     int num_pixels, \
+     int offset, \
+     int stride) \
+    { \
+      kernel_cuda_film_convert_common(&kfilm_convert, \
+                                      pixels, \
+                                      render_buffer, \
+                                      num_pixels, \
+                                      offset, \
+                                      stride, \
+                                      film_get_pass_pixel_##variant); \
+    } \
     KERNEL_FILM_CONVERT_PROC(kernel_cuda_film_convert_##variant##_half_rgba) \
     (const KernelFilmConvert kfilm_convert, \
      uchar4 *rgba, \
@@ -645,19 +683,25 @@ extern "C" __global__ void CUDA_LAUNCH_BOUNDS(CUDA_KERNEL_BLOCK_NUM_THREADS,
   }
 
   if (num_inputs > 0) {
-    const float *in = buffer + pass_offset.x;
     float *out = rgb + (x + y * sw) * 3;
-    out[0] = clamp(in[0] * pixel_scale, 0.0f, 10000.0f);
-    out[1] = clamp(in[1] * pixel_scale, 0.0f, 10000.0f);
-    out[2] = clamp(in[2] * pixel_scale, 0.0f, 10000.0f);
+    out[0] = clamp(out[0], 0.0f, 10000.0f);
+    out[1] = clamp(out[1], 0.0f, 10000.0f);
+    out[2] = clamp(out[2], 0.0f, 10000.0f);
   }
 
   if (num_inputs > 1) {
-    const float *in = buffer + pass_offset.y;
     float *out = rgb + (x + y * sw) * 3 + (sw * sh) * 3;
-    out[0] = in[0] * pixel_scale;
-    out[1] = in[1] * pixel_scale;
-    out[2] = in[2] * pixel_scale;
+    if (pass_offset.y != PASS_UNUSED) {
+      const float *in = buffer + pass_offset.y;
+      out[0] = in[0] * pixel_scale;
+      out[1] = in[1] * pixel_scale;
+      out[2] = in[2] * pixel_scale;
+    }
+    else {
+      out[0] = 0.5f;
+      out[1] = 0.5f;
+      out[2] = 0.5f;
+    }
   }
 
   if (num_inputs > 2) {

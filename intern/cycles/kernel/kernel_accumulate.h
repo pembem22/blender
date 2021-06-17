@@ -339,15 +339,13 @@ ccl_device_inline int kernel_accum_sample(INTEGRATOR_STATE_CONST_ARGS,
 }
 
 ccl_device void kernel_accum_adaptive_buffer(INTEGRATOR_STATE_CONST_ARGS,
-                                             const SpectralColor contribution,
+                                             const float3 contribution_rgb,
                                              ccl_global float *ccl_restrict buffer)
 {
   /* Adaptive Sampling. Fill the additional buffer with the odd samples and calculate our stopping
    * criteria. This is the heuristic from "A hierarchical automatic stopping condition for Monte
    * Carlo global illumination" except that here it is applied per pixel and not in hierarchical
    * tiles. */
-
-  const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);
 
   if (kernel_data.film.pass_adaptive_aux_buffer == PASS_UNUSED) {
     return;
@@ -372,28 +370,34 @@ ccl_device void kernel_accum_adaptive_buffer(INTEGRATOR_STATE_CONST_ARGS,
 /* Accumulate contribution to the Shadow Catcher pass.
  *
  * Returns truth if the contribution is fully handled here and is not to be added to the other
- * passes (like combined, adaptive sampling, denoising passes). */
+ * passes (like combined, adaptive sampling). */
 
 ccl_device bool kernel_accum_shadow_catcher(INTEGRATOR_STATE_CONST_ARGS,
                                             const SpectralColor contribution,
                                             ccl_global float *ccl_restrict buffer)
 {
+  if (!kernel_data.integrator.has_shadow_catcher) {
+    return false;
+  }
+
+  kernel_assert(kernel_data.film.pass_shadow_catcher != PASS_UNUSED);
+  kernel_assert(kernel_data.film.pass_shadow_catcher_matte != PASS_UNUSED);
+
   const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);
 
   /* Matte pass. */
-  if (kernel_data.film.pass_shadow_catcher_matte != PASS_UNUSED) {
-    if (kernel_shadow_catcher_is_matte_path(INTEGRATOR_STATE_PASS)) {
-      kernel_write_pass_float3(buffer + kernel_data.film.pass_shadow_catcher_matte,
-                               contribution_rgb);
-    }
+  if (kernel_shadow_catcher_is_matte_path(INTEGRATOR_STATE_PASS)) {
+    kernel_write_pass_float3(buffer + kernel_data.film.pass_shadow_catcher_matte,
+                             contribution_rgb);
+    /* NOTE: Accumulate the combined pass and to the samples count pass, so that the adaptive
+     * sampling is based on how noisy the combined pass is as if there were no catchers in the
+     * scene. */
   }
 
   /* Shadow catcher pass. */
-  if (kernel_data.film.pass_shadow_catcher != PASS_UNUSED) {
-    if (kernel_shadow_catcher_is_object_pass(INTEGRATOR_STATE_PASS)) {
-      kernel_write_pass_float3(buffer + kernel_data.film.pass_shadow_catcher, contribution_rgb);
-      return true;
-    }
+  if (kernel_shadow_catcher_is_object_pass(INTEGRATOR_STATE_PASS)) {
+    kernel_write_pass_float3(buffer + kernel_data.film.pass_shadow_catcher, contribution_rgb);
+    return true;
   }
 
   return false;
@@ -404,25 +408,32 @@ ccl_device bool kernel_accum_shadow_catcher_transparent(INTEGRATOR_STATE_CONST_A
                                                         const float transparent,
                                                         ccl_global float *ccl_restrict buffer)
 {
+  if (!kernel_data.integrator.has_shadow_catcher) {
+    return false;
+  }
+
+  kernel_assert(kernel_data.film.pass_shadow_catcher != PASS_UNUSED);
+  kernel_assert(kernel_data.film.pass_shadow_catcher_matte != PASS_UNUSED);
+
   const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);
 
   /* Matte pass. */
-  if (kernel_data.film.pass_shadow_catcher_matte != PASS_UNUSED) {
-    if (kernel_shadow_catcher_is_matte_path(INTEGRATOR_STATE_PASS)) {
-      kernel_write_pass_float4(
-          buffer + kernel_data.film.pass_shadow_catcher_matte,
-          make_float4(contribution_rgb.x, contribution_rgb.y, contribution_rgb.z, transparent));
-    }
+  if (kernel_shadow_catcher_is_matte_path(INTEGRATOR_STATE_PASS)) {
+    kernel_write_pass_float4(
+        buffer + kernel_data.film.pass_shadow_catcher_matte,
+        make_float4(contribution_rgb.x, contribution_rgb.y, contribution_rgb.z, transparent));
+    /* NOTE: Accumulate the combined pass and to the samples count pass, so that the adaptive
+     * sampling is based on how noisy the combined pass is as if there were no catchers in the
+     * scene. */
   }
 
   /* Shadow catcher pass. */
-  if (kernel_data.film.pass_shadow_catcher != PASS_UNUSED) {
-    if (kernel_shadow_catcher_is_object_pass(INTEGRATOR_STATE_PASS)) {
-      kernel_write_pass_float4(
-          buffer + kernel_data.film.pass_shadow_catcher,
-          make_float4(contribution_rgb.x, contribution_rgb.y, contribution_rgb.z, transparent));
-      return true;
-    }
+  if (kernel_shadow_catcher_is_object_pass(INTEGRATOR_STATE_PASS)) {
+    /* NOTE: The transparency of the shadow catcher pass is ignored. It is not needed for the
+     * calculation and the alpha channel of the pass contains numbers of samples contributed to a
+     * pixel of the pass. */
+    kernel_write_pass_float3(buffer + kernel_data.film.pass_shadow_catcher, contribution_rgb);
+    return true;
   }
 
   return false;
@@ -445,12 +456,13 @@ ccl_device_inline void kernel_accum_combined_pass(INTEGRATOR_STATE_CONST_ARGS,
   }
 #endif
 
+  const float3 contribution_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, contribution);
+
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
-    kernel_write_pass_spectral_color(
-        INTEGRATOR_STATE_PASS, buffer + kernel_data.film.pass_combined, contribution);
+    kernel_write_pass_float3(buffer + kernel_data.film.pass_combined, contribution_rgb);
   }
 
-  kernel_accum_adaptive_buffer(INTEGRATOR_STATE_PASS, contribution, buffer);
+  kernel_accum_adaptive_buffer(INTEGRATOR_STATE_PASS, contribution_rgb, buffer);
 }
 
 /* Write combined pass with transparency. */
@@ -475,7 +487,7 @@ ccl_device_inline void kernel_accum_combined_transparent_pass(INTEGRATOR_STATE_C
         make_float4(contribution_rgb.x, contribution_rgb.y, contribution_rgb.z, transparent));
   }
 
-  kernel_accum_adaptive_buffer(INTEGRATOR_STATE_PASS, contribution, buffer);
+  kernel_accum_adaptive_buffer(INTEGRATOR_STATE_PASS, contribution_rgb, buffer);
 }
 
 /* Write background or emission to appropriate pass. */
