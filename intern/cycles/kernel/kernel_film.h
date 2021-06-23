@@ -326,16 +326,6 @@ film_calculate_shadow_catcher(const KernelFilmConvert *ccl_restrict kfilm_conver
     return film_calculate_shadow_catcher_denoised(kfilm_convert, buffer);
   }
 
-  float scale, scale_exposure;
-  film_get_scale_and_scale_exposure(kfilm_convert, buffer, &scale, &scale_exposure);
-
-  if (kfilm_convert->is_denoised) {
-    kernel_assert(kfilm_convert->pass_shadow_catcher != PASS_UNUSED);
-    ccl_global const float *in_catcher = buffer + kfilm_convert->pass_shadow_catcher;
-    const float3 pixel = make_float3(in_catcher[0], in_catcher[1], in_catcher[2]) * scale_exposure;
-    return make_float4(pixel.x, pixel.y, pixel.z, 1.0f);
-  }
-
   kernel_assert(kfilm_convert->pass_offset != PASS_UNUSED);
   kernel_assert(kfilm_convert->pass_combined != PASS_UNUSED);
   kernel_assert(kfilm_convert->pass_shadow_catcher != PASS_UNUSED);
@@ -364,7 +354,7 @@ film_calculate_shadow_catcher(const KernelFilmConvert *ccl_restrict kfilm_conver
    * the matte objects were not accumulated to the combined pass. */
   const float3 combined_no_matte = color_combined - color_matte;
 
-  const float3 shadow_catcher = safe_divide_color(combined_no_matte, color_catcher);
+  const float3 shadow_catcher = safe_divide(combined_no_matte, color_catcher);
 
   const float scale = film_get_scale(kfilm_convert, buffer);
   const float transparency = in_combined[3] * scale;
