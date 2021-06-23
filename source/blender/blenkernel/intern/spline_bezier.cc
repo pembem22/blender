@@ -352,9 +352,9 @@ static void bezier_forward_difference_3d(const float3 &point_0,
   }
 }
 
-void BezierSpline::evaluate_bezier_segment(const int index,
-                                           const int next_index,
-                                           MutableSpan<float3> positions) const
+void BezierSpline::evaluate_segment(const int index,
+                                    const int next_index,
+                                    MutableSpan<float3> positions) const
 {
   if (this->segment_is_vector(index)) {
     BLI_assert(positions.size() == 1);
@@ -417,7 +417,7 @@ static void calculate_mappings_linear_resolution(Span<int> offsets,
   }
 
   const int grain_size = std::max(2048 / resolution, 1);
-  parallel_for(IndexRange(1, size - 2), grain_size, [&](IndexRange range) {
+  blender::threading::parallel_for(IndexRange(1, size - 2), grain_size, [&](IndexRange range) {
     for (const int i_control_point : range) {
       const int segment_len = offsets[i_control_point + 1] - offsets[i_control_point];
       const float segment_len_inv = 1.0f / segment_len;
@@ -497,14 +497,13 @@ Span<float3> BezierSpline::evaluated_positions() const
   Span<int> offsets = this->control_point_offsets();
 
   const int grain_size = std::max(512 / resolution_, 1);
-  parallel_for(IndexRange(size - 1), grain_size, [&](IndexRange range) {
+  blender::threading::parallel_for(IndexRange(size - 1), grain_size, [&](IndexRange range) {
     for (const int i : range) {
-      this->evaluate_bezier_segment(
-          i, i + 1, positions.slice(offsets[i], offsets[i + 1] - offsets[i]));
+      this->evaluate_segment(i, i + 1, positions.slice(offsets[i], offsets[i + 1] - offsets[i]));
     }
   });
   if (is_cyclic_) {
-    this->evaluate_bezier_segment(
+    this->evaluate_segment(
         size - 1, 0, positions.slice(offsets[size - 1], offsets[size] - offsets[size - 1]));
   }
   else {
@@ -546,9 +545,9 @@ BezierSpline::InterpolationData BezierSpline::interpolation_data_from_index_fact
 
 /* Use a spline argument to avoid adding this to the header. */
 template<typename T>
-static void interpolate_to_evaluated_points_impl(const BezierSpline &spline,
-                                                 const blender::VArray<T> &source_data,
-                                                 MutableSpan<T> result_data)
+static void interpolate_to_evaluated_impl(const BezierSpline &spline,
+                                          const blender::VArray<T> &source_data,
+                                          MutableSpan<T> result_data)
 {
   Span<float> mappings = spline.evaluated_mappings();
 
@@ -563,7 +562,7 @@ static void interpolate_to_evaluated_points_impl(const BezierSpline &spline,
   }
 }
 
-blender::fn::GVArrayPtr BezierSpline::interpolate_to_evaluated_points(
+blender::fn::GVArrayPtr BezierSpline::interpolate_to_evaluated(
     const blender::fn::GVArray &source_data) const
 {
   BLI_assert(source_data.size() == this->size());
@@ -582,7 +581,7 @@ blender::fn::GVArrayPtr BezierSpline::interpolate_to_evaluated_points(
     using T = decltype(dummy);
     if constexpr (!std::is_void_v<blender::attribute_math::DefaultMixer<T>>) {
       Array<T> values(eval_size);
-      interpolate_to_evaluated_points_impl<T>(*this, source_data.typed<T>(), values);
+      interpolate_to_evaluated_impl<T>(*this, source_data.typed<T>(), values);
       new_varray = std::make_unique<blender::fn::GVArray_For_ArrayContainer<Array<T>>>(
           std::move(values));
     }

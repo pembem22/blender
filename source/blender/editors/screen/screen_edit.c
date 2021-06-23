@@ -68,7 +68,7 @@ static ScrArea *screen_addarea_ex(ScrAreaMap *area_map,
                                   ScrVert *top_left,
                                   ScrVert *top_right,
                                   ScrVert *bottom_right,
-                                  short spacetype)
+                                  const eSpace_Type space_type)
 {
   ScrArea *area = MEM_callocN(sizeof(ScrArea), "addscrarea");
 
@@ -76,7 +76,7 @@ static ScrArea *screen_addarea_ex(ScrAreaMap *area_map,
   area->v2 = top_left;
   area->v3 = top_right;
   area->v4 = bottom_right;
-  area->spacetype = spacetype;
+  area->spacetype = space_type;
 
   BLI_addtail(&area_map->areabase, area);
 
@@ -87,10 +87,10 @@ static ScrArea *screen_addarea(bScreen *screen,
                                ScrVert *left_top,
                                ScrVert *right_top,
                                ScrVert *right_bottom,
-                               short spacetype)
+                               const eSpace_Type space_type)
 {
   return screen_addarea_ex(
-      AREAMAP_FROM_SCREEN(screen), left_bottom, left_top, right_top, right_bottom, spacetype);
+      AREAMAP_FROM_SCREEN(screen), left_bottom, left_top, right_top, right_bottom, space_type);
 }
 
 static void screen_delarea(bContext *C, bScreen *screen, ScrArea *area)
@@ -972,7 +972,7 @@ int ED_screen_area_active(const bContext *C)
  */
 static ScrArea *screen_area_create_with_geometry(ScrAreaMap *area_map,
                                                  const rcti *rect,
-                                                 short spacetype)
+                                                 eSpace_Type space_type)
 {
   ScrVert *bottom_left = screen_geom_vertex_add_ex(area_map, rect->xmin, rect->ymin);
   ScrVert *top_left = screen_geom_vertex_add_ex(area_map, rect->xmin, rect->ymax);
@@ -984,7 +984,7 @@ static ScrArea *screen_area_create_with_geometry(ScrAreaMap *area_map,
   screen_geom_edge_add_ex(area_map, top_right, bottom_right);
   screen_geom_edge_add_ex(area_map, bottom_right, bottom_left);
 
-  return screen_addarea_ex(area_map, bottom_left, top_left, top_right, bottom_right, spacetype);
+  return screen_addarea_ex(area_map, bottom_left, top_left, top_right, bottom_right, space_type);
 }
 
 static void screen_area_set_geometry_rect(ScrArea *area, const rcti *rect)
@@ -1001,7 +1001,7 @@ static void screen_area_set_geometry_rect(ScrArea *area, const rcti *rect)
 
 static void screen_global_area_refresh(wmWindow *win,
                                        bScreen *screen,
-                                       eSpace_Type space_type,
+                                       const eSpace_Type space_type,
                                        GlobalAreaAlign align,
                                        const rcti *rect,
                                        const short height_cur,
@@ -1275,11 +1275,14 @@ void ED_screen_scene_change(bContext *C, wmWindow *win, Scene *scene)
 
 ScrArea *ED_screen_full_newspace(bContext *C, ScrArea *area, int type)
 {
+  bScreen *newscreen = NULL;
   ScrArea *newsa = NULL;
   SpaceLink *newsl;
 
   if (!area || area->full == NULL) {
-    newsa = ED_screen_state_maximized_create(C);
+    newscreen = ED_screen_state_maximized_create(C);
+    newsa = newscreen->areabase.first;
+    BLI_assert(newsa->spacetype == SPACE_EMPTY);
   }
 
   if (!newsa) {
@@ -1295,6 +1298,10 @@ ScrArea *ED_screen_full_newspace(bContext *C, ScrArea *area, int type)
   }
 
   ED_area_newspace(C, newsa, type, (newsl && newsl->link_flag & SPACE_FLAG_TYPE_TEMPORARY));
+
+  if (newscreen) {
+    ED_screen_change(C, newscreen);
+  }
 
   return newsa;
 }
@@ -1361,6 +1368,10 @@ void ED_screen_full_restore(bContext *C, ScrArea *area)
  * \param toggle_area: If this is set, its space data will be swapped with the one of the new empty
  *                     area, when toggling back it can be swapped back again.
  * \return The newly created screen with the non-normal area.
+ *
+ * \note The caller must run #ED_screen_change this is not done in this function
+ * as it would attempt to initialize areas that don't yet have a space-type assigned
+ * (converting them to 3D view without creating the space-data).
  */
 static bScreen *screen_state_to_nonnormal(bContext *C,
                                           wmWindow *win,
@@ -1429,7 +1440,6 @@ static bScreen *screen_state_to_nonnormal(bContext *C,
   }
   newa->full = oldscreen;
 
-  ED_screen_change(C, screen);
   ED_area_tag_refresh(newa);
 
   return screen;
@@ -1442,10 +1452,9 @@ static bScreen *screen_state_to_nonnormal(bContext *C,
  * Use this to just create a new maximized screen/area, rather than maximizing an existing one.
  * Otherwise, maximize with #ED_screen_state_toggle().
  */
-ScrArea *ED_screen_state_maximized_create(bContext *C)
+bScreen *ED_screen_state_maximized_create(bContext *C)
 {
-  bScreen *screen = screen_state_to_nonnormal(C, CTX_wm_window(C), NULL, SCREENMAXIMIZED);
-  return screen->areabase.first;
+  return screen_state_to_nonnormal(C, CTX_wm_window(C), NULL, SCREENMAXIMIZED);
 }
 
 /**
@@ -1548,6 +1557,8 @@ ScrArea *ED_screen_state_toggle(bContext *C, wmWindow *win, ScrArea *area, const
     }
 
     screen = screen_state_to_nonnormal(C, win, toggle_area, state);
+
+    ED_screen_change(C, screen);
   }
 
   BLI_assert(CTX_wm_screen(C) == screen);

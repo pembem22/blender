@@ -71,7 +71,7 @@ namespace blender::nodes {
  */
 static void evaluate_splines(Span<SplinePtr> splines)
 {
-  parallel_for_each(splines, [](const SplinePtr &spline) {
+  threading::parallel_for_each(splines, [](const SplinePtr &spline) {
     /* These functions fill the corresponding caches on each spline. */
     spline->evaluated_positions();
     spline->evaluated_tangents();
@@ -186,23 +186,21 @@ static ResultAttributes create_point_attributes(PointCloudComponent &points,
 
 /**
  * TODO: For non-poly splines, this has double copies that could be avoided as part
- * of a general look at optimizing uses of #interpolate_to_evaluated_points.
+ * of a general look at optimizing uses of #Spline::interpolate_to_evaluated.
  */
 static void copy_evaluated_point_attributes(Span<SplinePtr> splines,
                                             Span<int> offsets,
                                             ResultAttributes &data)
 {
-  parallel_for(splines.index_range(), 64, [&](IndexRange range) {
+  threading::parallel_for(splines.index_range(), 64, [&](IndexRange range) {
     for (const int i : range) {
       const Spline &spline = *splines[i];
       const int offset = offsets[i];
       const int size = offsets[i + 1] - offsets[i];
 
       data.positions.slice(offset, size).copy_from(spline.evaluated_positions());
-      spline.interpolate_to_evaluated_points(spline.radii())
-          ->materialize(data.radii.slice(offset, size));
-      spline.interpolate_to_evaluated_points(spline.tilts())
-          ->materialize(data.tilts.slice(offset, size));
+      spline.interpolate_to_evaluated(spline.radii())->materialize(data.radii.slice(offset, size));
+      spline.interpolate_to_evaluated(spline.tilts())->materialize(data.tilts.slice(offset, size));
 
       for (const Map<std::string, GMutableSpan>::Item &item : data.point_attributes.items()) {
         const StringRef name = item.key;
@@ -211,7 +209,7 @@ static void copy_evaluated_point_attributes(Span<SplinePtr> splines,
         BLI_assert(spline.attributes.get_for_read(name));
         GSpan spline_span = *spline.attributes.get_for_read(name);
 
-        spline.interpolate_to_evaluated_points(spline_span)
+        spline.interpolate_to_evaluated(spline_span)
             ->materialize(point_span.slice(offset, size).data());
       }
 
@@ -225,7 +223,7 @@ static void copy_uniform_sample_point_attributes(Span<SplinePtr> splines,
                                                  Span<int> offsets,
                                                  ResultAttributes &data)
 {
-  parallel_for(splines.index_range(), 64, [&](IndexRange range) {
+  threading::parallel_for(splines.index_range(), 64, [&](IndexRange range) {
     for (const int i : range) {
       const Spline &spline = *splines[i];
       const int offset = offsets[i];
@@ -236,18 +234,16 @@ static void copy_uniform_sample_point_attributes(Span<SplinePtr> splines,
 
       const Array<float> uniform_samples = spline.sample_uniform_index_factors(size);
 
-      spline.sample_based_on_index_factors<float3>(
+      spline.sample_with_index_factors<float3>(
           spline.evaluated_positions(), uniform_samples, data.positions.slice(offset, size));
 
-      spline.sample_based_on_index_factors<float>(
-          spline.interpolate_to_evaluated_points(spline.radii()),
-          uniform_samples,
-          data.radii.slice(offset, size));
+      spline.sample_with_index_factors<float>(spline.interpolate_to_evaluated(spline.radii()),
+                                              uniform_samples,
+                                              data.radii.slice(offset, size));
 
-      spline.sample_based_on_index_factors<float>(
-          spline.interpolate_to_evaluated_points(spline.tilts()),
-          uniform_samples,
-          data.tilts.slice(offset, size));
+      spline.sample_with_index_factors<float>(spline.interpolate_to_evaluated(spline.tilts()),
+                                              uniform_samples,
+                                              data.tilts.slice(offset, size));
 
       for (const Map<std::string, GMutableSpan>::Item &item : data.point_attributes.items()) {
         const StringRef name = item.key;
@@ -256,18 +252,18 @@ static void copy_uniform_sample_point_attributes(Span<SplinePtr> splines,
         BLI_assert(spline.attributes.get_for_read(name));
         GSpan spline_span = *spline.attributes.get_for_read(name);
 
-        spline.sample_based_on_index_factors(*spline.interpolate_to_evaluated_points(spline_span),
-                                             uniform_samples,
-                                             point_span.slice(offset, size));
+        spline.sample_with_index_factors(*spline.interpolate_to_evaluated(spline_span),
+                                         uniform_samples,
+                                         point_span.slice(offset, size));
       }
 
-      spline.sample_based_on_index_factors<float3>(
+      spline.sample_with_index_factors<float3>(
           spline.evaluated_tangents(), uniform_samples, data.tangents.slice(offset, size));
       for (float3 &tangent : data.tangents) {
         tangent.normalize();
       }
 
-      spline.sample_based_on_index_factors<float3>(
+      spline.sample_with_index_factors<float3>(
           spline.evaluated_normals(), uniform_samples, data.normals.slice(offset, size));
       for (float3 &normals : data.normals) {
         normals.normalize();
@@ -313,7 +309,7 @@ static void copy_spline_domain_attributes(const CurveComponent &curve_component,
 
 static void create_default_rotation_attribute(ResultAttributes &data)
 {
-  parallel_for(IndexRange(data.result_size), 512, [&](IndexRange range) {
+  threading::parallel_for(IndexRange(data.result_size), 512, [&](IndexRange range) {
     for (const int i : range) {
       data.rotations[i] = float4x4::from_normalized_axis_data(
                               {0, 0, 0}, data.normals[i], data.tangents[i])
@@ -329,6 +325,8 @@ static void geo_node_curve_to_points_exec(GeoNodeExecParams params)
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
   geometry_set = bke::geometry_set_realize_instances(geometry_set);
+
+  SCOPED_TIMER(__func__);
 
   if (!geometry_set.has_curve()) {
     params.set_output("Geometry", GeometrySet());

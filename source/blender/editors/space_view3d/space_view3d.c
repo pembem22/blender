@@ -187,7 +187,7 @@ bool ED_view3d_area_user_region(const ScrArea *area, const View3D *v3d, ARegion 
  * view3d_project_short_clip and view3d_project_short_noclip in cases where
  * these functions are not used during draw_object
  */
-void ED_view3d_init_mats_rv3d(struct Object *ob, struct RegionView3D *rv3d)
+void ED_view3d_init_mats_rv3d(const struct Object *ob, struct RegionView3D *rv3d)
 {
   /* local viewmat and persmat, to calculate projections */
   mul_m4_m4m4(rv3d->viewmatob, rv3d->viewmat, ob->obmat);
@@ -197,7 +197,7 @@ void ED_view3d_init_mats_rv3d(struct Object *ob, struct RegionView3D *rv3d)
   ED_view3d_clipping_local(rv3d, ob->obmat);
 }
 
-void ED_view3d_init_mats_rv3d_gl(struct Object *ob, struct RegionView3D *rv3d)
+void ED_view3d_init_mats_rv3d_gl(const struct Object *ob, struct RegionView3D *rv3d)
 {
   ED_view3d_init_mats_rv3d(ob, rv3d);
 
@@ -331,6 +331,8 @@ static void view3d_free(SpaceLink *sl)
     MEM_freeN(vd->localvd);
   }
 
+  MEM_SAFE_FREE(vd->runtime.local_stats);
+
   if (vd->runtime.properties_storage) {
     MEM_freeN(vd->runtime.properties_storage);
   }
@@ -344,6 +346,13 @@ static void view3d_free(SpaceLink *sl)
 /* spacetype; init callback */
 static void view3d_init(wmWindowManager *UNUSED(wm), ScrArea *UNUSED(area))
 {
+}
+
+static void view3d_exit(wmWindowManager *UNUSED(wm), ScrArea *area)
+{
+  BLI_assert(area->spacetype == SPACE_VIEW3D);
+  View3D *v3d = area->spacedata.first;
+  MEM_SAFE_FREE(v3d->runtime.local_stats);
 }
 
 static SpaceLink *view3d_duplicate(SpaceLink *sl)
@@ -1581,7 +1590,7 @@ static void space_view3d_listener(const wmSpaceTypeListenerParams *params)
   }
 }
 
-static void space_view3d_refresh(const bContext *C, ScrArea *UNUSED(area))
+static void space_view3d_refresh(const bContext *C, ScrArea *area)
 {
   Scene *scene = CTX_data_scene(C);
   LightCache *lcache = scene->eevee.light_cache_data;
@@ -1590,6 +1599,9 @@ static void space_view3d_refresh(const bContext *C, ScrArea *UNUSED(area))
     lcache->flag &= ~LIGHTCACHE_UPDATE_AUTO;
     view3d_lightcache_update((bContext *)C);
   }
+
+  View3D *v3d = (View3D *)area->spacedata.first;
+  MEM_SAFE_FREE(v3d->runtime.local_stats);
 }
 
 const char *view3d_context_dir[] = {
@@ -1697,6 +1709,7 @@ void ED_spacetype_view3d(void)
   st->create = view3d_create;
   st->free = view3d_free;
   st->init = view3d_init;
+  st->exit = view3d_exit;
   st->listener = space_view3d_listener;
   st->refresh = space_view3d_refresh;
   st->duplicate = view3d_duplicate;
