@@ -46,7 +46,7 @@ ccl_device void kernel_displace_evaluate(const KernelGlobals *kg,
   output[offset] += make_float4(D.x, D.y, D.z, 0.0f);
 }
 
-ccl_device void kernel_background_evaluate(const KernelGlobals *kg,
+ccl_device void kernel_background_evaluate(INTEGRATOR_STATE_ARGS,
                                            ccl_global const KernelShaderEvalInput *input,
                                            ccl_global float4 *output,
                                            const int offset)
@@ -61,17 +61,22 @@ ccl_device void kernel_background_evaluate(const KernelGlobals *kg,
   ShaderData sd;
   shader_setup_from_background(kg, &sd, ray_P, ray_D, ray_time);
 
+  /* Setup RNG and wavelengths in integrator state. */
+  const uint rng_hash = path_rng_hash_init(kg, 0, offset, 0);
+  path_state_init_integrator(INTEGRATOR_STATE_PASS, 0, rng_hash);
+  generate_wavelengths(INTEGRATOR_STATE_PASS);
+
   /* Evaluate shader.
    * This is being evaluated for all BSDFs, so path flag does not contain a specific type. */
   const int path_flag = PATH_RAY_EMISSION;
   shader_eval_surface<NODE_FEATURE_MASK_SURFACE_LIGHT>(
-      INTEGRATOR_STATE_PASS_NULL, &sd, NULL, path_flag);
+      INTEGRATOR_STATE_PASS, &sd, NULL, path_flag);
   const SpectralColor color = shader_background_eval(&sd);
 
-  // const float3 color_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, color);
+  const float3 color_rgb = spectrum_to_rgb(INTEGRATOR_STATE_PASS, color);
 
-  // /* Write output. */
-  // output[offset] += make_float4(color_rgb.x, color_rgb.y, color_rgb.z, 0.0f);
+  /* Write output. */
+  output[offset] += make_float4(color_rgb.x, color_rgb.y, color_rgb.z, 0.0f);
 }
 
 CCL_NAMESPACE_END

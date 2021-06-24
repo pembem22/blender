@@ -125,7 +125,9 @@ void KERNEL_FUNCTION_FULL_NAME(shader_eval_background)(const KernelGlobals *kg,
 #ifdef KERNEL_STUB
   STUB_ASSERT(KERNEL_ARCH, shader_eval_background);
 #else
-  kernel_background_evaluate(kg, input, output, offset);
+  IntegratorState integrator_state;
+
+  kernel_background_evaluate(kg, &integrator_state, input, output, offset);
 #endif
 }
 

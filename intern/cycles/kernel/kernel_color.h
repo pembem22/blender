@@ -814,7 +814,7 @@ ccl_device float3 spectrum_to_rgb(INTEGRATOR_STATE_CONST_ARGS, SpectralColor int
 #ifndef __SPECTRAL_RENDERING__
   return intensities;
 #else
-  const SpectralColor &wavelengths = INTEGRATOR_STATE(ray, wavelengths);
+  const SpectralColor wavelengths = INTEGRATOR_STATE(ray, wavelengths);
 
   float3 xyz_sum = zero_float3();
   FOREACH_CHANNEL (i) {
@@ -832,7 +832,7 @@ ccl_device SpectralColor rgb_to_spectrum(INTEGRATOR_STATE_CONST_ARGS, float3 rgb
 #ifndef __SPECTRAL_RENDERING__
   return rgb;
 #else
-  const SpectralColor &wavelengths = INTEGRATOR_STATE(ray, wavelengths);
+  const SpectralColor wavelengths = INTEGRATOR_STATE(ray, wavelengths);
 
   SpectralColor intensities;
   FOREACH_CHANNEL (i) {
