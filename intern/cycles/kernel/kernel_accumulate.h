@@ -675,10 +675,11 @@ ccl_device_inline void kernel_accum_background(INTEGRATOR_STATE_CONST_ARGS,
 
 /* Write emission to render buffer. */
 ccl_device_inline void kernel_accum_emission(INTEGRATOR_STATE_CONST_ARGS,
+                                             const SpectralColor throughput,
                                              const SpectralColor L,
                                              ccl_global float *ccl_restrict render_buffer)
 {
-  SpectralColor contribution = INTEGRATOR_STATE(path, throughput) * L;
+  SpectralColor contribution = throughput * L;
   kernel_accum_clamp(kg, &contribution, INTEGRATOR_STATE(path, bounce) - 1);
 
   ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,

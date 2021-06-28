@@ -94,7 +94,8 @@ ccl_device_forceinline void integrate_surface_emission(INTEGRATOR_STATE_CONST_AR
     L *= mis_weight;
   }
 
-  kernel_accum_emission(INTEGRATOR_STATE_PASS, L, render_buffer);
+  const float3 throughput = INTEGRATOR_STATE(path, throughput);
+  kernel_accum_emission(INTEGRATOR_STATE_PASS, throughput, L, render_buffer);
 }
 #endif /* __EMISSION__ */
 
@@ -158,6 +159,15 @@ ccl_device_forceinline void integrate_surface_direct_light(INTEGRATOR_STATE_ARGS
   light_sample_to_shadow_ray(sd, &ls, &ray);
   const bool is_light = light_sample_is_light(&ls);
 
+  /* Copy volume stack and enter/exit volume. */
+  integrator_state_copy_volume_stack_to_shadow(INTEGRATOR_STATE_PASS);
+
+  if (is_transmission) {
+#  ifdef __VOLUME__
+    shadow_volume_stack_enter_exit(INTEGRATOR_STATE_PASS, sd);
+#  endif
+  }
+
   /* Write shadow ray and associated state to global memory. */
   integrator_state_write_shadow_ray(INTEGRATOR_STATE_PASS, &ray);
 
@@ -178,21 +188,19 @@ ccl_device_forceinline void integrate_surface_direct_light(INTEGRATOR_STATE_ARGS
   INTEGRATOR_STATE_WRITE(shadow_path, diffuse_glossy_ratio) = diffuse_glossy_ratio;
   INTEGRATOR_STATE_WRITE(shadow_path, throughput) = throughput;
 
-  integrator_state_copy_volume_stack_to_shadow(INTEGRATOR_STATE_PASS);
-
-  /* Branch of shadow kernel. */
+  /* Branch off shadow kernel. */
   INTEGRATOR_SHADOW_PATH_INIT(DEVICE_KERNEL_INTEGRATOR_INTERSECT_SHADOW);
 }
 #endif
 
 /* Path tracing: bounce off or through surface with new direction. */
-ccl_device_forceinline bool integrate_surface_bsdf_bssrdf_bounce(INTEGRATOR_STATE_ARGS,
-                                                                 ShaderData *sd,
-                                                                 const RNGState *rng_state)
+ccl_device_forceinline int integrate_surface_bsdf_bssrdf_bounce(INTEGRATOR_STATE_ARGS,
+                                                                ShaderData *sd,
+                                                                const RNGState *rng_state)
 {
   /* Sample BSDF or BSSRDF. */
   if (!(sd->flag & (SD_BSDF | SD_BSSRDF))) {
-    return false;
+    return LABEL_NONE;
   }
 
   float bsdf_u, bsdf_v;
@@ -224,7 +232,7 @@ ccl_device_forceinline bool integrate_surface_bsdf_bssrdf_bounce(INTEGRATOR_STAT
                                      &bsdf_pdf);
 
   if (bsdf_pdf == 0.0f || bsdf_eval_is_zero(&bsdf_eval)) {
-    return false;
+    return LABEL_NONE;
   }
 
   /* Setup ray. Note that clipping works through transparent bounces. */
@@ -257,7 +265,7 @@ ccl_device_forceinline bool integrate_surface_bsdf_bssrdf_bounce(INTEGRATOR_STAT
   }
 
   path_state_next(INTEGRATOR_STATE_PASS, label);
-  return true;
+  return label;
 }
 
 #ifdef __VOLUME__
@@ -265,7 +273,7 @@ ccl_device_forceinline bool integrate_surface_volume_only_bounce(INTEGRATOR_STAT
                                                                  ShaderData *sd)
 {
   if (!path_state_volume_next(INTEGRATOR_STATE_PASS)) {
-    return false;
+    return LABEL_NONE;
   }
 
   /* Setup ray position, direction stays unchanged. */
@@ -278,7 +286,7 @@ ccl_device_forceinline bool integrate_surface_volume_only_bounce(INTEGRATOR_STAT
   INTEGRATOR_STATE_WRITE(ray, dP) = differential_make_compact(sd->dP);
 #  endif
 
-  return true;
+  return LABEL_TRANSMIT | LABEL_TRANSPARENT;
 }
 #endif
 
@@ -291,21 +299,24 @@ ccl_device bool integrate_surface(INTEGRATOR_STATE_ARGS,
   ShaderData sd;
   integrate_surface_shader_setup(INTEGRATOR_STATE_PASS, &sd);
 
-  bool continue_path;
+  int continue_path_label = 0;
 
   /* Skip most work for volume bounding surface. */
 #ifdef __VOLUME__
   if (!(sd.flag & SD_HAS_ONLY_VOLUME)) {
 #endif
 
-    const int path_flag = INTEGRATOR_STATE(path, flag);
-#ifdef __SUBSURFACE__
-    /* Can skip shader evaluation for BSSRDF exit point without bump mapping. */
-    if (!(path_flag & PATH_RAY_SUBSURFACE) || ((sd.flag & SD_HAS_BSSRDF_BUMP)))
-#endif
     {
-      /* Evaluate shader. */
-      shader_eval_surface<node_feature_mask>(INTEGRATOR_STATE_PASS, &sd, render_buffer, path_flag);
+      const int path_flag = INTEGRATOR_STATE(path, flag);
+#ifdef __SUBSURFACE__
+      /* Can skip shader evaluation for BSSRDF exit point without bump mapping. */
+      if (!(path_flag & PATH_RAY_SUBSURFACE) || ((sd.flag & SD_HAS_BSSRDF_BUMP)))
+#endif
+      {
+        /* Evaluate shader. */
+        shader_eval_surface<node_feature_mask>(
+            INTEGRATOR_STATE_PASS, &sd, render_buffer, path_flag);
+      }
     }
 
 #ifdef __SUBSURFACE__
@@ -345,7 +356,11 @@ ccl_device bool integrate_surface(INTEGRATOR_STATE_ARGS,
     /* Perform path termination. Most paths have already been terminated in
      * the intersect_closest kernel, this is just for emission and for dividing
      * throughput by the probability at the right moment. */
-    const float probability = path_state_continuation_probability(INTEGRATOR_STATE_PASS);
+    const int path_flag = INTEGRATOR_STATE(path, flag);
+    const float probability = (path_flag & PATH_RAY_TERMINATE_ON_NEXT_SURFACE) ?
+                                  0.0f :
+                                  path_state_continuation_probability(INTEGRATOR_STATE_PASS,
+                                                                      path_flag);
     if (probability == 0.0f) {
       return false;
     }
@@ -374,20 +389,23 @@ ccl_device bool integrate_surface(INTEGRATOR_STATE_ARGS,
 #  endif /* __AO__ */
 #endif
 
-    continue_path = integrate_surface_bsdf_bssrdf_bounce(INTEGRATOR_STATE_PASS, &sd, &rng_state);
+    continue_path_label = integrate_surface_bsdf_bssrdf_bounce(
+        INTEGRATOR_STATE_PASS, &sd, &rng_state);
 #ifdef __VOLUME__
   }
   else {
-    continue_path = integrate_surface_volume_only_bounce(INTEGRATOR_STATE_PASS, &sd);
+    continue_path_label = integrate_surface_volume_only_bounce(INTEGRATOR_STATE_PASS, &sd);
   }
 #endif
 
-  /* Enter/Exit volume. */
+  if (continue_path_label & LABEL_TRANSMIT) {
+    /* Enter/Exit volume. */
 #ifdef __VOLUME__
-  volume_stack_enter_exit(INTEGRATOR_STATE_PASS, &sd);
+    volume_stack_enter_exit(INTEGRATOR_STATE_PASS, &sd);
 #endif
+  }
 
-  return continue_path;
+  return continue_path_label != 0;
 }
 
 template<uint node_feature_mask = NODE_FEATURE_MASK_SURFACE & ~NODE_FEATURE_RAYTRACE,

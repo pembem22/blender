@@ -60,8 +60,8 @@ ccl_device_forceinline SpectralColor bsdf_ashikhmin_shirley_eval_reflect(const S
   const MicrofacetBsdf *bsdf = (const MicrofacetBsdf *)sc;
   float3 N = bsdf->N;
 
-  float NdotI = dot(N, I);        /* in Cycles/OSL convention I is omega_out    */
-  float NdotO = dot(N, omega_in); /* and consequently we use for O omaga_in ;)  */
+  float NdotI = dot(N, I);        /* in Cycles/OSL convention I is omega_out */
+  float NdotO = dot(N, omega_in); /* and consequently we use for O omaga_in ;) */
 
   float out = 0.0f;
 

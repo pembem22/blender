@@ -266,4 +266,5 @@ ForEachMacros:
   - FOREACH_CHANNEL
 
 StatementMacros:
+  - PyObject_HEAD
   - PyObject_VAR_HEAD

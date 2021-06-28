@@ -60,8 +60,10 @@ ccl_device_inline SpectralColor integrate_transparent_surface_shadow(INTEGRATOR_
 }
 
 #  ifdef __VOLUME__
-ccl_device_inline SpectralColor integrate_transparent_volume_shadow(INTEGRATOR_STATE_ARGS,
-                                                                    const int hit)
+ccl_device_inline void integrate_transparent_volume_shadow(INTEGRATOR_STATE_ARGS,
+                                                           const int hit,
+                                                           const int num_recorded_hits,
+                                                           SpectralColor *ccl_restrict throughput)
 {
   /* TODO: deduplicate with surface, or does it not matter for memory usage? */
   ShaderDataTinyStorage shadow_sd_storage;
@@ -69,63 +71,71 @@ ccl_device_inline SpectralColor integrate_transparent_volume_shadow(INTEGRATOR_S
 
   /* Setup shader data. */
   Ray ray ccl_optional_struct_init;
-  integrator_state_read_ray(INTEGRATOR_STATE_PASS, &ray);
+  integrator_state_read_shadow_ray(INTEGRATOR_STATE_PASS, &ray);
 
-  Intersection isect ccl_optional_struct_init;
-  integrator_state_read_shadow_isect(INTEGRATOR_STATE_PASS, &isect, hit);
+  /* Modify ray position and length to match current segment. */
+  const float start_t = (hit == 0) ? 0.0f : INTEGRATOR_STATE_ARRAY(shadow_isect, hit - 1, t);
+  const float end_t = (hit < num_recorded_hits) ? INTEGRATOR_STATE_ARRAY(shadow_isect, hit, t) :
+                                                  ray.t;
+  ray.P += start_t * ray.D;
+  ray.t = end_t - start_t;
 
   shader_setup_from_volume(kg, shadow_sd, &ray);
 
-  /* Evaluate shader. */
-  SpectralColor sigma_a = zero_spectral_color();
-  if (!shadow_volume_shader_sample(INTEGRATOR_STATE_PASS, shadow_sd, &sigma_a)) {
-    return one_spectral_color();
-  }
+  const float step_size = volume_stack_step_size(INTEGRATOR_STATE_PASS, [=](const int i) {
+    return integrator_state_read_shadow_volume_stack(INTEGRATOR_STATE_PASS, i);
+  });
 
-  /* Integrate extinction over segment. */
-  const float start_t = (hit == 0) ? 0.0f : INTEGRATOR_STATE_ARRAY(shadow_isect, hit - 1, t);
-  const float end_t = isect.t;
-  const float t = end_t - start_t;
-
-  return exp(-sigma_a * t);
+  volume_shadow_heterogeneous(INTEGRATOR_STATE_PASS, &ray, shadow_sd, throughput, step_size);
 }
 #  endif
+
+ccl_device_inline bool shadow_intersections_has_remaining(const int num_hits)
+{
+  return num_hits >= INTEGRATOR_SHADOW_ISECT_SIZE;
+}
 
 ccl_device_inline bool integrate_transparent_shadow(INTEGRATOR_STATE_ARGS, const int num_hits)
 {
   /* Accumulate shadow for transparent surfaces. */
   const int num_recorded_hits = min(num_hits, INTEGRATOR_SHADOW_ISECT_SIZE);
 
-  for (int hit = 0; hit < num_recorded_hits; hit++) {
+  for (int hit = 0; hit < num_recorded_hits + 1; hit++) {
+
+    if (hit < num_recorded_hits || !shadow_intersections_has_remaining(num_hits)) {
 #  ifdef __VOLUME__
-    /* Volume shaders. */
-    if (INTEGRATOR_STATE_ARRAY(shadow_volume_stack, 0, shader) != SHADER_NONE) {
-      const SpectralColor shadow = integrate_transparent_volume_shadow(INTEGRATOR_STATE_PASS, hit);
+      if (!integrator_state_shadow_volume_stack_is_empty(INTEGRATOR_STATE_PASS)) {
+        SpectralColor throughput = INTEGRATOR_STATE(shadow_path, throughput);
+        integrate_transparent_volume_shadow(
+            INTEGRATOR_STATE_PASS, hit, num_recorded_hits, &throughput);
+        if (is_zero(throughput)) {
+          return true;
+        }
+
+        INTEGRATOR_STATE_WRITE(shadow_path, throughput) = throughput;
+      }
+#  endif
+    }
+
+    /* Surface shaders. */
+    if (hit < num_recorded_hits) {
+      const SpectralColor shadow = integrate_transparent_surface_shadow(INTEGRATOR_STATE_PASS,
+                                                                        hit);
       const SpectralColor throughput = INTEGRATOR_STATE(shadow_path, throughput) * shadow;
       if (is_zero(throughput)) {
         return true;
       }
 
       INTEGRATOR_STATE_WRITE(shadow_path, throughput) = throughput;
+      INTEGRATOR_STATE_WRITE(shadow_path, transparent_bounce) += 1;
     }
-#  endif
-
-    /* Surface shaders. */
-    const SpectralColor shadow = integrate_transparent_surface_shadow(INTEGRATOR_STATE_PASS, hit);
-    const SpectralColor throughput = INTEGRATOR_STATE(shadow_path, throughput) * shadow;
-    if (is_zero(throughput)) {
-      return true;
-    }
-
-    INTEGRATOR_STATE_WRITE(shadow_path, throughput) = throughput;
-    INTEGRATOR_STATE_WRITE(shadow_path, transparent_bounce) += 1;
 
     /* Note we do not need to check max_transparent_bounce here, the number
      * of intersections is already limited and made opaque in the
      * INTERSECT_SHADOW kernel. */
   }
 
-  if (num_hits >= INTEGRATOR_SHADOW_ISECT_SIZE) {
+  if (shadow_intersections_has_remaining(num_hits)) {
     /* There are more hits that we could not recorded due to memory usage,
      * adjust ray to intersect again from the last hit. */
     const float last_hit_t = INTEGRATOR_STATE_ARRAY(shadow_isect, num_recorded_hits - 1, t);
@@ -153,7 +163,7 @@ ccl_device void integrator_shade_shadow(INTEGRATOR_STATE_ARGS,
   }
 #endif
 
-  if (num_hits >= INTEGRATOR_SHADOW_ISECT_SIZE) {
+  if (shadow_intersections_has_remaining(num_hits)) {
     /* More intersections to find, continue shadow ray. */
     INTEGRATOR_SHADOW_PATH_NEXT(DEVICE_KERNEL_INTEGRATOR_SHADE_SHADOW,
                                 DEVICE_KERNEL_INTEGRATOR_INTERSECT_SHADOW);

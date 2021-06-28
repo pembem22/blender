@@ -29,20 +29,24 @@
 CCL_NAMESPACE_BEGIN
 
 template<uint32_t current_kernel>
-ccl_device_forceinline bool integrator_intersect_shader_next_kernel(
-    INTEGRATOR_STATE_ARGS, const Intersection *ccl_restrict isect)
+ccl_device_forceinline bool integrator_intersect_terminate(INTEGRATOR_STATE_ARGS,
+                                                           const Intersection *ccl_restrict isect,
+                                                           const int shader_flags)
 {
-  /* Find shader from intersection. */
-  const int shader = intersection_get_shader(kg, isect);
-  const int flags = kernel_tex_fetch(__shaders, shader).flags;
 
-  /* Optional AO bounce termination. */
+  /* Optional AO bounce termination.
+   * We continue evaluating emissive/transparent surfaces and volumes, similar
+   * to direct lighting. Only if we know there are none can we terminate the
+   * path immediately. */
   if (path_state_ao_bounce(INTEGRATOR_STATE_PASS)) {
-    if (flags & (SD_HAS_TRANSPARENT_SHADOW | SD_HAS_EMISSION)) {
+    if (shader_flags & (SD_HAS_TRANSPARENT_SHADOW | SD_HAS_EMISSION)) {
       INTEGRATOR_STATE_WRITE(path, flag) |= PATH_RAY_TERMINATE_AFTER_TRANSPARENT;
     }
+    else if (!integrator_state_volume_stack_is_empty(INTEGRATOR_STATE_PASS)) {
+      INTEGRATOR_STATE_WRITE(path, flag) |= PATH_RAY_TERMINATE_AFTER_VOLUME;
+    }
     else {
-      return false;
+      return true;
     }
   }
 
@@ -54,24 +58,39 @@ ccl_device_forceinline bool integrator_intersect_shader_next_kernel(
    * and evaluating the shader when not needed. Only for emission and transparent
    * surfaces in front of emission do we need to evaluate the shader, since we
    * perform MIS as part of indirect rays. */
-  const float probability = path_state_continuation_probability(INTEGRATOR_STATE_PASS);
+  const int path_flag = INTEGRATOR_STATE(path, flag);
+  const float probability = path_state_continuation_probability(INTEGRATOR_STATE_PASS, path_flag);
 
   if (probability != 1.0f) {
     const float terminate = path_state_rng_1D(kg, &rng_state, PRNG_TERMINATE);
 
     if (probability == 0.0f || terminate >= probability) {
-      if (flags & (SD_HAS_TRANSPARENT_SHADOW | SD_HAS_EMISSION)) {
-        /* Mark path to be terminated right after shader evaluation. */
-        INTEGRATOR_STATE_WRITE(path, flag) |= PATH_RAY_TERMINATE_IMMEDIATE;
+      if (shader_flags & SD_HAS_EMISSION) {
+        /* Mark path to be terminated right after shader evaluation on the surface. */
+        INTEGRATOR_STATE_WRITE(path, flag) |= PATH_RAY_TERMINATE_ON_NEXT_SURFACE;
+      }
+      else if (!integrator_state_volume_stack_is_empty(INTEGRATOR_STATE_PASS)) {
+        /* TODO: only do this for emissive volumes. */
+        INTEGRATOR_STATE_WRITE(path, flag) |= PATH_RAY_TERMINATE_IN_NEXT_VOLUME;
       }
       else {
-        return false;
+        return true;
       }
     }
   }
 
+  return false;
+}
+
+template<uint32_t current_kernel>
+ccl_device_forceinline void integrator_intersect_shader_next_kernel(
+    INTEGRATOR_STATE_ARGS,
+    const Intersection *ccl_restrict isect,
+    const int shader,
+    const int shader_flags)
+{
   /* Setup next kernel to execute. */
-  if (flags & SD_HAS_RAYTRACE) {
+  if (shader_flags & SD_HAS_RAYTRACE) {
     INTEGRATOR_PATH_NEXT_SORTED(
         current_kernel, DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE, shader);
   }
@@ -82,8 +101,6 @@ ccl_device_forceinline bool integrator_intersect_shader_next_kernel(
   /* Setup shadow catcher. */
   const int object_flags = intersection_get_object_flags(kg, isect);
   kernel_shadow_catcher_split(INTEGRATOR_STATE_PASS, object_flags);
-
-  return true;
 }
 
 ccl_device void integrator_intersect_closest(INTEGRATOR_STATE_ARGS)
@@ -124,11 +141,20 @@ ccl_device void integrator_intersect_closest(INTEGRATOR_STATE_ARGS)
   integrator_state_write_isect(INTEGRATOR_STATE_PASS, &isect);
 
 #ifdef __VOLUME__
-  if (INTEGRATOR_STATE_ARRAY(volume_stack, 0, shader) != SHADER_NONE) {
-    /* Continue with volume kernel if we are inside a volume, regardless
-     * if we hit anything. */
-    INTEGRATOR_PATH_NEXT(DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST,
-                         DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME);
+  if (!integrator_state_volume_stack_is_empty(INTEGRATOR_STATE_PASS)) {
+    const int shader = (hit) ? intersection_get_shader(kg, &isect) : SHADER_NONE;
+    const int flags = (hit) ? kernel_tex_fetch(__shaders, shader).flags : 0;
+
+    if (!integrator_intersect_terminate<DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST>(
+            INTEGRATOR_STATE_PASS, &isect, flags)) {
+      /* Continue with volume kernel if we are inside a volume, regardless
+       * if we hit anything. */
+      INTEGRATOR_PATH_NEXT(DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST,
+                           DEVICE_KERNEL_INTEGRATOR_SHADE_VOLUME);
+    }
+    else {
+      INTEGRATOR_PATH_TERMINATE(DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST);
+    }
     return;
   }
 #endif
@@ -142,8 +168,13 @@ ccl_device void integrator_intersect_closest(INTEGRATOR_STATE_ARGS)
     }
     else {
       /* Hit a surface, continue with surface kernel unless terminated. */
-      if (integrator_intersect_shader_next_kernel<DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST>(
-              INTEGRATOR_STATE_PASS, &isect)) {
+      const int shader = intersection_get_shader(kg, &isect);
+      const int flags = kernel_tex_fetch(__shaders, shader).flags;
+
+      if (!integrator_intersect_terminate<DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST>(
+              INTEGRATOR_STATE_PASS, &isect, flags)) {
+        integrator_intersect_shader_next_kernel<DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST>(
+            INTEGRATOR_STATE_PASS, &isect, shader, flags);
         return;
       }
       else {

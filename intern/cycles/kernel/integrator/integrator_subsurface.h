@@ -91,7 +91,7 @@ ccl_device void subsurface_color_bump_blur(const KernelGlobals *kg,
 }
 #  endif
 
-ccl_device bool subsurface_bounce(INTEGRATOR_STATE_ARGS, ShaderData *sd, const ShaderClosure *sc)
+ccl_device int subsurface_bounce(INTEGRATOR_STATE_ARGS, ShaderData *sd, const ShaderClosure *sc)
 {
   /* We should never have two consecutive BSSRDF bounces, the second one should
    * be converted to a diffuse BSDF to avoid this. */
@@ -124,7 +124,7 @@ ccl_device bool subsurface_bounce(INTEGRATOR_STATE_ARGS, ShaderData *sd, const S
   INTEGRATOR_STATE_WRITE(subsurface, radius) = bssrdf->radius;
   INTEGRATOR_STATE_WRITE(subsurface, roughness) = roughness;
 
-  return true;
+  return LABEL_SUBSURFACE_SCATTER;
 }
 
 ccl_device void subsurface_shader_data_setup(INTEGRATOR_STATE_ARGS, ShaderData *sd)

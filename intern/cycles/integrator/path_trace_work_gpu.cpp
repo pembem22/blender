@@ -50,6 +50,11 @@ PathTraceWorkGPU::PathTraceWorkGPU(Device *device,
       max_active_path_index_(0)
 {
   memset(&integrator_state_gpu_, 0, sizeof(integrator_state_gpu_));
+
+  /* Limit number of active paths to the half of the overall state. This is due to the logic in the
+   * path compaction which relies on the fact that regeneration does not happen sooner than half of
+   * the states are available again. */
+  min_num_active_paths_ = min(min_num_active_paths_, max_num_paths_ / 2);
 }
 
 void PathTraceWorkGPU::alloc_integrator_soa()
@@ -629,6 +634,12 @@ void PathTraceWorkGPU::copy_to_gpu_display(GPUDisplay *gpu_display,
                                            PassMode pass_mode,
                                            int num_samples)
 {
+  if (device_->have_error()) {
+    /* Don't attempt to update GPU display if the device has errors: the error state will make
+     * wrong decisions to happen about interop, causing more chained bugs. */
+    return;
+  }
+
   if (!interop_use_checked_) {
     Device *device = queue_->device;
     interop_use_ = device->should_use_graphics_interop();
@@ -657,8 +668,6 @@ void PathTraceWorkGPU::copy_to_gpu_display_naive(GPUDisplay *gpu_display,
                                                  PassMode pass_mode,
                                                  int num_samples)
 {
-  const int width = effective_buffer_params_.width;
-  const int height = effective_buffer_params_.height;
   const int final_width = render_buffers_->params.width;
   const int final_height = render_buffers_->params.height;
 
@@ -669,7 +678,7 @@ void PathTraceWorkGPU::copy_to_gpu_display_naive(GPUDisplay *gpu_display,
    * allocated memory as well. */
   if (gpu_display_rgba_half_.data_width != final_width ||
       gpu_display_rgba_half_.data_height != final_height) {
-    gpu_display_rgba_half_.alloc(width, height);
+    gpu_display_rgba_half_.alloc(final_width, final_height);
     /* TODO(sergey): There should be a way to make sure device-side memory is allocated without
      * transfering zeroes to the device. */
     queue_->zero_to_device(gpu_display_rgba_half_);
@@ -686,10 +695,8 @@ bool PathTraceWorkGPU::copy_to_gpu_display_interop(GPUDisplay *gpu_display,
                                                    PassMode pass_mode,
                                                    int num_samples)
 {
-  Device *device = queue_->device;
-
   if (!device_graphics_interop_) {
-    device_graphics_interop_ = device->graphics_interop_create();
+    device_graphics_interop_ = queue_->graphics_interop_create();
   }
 
   const DeviceGraphicsInteropDestination graphics_interop_dst =
