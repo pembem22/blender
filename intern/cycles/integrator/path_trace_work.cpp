@@ -28,23 +28,21 @@ CCL_NAMESPACE_BEGIN
 
 unique_ptr<PathTraceWork> PathTraceWork::create(Device *device,
                                                 DeviceScene *device_scene,
-                                                RenderBuffers *buffers,
                                                 bool *cancel_requested_flag)
 {
   if (device->info.type == DEVICE_CPU) {
-    return make_unique<PathTraceWorkCPU>(device, device_scene, buffers, cancel_requested_flag);
+    return make_unique<PathTraceWorkCPU>(device, device_scene, cancel_requested_flag);
   }
 
-  return make_unique<PathTraceWorkGPU>(device, device_scene, buffers, cancel_requested_flag);
+  return make_unique<PathTraceWorkGPU>(device, device_scene, cancel_requested_flag);
 }
 
 PathTraceWork::PathTraceWork(Device *device,
                              DeviceScene *device_scene,
-                             RenderBuffers *buffers,
                              bool *cancel_requested_flag)
     : device_(device),
       device_scene_(device_scene),
-      buffers_(buffers),
+      buffers_(make_unique<RenderBuffers>(device)),
       effective_buffer_params_(buffers_->params),
       cancel_requested_flag_(cancel_requested_flag)
 {
@@ -54,9 +52,135 @@ PathTraceWork::~PathTraceWork()
 {
 }
 
-void PathTraceWork::set_effective_buffer_params(const BufferParams &effective_buffer_params)
+RenderBuffers *PathTraceWork::get_render_buffers()
 {
+  return buffers_.get();
+}
+
+void PathTraceWork::set_effective_buffer_params(const BufferParams &effective_big_tile_params,
+                                                const BufferParams &effective_buffer_params)
+{
+  effective_big_tile_params_ = effective_big_tile_params;
   effective_buffer_params_ = effective_buffer_params;
+}
+
+bool PathTraceWork::has_multiple_works() const
+{
+  /* Assume if there are multiple works working on the same big tile none of the works gets the
+   * entire big tile to work on. */
+  return !(effective_big_tile_params_.width == effective_buffer_params_.width &&
+           effective_big_tile_params_.height == effective_buffer_params_.height &&
+           effective_big_tile_params_.full_x == effective_buffer_params_.full_x &&
+           effective_big_tile_params_.full_y == effective_buffer_params_.full_y);
+}
+
+void PathTraceWork::copy_to_render_buffers(RenderBuffers *render_buffers)
+{
+  copy_render_buffers_from_device();
+
+  const int64_t width = effective_buffer_params_.width;
+  const int64_t height = effective_buffer_params_.height;
+  const int64_t pass_stride = effective_buffer_params_.pass_stride;
+  const int64_t row_stride = width * pass_stride;
+  const int64_t data_size = row_stride * height * sizeof(float);
+
+  const int64_t offset_y = effective_buffer_params_.full_y - effective_big_tile_params_.full_y;
+  const int64_t offset_in_floats = offset_y * row_stride;
+
+  const float *src = buffers_->buffer.data();
+  float *dst = render_buffers->buffer.data() + offset_in_floats;
+
+  memcpy(dst, src, data_size);
+}
+
+void PathTraceWork::copy_from_render_buffers(const RenderBuffers *render_buffers)
+{
+  const int64_t width = effective_buffer_params_.width;
+  const int64_t height = effective_buffer_params_.height;
+  const int64_t pass_stride = effective_buffer_params_.pass_stride;
+  const int64_t row_stride = width * pass_stride;
+  const int64_t data_size = row_stride * height * sizeof(float);
+
+  const int64_t offset_y = effective_buffer_params_.full_y - effective_big_tile_params_.full_y;
+  const int64_t offset_in_floats = offset_y * row_stride;
+
+  const float *src = render_buffers->buffer.data() + offset_in_floats;
+  float *dst = buffers_->buffer.data();
+
+  memcpy(dst, src, data_size);
+
+  copy_render_buffers_to_device();
+}
+
+void PathTraceWork::copy_from_denoised_render_buffers(const RenderBuffers *render_buffers)
+{
+  const int64_t width = effective_buffer_params_.width;
+  const int64_t height = effective_buffer_params_.height;
+  const int64_t pass_stride = effective_buffer_params_.pass_stride;
+  const int64_t row_stride = width * pass_stride;
+  const int64_t num_pixels = width * height;
+
+  const int64_t offset_y = effective_buffer_params_.full_y - effective_big_tile_params_.full_y;
+  const int64_t offset_in_floats = offset_y * row_stride;
+
+  const float *src = render_buffers->buffer.data() + offset_in_floats;
+  float *dst = buffers_->buffer.data();
+
+  /* Gather pass offsets which are to be copied. */
+  /* TODO(sergey): Somehow de-duplicate logic with OptiX and OpenImage denoisers, so that we don't
+   * have duplicated list of passes in multiple places. */
+  const PassType pass_types[] = {
+      PASS_COMBINED, PASS_SHADOW_CATCHER, PASS_SHADOW_CATCHER_MATTE, PASS_NONE};
+  int pass_offsets[PASS_NUM];
+  int num_passes = 0;
+  for (int i = 0; i < PASS_NUM; ++i) {
+    if (pass_types[i] == PASS_NONE) {
+      break;
+    }
+    pass_offsets[i] = render_buffers->params.get_pass_offset(pass_types[i], PassMode::DENOISED);
+    ++num_passes;
+  }
+
+  for (int i = 0; i < num_pixels; ++i, src += pass_stride, dst += pass_stride) {
+    for (int pass_offset_idx = 0; pass_offset_idx < num_passes; ++pass_offset_idx) {
+      const int pass_offset = pass_offsets[pass_offset_idx];
+      if (pass_offset == PASS_UNUSED) {
+        continue;
+      }
+
+      /* TODO(sergey): Support non-RGBA passes. */
+      dst[pass_offset + 0] = src[pass_offset + 0];
+      dst[pass_offset + 1] = src[pass_offset + 1];
+      dst[pass_offset + 2] = src[pass_offset + 2];
+      dst[pass_offset + 3] = src[pass_offset + 3];
+    }
+  }
+
+  copy_render_buffers_to_device();
+}
+
+bool PathTraceWork::get_render_tile_pixels(const PassAccessor &pass_accessor,
+                                           const PassAccessor::Destination &destination)
+{
+  const int offset_y = effective_buffer_params_.full_y - effective_big_tile_params_.full_y;
+  const int width = effective_buffer_params_.width;
+
+  PassAccessor::Destination slice_destination = destination;
+  slice_destination.offset += offset_y * width;
+
+  return pass_accessor.get_render_tile_pixels(buffers_.get(), slice_destination);
+}
+
+bool PathTraceWork::set_render_tile_pixels(PassAccessor &pass_accessor,
+                                           const PassAccessor::Source &source)
+{
+  const int offset_y = effective_buffer_params_.full_y - effective_big_tile_params_.full_y;
+  const int width = effective_buffer_params_.width;
+
+  PassAccessor::Source slice_source = source;
+  slice_source.offset += offset_y * width;
+
+  return pass_accessor.set_render_tile_pixels(buffers_.get(), slice_source);
 }
 
 PassAccessor::PassAccessInfo PathTraceWork::get_display_pass_access_info(PassMode pass_mode) const

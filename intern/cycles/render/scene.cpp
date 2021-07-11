@@ -515,6 +515,10 @@ DeviceRequestedFeatures Scene::get_requested_device_features()
     requested_features.use_denoising = true;
   }
 
+  if (Pass::find(passes, PASS_AO)) {
+    requested_features.nodes_features |= NODE_FEATURE_RAYTRACE;
+  }
+
   return requested_features;
 }
 
@@ -582,7 +586,7 @@ void Scene::update_passes()
   }
 
   /* Create passes for shadow catcher. */
-  if (display_pass == PASS_SHADOW_CATCHER || has_shadow_catcher()) {
+  if (has_shadow_catcher()) {
     Pass::add_internal(passes, PASS_SHADOW_CATCHER, Pass::FLAG_AUTO);
     Pass::add_internal(passes, PASS_SHADOW_CATCHER_MATTE, Pass::FLAG_AUTO);
 
@@ -667,17 +671,26 @@ int Scene::get_max_closure_count()
   return max_closure_global;
 }
 
-bool Scene::has_shadow_catcher() const
+bool Scene::has_shadow_catcher()
 {
-  /* TODO(sergey): Calculate once when object manager changes. */
-
-  for (Object *object : objects) {
-    if (object->get_is_shadow_catcher()) {
-      return true;
+  if (shadow_catcher_modified_) {
+    has_shadow_catcher_ = false;
+    for (Object *object : objects) {
+      if (object->get_is_shadow_catcher()) {
+        has_shadow_catcher_ = true;
+        break;
+      }
     }
+
+    shadow_catcher_modified_ = false;
   }
 
-  return false;
+  return has_shadow_catcher_;
+}
+
+void Scene::tag_shadow_catcher_modified()
+{
+  shadow_catcher_modified_ = true;
 }
 
 template<> Light *Scene::create_node<Light>()

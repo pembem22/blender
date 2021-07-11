@@ -505,23 +505,23 @@ ccl_device_inline void kernel_accum_emission_or_background_pass(INTEGRATOR_STATE
   const int path_flag = INTEGRATOR_STATE(path, flag);
   int pass_offset = PASS_UNUSED;
 
+  /* Denoising albedo. */
+#  ifdef __DENOISING_FEATURES__
+  if (path_flag & PATH_RAY_DENOISING_FEATURES) {
+    if (kernel_data.film.pass_denoising_albedo != PASS_UNUSED) {
+      const SpectralColor denoising_feature_throughput = INTEGRATOR_STATE(
+          path, denoising_feature_throughput);
+      const SpectralColor denoising_albedo = denoising_feature_throughput * contribution;
+      kernel_write_pass_spectral_color_unaligned(INTEGRATOR_STATE_PASS,
+                                                 buffer + kernel_data.film.pass_denoising_albedo,
+                                                 denoising_albedo);
+    }
+  }
+#  endif /* __DENOISING_FEATURES__ */
+
   if (!(path_flag & PATH_RAY_ANY_PASS)) {
     /* Directly visible, write to emission or background pass. */
     pass_offset = pass;
-
-    /* Denoising albedo. */
-#  ifdef __DENOISING_FEATURES__
-    if (path_flag & PATH_RAY_DENOISING_FEATURES) {
-      if (kernel_data.film.pass_denoising_albedo != PASS_UNUSED) {
-        const SpectralColor denoising_feature_throughput = INTEGRATOR_STATE(
-            path, denoising_feature_throughput);
-        const SpectralColor denoising_albedo = denoising_feature_throughput * contribution;
-        kernel_write_pass_spectral_color_unaligned(INTEGRATOR_STATE_PASS,
-                                                   buffer + kernel_data.film.pass_denoising_albedo,
-                                                   denoising_albedo);
-      }
-    }
-#  endif /* __DENOISING_FEATURES__ */
   }
   else if (path_flag & PATH_RAY_REFLECT_PASS) {
     /* Indirectly visible through reflection. */
@@ -650,7 +650,7 @@ ccl_device_inline void kernel_accum_transparent(INTEGRATOR_STATE_CONST_ARGS,
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
     ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,
                                                                 render_buffer);
-    kernel_write_pass_float(buffer + 3, transparent);
+    kernel_write_pass_float(buffer + kernel_data.film.pass_combined + 3, transparent);
   }
 }
 

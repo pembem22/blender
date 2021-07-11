@@ -25,6 +25,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "MEM_guardedalloc.h"
+
 #include "BLI_alloca.h"
 #include "BLI_blenlib.h"
 #include "BLI_fileops_types.h"
@@ -108,7 +110,7 @@ void ED_file_path_button(bScreen *screen,
   UI_but_func_complete_set(but, autocomplete_directory, NULL);
   UI_but_funcN_set(but, file_directory_enter_handle, NULL, but);
 
-  /* TODO, directory editing is non-functional while a library is loaded
+  /* TODO: directory editing is non-functional while a library is loaded
    * until this is properly supported just disable it. */
   if (sfile && sfile->files && filelist_lib(sfile->files)) {
     UI_but_flag_enable(but, UI_BUT_DISABLED);
@@ -165,10 +167,10 @@ static void file_draw_icon(const SpaceFile *sfile,
   const float a2 = dimmed ? 0.3f : 0.0f;
   but = uiDefIconBut(
       block, UI_BTYPE_LABEL, 0, icon, x, y, width, height, NULL, 0.0f, 0.0f, a1, a2, NULL);
-  UI_but_func_tooltip_set(but, file_draw_tooltip_func, BLI_strdup(path));
+  UI_but_func_tooltip_set(but, file_draw_tooltip_func, BLI_strdup(path), MEM_freeN);
 
   if (drag) {
-    /* TODO duplicated from file_draw_preview(). */
+    /* TODO: duplicated from file_draw_preview(). */
     ID *id;
 
     if ((id = filelist_file_get_id(file))) {
@@ -398,7 +400,7 @@ static void file_draw_preview(const SpaceFile *sfile,
                          imb->x,
                          imb->y,
                          GPU_RGBA8,
-                         false,
+                         true,
                          imb->rect,
                          scale,
                          scale,
@@ -489,7 +491,8 @@ static void file_draw_preview(const SpaceFile *sfile,
       UI_but_drag_set_id(but, id);
     }
     /* path is no more static, cannot give it directly to but... */
-    else if (file->typeflag & FILE_TYPE_ASSET) {
+    else if (sfile->browse_mode == FILE_BROWSE_MODE_ASSETS &&
+             (file->typeflag & FILE_TYPE_ASSET) != 0) {
       char blend_path[FILE_MAX_LIBEXTRA];
 
       if (BLO_library_path_explode(path, blend_path, NULL, NULL)) {
@@ -520,6 +523,7 @@ static void renamebutton_cb(bContext *C, void *UNUSED(arg1), char *oldname)
   char orgname[FILE_MAX + 12];
   char filename[FILE_MAX + 12];
   wmWindowManager *wm = CTX_wm_manager(C);
+  wmWindow *win = CTX_wm_window(C);
   SpaceFile *sfile = (SpaceFile *)CTX_wm_space_data(C);
   ARegion *region = CTX_wm_region(C);
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
@@ -539,17 +543,15 @@ static void renamebutton_cb(bContext *C, void *UNUSED(arg1), char *oldname)
       else {
         /* If rename is successful, scroll to newly renamed entry. */
         BLI_strncpy(params->renamefile, filename, sizeof(params->renamefile));
-        params->rename_flag = FILE_PARAMS_RENAME_POSTSCROLL_PENDING;
-
-        if (sfile->smoothscroll_timer != NULL) {
-          WM_event_remove_timer(CTX_wm_manager(C), CTX_wm_window(C), sfile->smoothscroll_timer);
-        }
-        sfile->smoothscroll_timer = WM_event_add_timer(wm, CTX_wm_window(C), TIMER1, 1.0 / 1000.0);
-        sfile->scroll_offset = 0;
+        file_params_invoke_rename_postscroll(wm, win, sfile);
       }
 
       /* to make sure we show what is on disk */
-      ED_fileselect_clear(wm, CTX_data_scene(C), sfile);
+      ED_fileselect_clear(wm, sfile);
+    }
+    else {
+      /* Renaming failed, reset the name for further renaming handling. */
+      BLI_strncpy(params->renamefile, oldname, sizeof(params->renamefile));
     }
 
     ED_region_tag_redraw(region);
@@ -724,40 +726,45 @@ static void draw_columnheader_columns(const FileSelectParams *params,
 /**
  * Updates the stat string stored in file->entry if necessary.
  */
-static const char *filelist_get_details_column_string(FileAttributeColumnType column,
-                                                      const FileDirEntry *file,
-                                                      const bool small_size,
-                                                      const bool update_stat_strings)
+static const char *filelist_get_details_column_string(
+    FileAttributeColumnType column,
+    /* Generated string will be cached in the file, so non-const. */
+    FileDirEntry *file,
+    const bool small_size,
+    const bool update_stat_strings)
 {
   switch (column) {
     case COLUMN_DATETIME:
       if (!(file->typeflag & FILE_TYPE_BLENDERLIB) && !FILENAME_IS_CURRPAR(file->relpath)) {
-        if ((file->entry->datetime_str[0] == '\0') || update_stat_strings) {
+        if ((file->draw_data.datetime_str[0] == '\0') || update_stat_strings) {
           char date[FILELIST_DIRENTRY_DATE_LEN], time[FILELIST_DIRENTRY_TIME_LEN];
           bool is_today, is_yesterday;
 
           BLI_filelist_entry_datetime_to_string(
-              NULL, file->entry->time, small_size, time, date, &is_today, &is_yesterday);
+              NULL, file->time, small_size, time, date, &is_today, &is_yesterday);
 
           if (is_today || is_yesterday) {
             BLI_strncpy(date, is_today ? N_("Today") : N_("Yesterday"), sizeof(date));
           }
-          BLI_snprintf(
-              file->entry->datetime_str, sizeof(file->entry->datetime_str), "%s %s", date, time);
+          BLI_snprintf(file->draw_data.datetime_str,
+                       sizeof(file->draw_data.datetime_str),
+                       "%s %s",
+                       date,
+                       time);
         }
 
-        return file->entry->datetime_str;
+        return file->draw_data.datetime_str;
       }
       break;
     case COLUMN_SIZE:
       if ((file->typeflag & (FILE_TYPE_BLENDER | FILE_TYPE_BLENDER_BACKUP)) ||
           !(file->typeflag & (FILE_TYPE_DIR | FILE_TYPE_BLENDERLIB))) {
-        if ((file->entry->size_str[0] == '\0') || update_stat_strings) {
+        if ((file->draw_data.size_str[0] == '\0') || update_stat_strings) {
           BLI_filelist_entry_size_to_string(
-              NULL, file->entry->size, small_size, file->entry->size_str);
+              NULL, file->size, small_size, file->draw_data.size_str);
         }
 
-        return file->entry->size_str;
+        return file->draw_data.size_str;
       }
       break;
     default:
@@ -769,7 +776,7 @@ static const char *filelist_get_details_column_string(FileAttributeColumnType co
 
 static void draw_details_columns(const FileSelectParams *params,
                                  const FileLayout *layout,
-                                 const FileDirEntry *file,
+                                 FileDirEntry *file,
                                  const int pos_x,
                                  const int pos_y,
                                  const uchar text_col[4])
@@ -810,6 +817,8 @@ static void draw_details_columns(const FileSelectParams *params,
 
 void file_draw_list(const bContext *C, ARegion *region)
 {
+  wmWindowManager *wm = CTX_wm_manager(C);
+  wmWindow *win = CTX_wm_window(C);
   SpaceFile *sfile = CTX_wm_space_file(C);
   FileSelectParams *params = ED_fileselect_get_active_params(sfile);
   FileLayout *layout = ED_fileselect_get_layout(sfile, region);
@@ -880,12 +889,12 @@ void file_draw_list(const bContext *C, ARegion *region)
       //          printf("%s: preview task: %d\n", __func__, previews_running);
       if (previews_running && !sfile->previews_timer) {
         sfile->previews_timer = WM_event_add_timer_notifier(
-            CTX_wm_manager(C), CTX_wm_window(C), NC_SPACE | ND_SPACE_FILE_PREVIEW, 0.01);
+            wm, win, NC_SPACE | ND_SPACE_FILE_PREVIEW, 0.01);
       }
       if (!previews_running && sfile->previews_timer) {
         /* Preview is not running, no need to keep generating update events! */
         //              printf("%s: Inactive preview task, sleeping!\n", __func__);
-        WM_event_remove_timer_notifier(CTX_wm_manager(C), CTX_wm_window(C), sfile->previews_timer);
+        WM_event_remove_timer_notifier(wm, win, sfile->previews_timer);
         sfile->previews_timer = NULL;
       }
     }
@@ -996,8 +1005,19 @@ void file_draw_list(const bContext *C, ARegion *region)
       UI_but_flag_enable(but, UI_BUT_NO_UTF8); /* allow non utf8 names */
       UI_but_flag_disable(but, UI_BUT_UNDO);
       if (false == UI_but_active_only(C, region, block, but)) {
-        file_selflag = filelist_entry_select_set(
-            sfile->files, file, FILE_SEL_REMOVE, FILE_SEL_EDITING, CHECK_ALL);
+        /* Note that this is the only place where we can also handle a cancelled renaming. */
+
+        file_params_rename_end(wm, win, sfile, file);
+
+        /* After the rename button is removed, we need to make sure the view is redrawn once more,
+         * in case selection changed. Usually UI code would trigger that redraw, but the rename
+         * operator may have been called from a different region.
+         * Tagging regions for redrawing while drawing is rightfully prevented. However, this
+         * active button removing basically introduces handling logic to drawing code. So a
+         * notifier should be an acceptable workaround. */
+        WM_event_add_notifier_ex(wm, win, NC_SPACE | ND_SPACE_FILE_PARAMS, NULL);
+
+        file_selflag = filelist_entry_select_get(sfile->files, file, CHECK_ALL);
       }
     }
 

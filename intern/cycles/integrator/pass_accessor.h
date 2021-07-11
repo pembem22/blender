@@ -69,7 +69,17 @@ class PassAccessor {
     device_ptr d_pixels = 0;
     device_ptr d_pixels_half_rgba = 0;
 
+    /* Number of components per pixel in the floating-point destination.
+     * Is ignored for half4 destination (where number of components is implied to be 4). */
     int num_components = 0;
+
+    /* Offset in pixels from the beginning of pixels storage.
+     * Allows to get pixels of render buffer into a partial slice of the destination. */
+    int offset = 0;
+
+    /* Number of floats per pixel. When zero is the same as `num_components`.
+     * NOTE: Is ignored for half4 destination. */
+    int pixel_stride = 0;
   };
 
   class Source {
@@ -80,6 +90,10 @@ class PassAccessor {
     /* CPU-side pointers. only usable by the `PassAccessorCPU`. */
     const float *pixels = nullptr;
     int num_components = 0;
+
+    /* Offset in pixels from the beginning of pixels storage.
+     * Allows to get pixels of render buffer into a partial slice of the destination. */
+    int offset = 0;
   };
 
   PassAccessor(const PassAccessInfo &pass_access_info, float exposure, int num_samples);

@@ -36,10 +36,7 @@ struct KernelWorkTile;
  * This implementation suits best devices which have a lot of integrator states, such as GPU. */
 class PathTraceWorkGPU : public PathTraceWork {
  public:
-  PathTraceWorkGPU(Device *device,
-                   DeviceScene *device_scene,
-                   RenderBuffers *buffers,
-                   bool *cancel_requested_flag);
+  PathTraceWorkGPU(Device *device, DeviceScene *device_scene, bool *cancel_requested_flag);
 
   virtual void init_execution() override;
 
@@ -48,6 +45,10 @@ class PathTraceWorkGPU : public PathTraceWork {
   virtual void copy_to_gpu_display(GPUDisplay *gpu_display,
                                    PassMode pass_mode,
                                    int num_samples) override;
+
+  virtual bool copy_render_buffers_from_device() override;
+  virtual bool copy_render_buffers_to_device() override;
+  virtual bool zero_render_buffers() override;
 
   virtual int adaptive_sampling_converge_filter_count_active(float threshold, bool reset) override;
 
@@ -81,6 +82,9 @@ class PathTraceWorkGPU : public PathTraceWork {
    * If there are no shadow catcher in the scene, it the same as `max_num_paths_`. */
   int get_max_num_camera_paths() const;
 
+  /* Check whether graphics interop can be used for the GPUDisplay update. */
+  bool should_use_graphics_interop();
+
   /* Naive implementation of the `copy_to_gpu_display()` which performs film conversion on the
    * device, then copies pixels to the host and pushes them to the `gpu_display`. */
   void copy_to_gpu_display_naive(GPUDisplay *gpu_display, PassMode pass_mode, int num_samples);
@@ -108,9 +112,6 @@ class PathTraceWorkGPU : public PathTraceWork {
 
   /* Scheduler which gives work to path tracing threads. */
   WorkTileScheduler work_tile_scheduler_;
-
-  /* Output render buffer. */
-  RenderBuffers *render_buffers_;
 
   /* Integrate state for paths. */
   IntegratorStateGPU integrator_state_gpu_;

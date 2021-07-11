@@ -214,6 +214,10 @@ void BKE_gpencil_layer_mask_remove_ref(struct bGPdata *gpd, const char *name);
 struct bGPDlayer_Mask *BKE_gpencil_layer_mask_named_get(struct bGPDlayer *gpl, const char *name);
 void BKE_gpencil_layer_mask_sort(struct bGPdata *gpd, struct bGPDlayer *gpl);
 void BKE_gpencil_layer_mask_sort_all(struct bGPdata *gpd);
+void BKE_gpencil_layer_mask_copy(const struct bGPDlayer *gpl_src, struct bGPDlayer *gpl_dst);
+void BKE_gpencil_layer_mask_cleanup(struct bGPdata *gpd, struct bGPDlayer *gpl);
+void BKE_gpencil_layer_mask_cleanup_all_layers(struct bGPdata *gpd);
+
 void BKE_gpencil_layer_frames_sort(struct bGPDlayer *gpl, bool *r_has_duplicate_frames);
 
 struct bGPDlayer *BKE_gpencil_layer_get_by_name(struct bGPdata *gpd,
@@ -278,20 +282,25 @@ bool BKE_gpencil_from_image(struct SpaceImage *sima,
                             const float size,
                             const bool mask);
 
-/* Iterator */
+/* Iterators */
 /* frame & stroke are NULL if it is a layer callback. */
 typedef void (*gpIterCb)(struct bGPDlayer *layer,
                          struct bGPDframe *frame,
                          struct bGPDstroke *stroke,
                          void *thunk);
 
-void BKE_gpencil_visible_stroke_iter(struct ViewLayer *view_layer,
-                                     struct Object *ob,
+void BKE_gpencil_visible_stroke_iter(struct bGPdata *gpd,
                                      gpIterCb layer_cb,
                                      gpIterCb stroke_cb,
-                                     void *thunk,
-                                     bool do_onion,
-                                     int cfra);
+                                     void *thunk);
+
+void BKE_gpencil_visible_stroke_advanced_iter(struct ViewLayer *view_layer,
+                                              struct Object *ob,
+                                              gpIterCb layer_cb,
+                                              gpIterCb stroke_cb,
+                                              void *thunk,
+                                              bool do_onion,
+                                              int cfra);
 
 extern void (*BKE_gpencil_batch_cache_dirty_tag_cb)(struct bGPdata *gpd);
 extern void (*BKE_gpencil_batch_cache_free_cb)(struct bGPdata *gpd);

@@ -188,7 +188,7 @@ class SceneParams {
 
   int curve_subdivisions()
   {
-    /* Matching the tesselation rate limit in Embree. */
+    /* Matching the tessellation rate limit in Embree. */
     return clamp(1 << hair_subdivisions, 1, 16);
   }
 };
@@ -275,7 +275,8 @@ class Scene : public NodeOwner {
   /* Update passes so that they contain all passes required for the configured functionality. */
   void update_passes();
 
-  bool has_shadow_catcher() const;
+  bool has_shadow_catcher();
+  void tag_shadow_catcher_modified();
 
   /* This function is used to create a node of a specified type instead of
    * calling 'new', and sets the scene as the owner of the node.
@@ -335,6 +336,9 @@ class Scene : public NodeOwner {
   DeviceRequestedFeatures loaded_kernel_features;
 
   bool load_kernels(Progress &progress, bool lock_scene = true);
+
+  bool has_shadow_catcher_ = false;
+  bool shadow_catcher_modified_ = true;
 
   /* ** Split kernel routines ** */
 

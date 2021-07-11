@@ -448,7 +448,7 @@ static void gpencil_weightpaint_select_stroke(tGP_BrushWeightpaintData *gso,
           ((!ELEM(V2D_IS_CLIPPED, pc2[0], pc2[1])) && BLI_rcti_isect_pt(rect, pc2[0], pc2[1]))) {
         /* Check if point segment of stroke had anything to do with
          * brush region  (either within stroke painted, or on its lines)
-         * - this assumes that linewidth is irrelevant
+         * - this assumes that line-width is irrelevant.
          */
         if (gpencil_stroke_inside_circle(gso->mval, radius, pc1[0], pc1[1], pc2[0], pc2[1])) {
 
@@ -555,7 +555,7 @@ static bool gpencil_weightpaint_brush_do_frame(bContext *C,
         break;
     }
   }
-  /* Clear the selected array, but keep the memory allocation.*/
+  /* Clear the selected array, but keep the memory allocation. */
   gso->pbuffer = gpencil_select_buffer_ensure(
       gso->pbuffer, &gso->pbuffer_size, &gso->pbuffer_used, true);
 

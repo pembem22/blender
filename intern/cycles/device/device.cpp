@@ -310,14 +310,13 @@ DeviceInfo Device::get_multi_device(const vector<DeviceInfo> &subdevices,
   }
 
   DeviceInfo info;
-  info.type = subdevices.front().type;
+  info.type = DEVICE_NONE;
   info.id = "MULTI";
   info.description = "Multi Device";
   info.num = 0;
 
   info.has_half_images = true;
   info.has_nanovdb = true;
-  info.has_volume_decoupled = true;
   info.has_osl = true;
   info.has_profiling = true;
   info.has_peer_memory = false;
@@ -355,14 +354,16 @@ DeviceInfo Device::get_multi_device(const vector<DeviceInfo> &subdevices,
     info.id += device.id;
 
     /* Set device type to MULTI if subdevices are not of a common type. */
-    if (device.type != info.type) {
+    if (info.type == DEVICE_NONE) {
+      info.type = device.type;
+    }
+    else if (device.type != info.type) {
       info.type = DEVICE_MULTI;
     }
 
     /* Accumulate device info. */
     info.has_half_images &= device.has_half_images;
     info.has_nanovdb &= device.has_nanovdb;
-    info.has_volume_decoupled &= device.has_volume_decoupled;
     info.has_osl &= device.has_osl;
     info.has_profiling &= device.has_profiling;
     info.has_peer_memory |= device.has_peer_memory;

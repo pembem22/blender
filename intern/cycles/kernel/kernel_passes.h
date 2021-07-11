@@ -35,7 +35,7 @@ ccl_device_forceinline ccl_global float *kernel_pass_pixel_render_buffer(
 
 #ifdef __DENOISING_FEATURES__
 
-ccl_device_inline void kernel_write_denoising_features(
+ccl_device_forceinline void kernel_write_denoising_features(
     INTEGRATOR_STATE_ARGS, const ShaderData *sd, ccl_global float *ccl_restrict render_buffer)
 {
   if (!(INTEGRATOR_STATE(path, flag) & PATH_RAY_DENOISING_FEATURES)) {
@@ -128,7 +128,7 @@ ccl_device_inline void kernel_write_denoising_features(
 #ifdef __SHADOW_CATCHER__
 
 /* Write shadow catcher passes on a bounce from the shadow catcher object. */
-ccl_device_inline void kernel_write_shadow_catcher_bounce_data(
+ccl_device_forceinline void kernel_write_shadow_catcher_bounce_data(
     INTEGRATOR_STATE_ARGS, const ShaderData *sd, ccl_global float *ccl_restrict render_buffer)
 {
   if (!kernel_data.integrator.has_shadow_catcher) {
@@ -312,79 +312,5 @@ ccl_device_inline void kernel_write_data_passes(INTEGRATOR_STATE_ARGS,
   }
 #endif
 }
-
-#if 0
-ccl_device_inline void kernel_write_light_passes(const KernelGlobals *ccl_restrict kg,
-                                                 ccl_global float *ccl_restrict buffer,
-                                                 PathRadiance *L)
-{
-#  ifdef __PASSES__
-  int light_flag = kernel_data.film.light_pass_flag;
-
-  if (!kernel_data.film.use_light_pass)
-    return;
-
-  if (light_flag & PASSMASK(AO))
-    kernel_write_pass_float3(buffer + kernel_data.film.pass_ao, L->ao);
-#  endif
-}
-#endif
-
-#if 0
-ccl_device_inline void kernel_write_result(const KernelGlobals *ccl_restrict kg,
-                                           ccl_global float *ccl_restrict buffer,
-                                           int sample,
-                                           PathRadiance *L)
-{
-  PROFILING_INIT(kg, PROFILING_WRITE_RESULT);
-  PROFILING_OBJECT(PRIM_NONE);
-
-  float alpha;
-  float3 L_sum = path_radiance_clamp_and_sum(kg, L, &alpha);
-
-  if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
-    kernel_write_pass_float4(buffer, make_float4(L_sum.x, L_sum.y, L_sum.z, alpha));
-  }
-
-
-  /* Adaptive Sampling. Fill the additional buffer with the odd samples and calculate our stopping
-     criteria. This is the heuristic from "A hierarchical automatic stopping condition for Monte
-     Carlo global illumination" except that here it is applied per pixel and not in hierarchical
-     tiles. */
-  if (kernel_data.film.pass_adaptive_aux_buffer != PASS_UNUSED) {
-    if (sample_is_even(kernel_data.integrator.sampling_pattern, sample)) {
-      kernel_write_pass_float4(buffer + kernel_data.film.pass_adaptive_aux_buffer,
-                               make_float4(L_sum.x * 2.0f, L_sum.y * 2.0f, L_sum.z * 2.0f, 0.0f));
-    }
-#  ifdef __KERNEL_CPU__
-    if ((sample > kernel_data.integrator.adaptive_min_samples) &&
-        kernel_data.integrator.adaptive_stop_per_sample) {
-      const int step = kernel_data.integrator.adaptive_step;
-
-      if ((sample & (step - 1)) == (step - 1)) {
-        kernel_do_adaptive_stopping(kg, buffer, sample);
-      }
-    }
-#  endif
-  }
-
-  /* Write the sample count as negative numbers initially to mark the samples as in progress.
-   * Once the tile has finished rendering, the sign gets flipped and all the pixel values
-   * are scaled as if they were taken at a uniform sample count. */
-  if (kernel_data.film.pass_sample_count != PASS_UNUSED) {
-    /* Make sure it's a negative number. In progressive refine mode, this bit gets flipped between
-     * passes. */
-#  ifdef __ATOMIC_PASS_WRITE__
-    atomic_fetch_and_or_uint32((ccl_global uint *)(buffer + kernel_data.film.pass_sample_count),
-                               0x80000000);
-#  else
-    if (buffer[kernel_data.film.pass_sample_count] > 0) {
-      buffer[kernel_data.film.pass_sample_count] *= -1.0f;
-    }
-#  endif
-    kernel_write_pass_float(buffer + kernel_data.film.pass_sample_count, -1.0f);
-  }
-}
-#endif
 
 CCL_NAMESPACE_END

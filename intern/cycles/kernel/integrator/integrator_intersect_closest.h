@@ -30,7 +30,6 @@ CCL_NAMESPACE_BEGIN
 
 template<uint32_t current_kernel>
 ccl_device_forceinline bool integrator_intersect_terminate(INTEGRATOR_STATE_ARGS,
-                                                           const Intersection *ccl_restrict isect,
                                                            const int shader_flags)
 {
 
@@ -82,6 +81,8 @@ ccl_device_forceinline bool integrator_intersect_terminate(INTEGRATOR_STATE_ARGS
   return false;
 }
 
+/* Note that current_kernel is a template value since making this a variable
+ * leads to poor performance with CUDA atomics. */
 template<uint32_t current_kernel>
 ccl_device_forceinline void integrator_intersect_shader_next_kernel(
     INTEGRATOR_STATE_ARGS,
@@ -90,7 +91,7 @@ ccl_device_forceinline void integrator_intersect_shader_next_kernel(
     const int shader_flags)
 {
   /* Setup next kernel to execute. */
-  if (shader_flags & SD_HAS_RAYTRACE) {
+  if ((shader_flags & SD_HAS_RAYTRACE) || (kernel_data.film.pass_ao != PASS_UNUSED)) {
     INTEGRATOR_PATH_NEXT_SORTED(
         current_kernel, DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE, shader);
   }
@@ -142,11 +143,12 @@ ccl_device void integrator_intersect_closest(INTEGRATOR_STATE_ARGS)
 
 #ifdef __VOLUME__
   if (!integrator_state_volume_stack_is_empty(INTEGRATOR_STATE_PASS)) {
-    const int shader = (hit) ? intersection_get_shader(kg, &isect) : SHADER_NONE;
-    const int flags = (hit) ? kernel_tex_fetch(__shaders, shader).flags : 0;
+    const bool hit_surface = hit && !(isect.type & PRIMITIVE_LAMP);
+    const int shader = (hit_surface) ? intersection_get_shader(kg, &isect) : SHADER_NONE;
+    const int flags = (hit_surface) ? kernel_tex_fetch(__shaders, shader).flags : 0;
 
     if (!integrator_intersect_terminate<DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST>(
-            INTEGRATOR_STATE_PASS, &isect, flags)) {
+            INTEGRATOR_STATE_PASS, flags)) {
       /* Continue with volume kernel if we are inside a volume, regardless
        * if we hit anything. */
       INTEGRATOR_PATH_NEXT(DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST,
@@ -172,7 +174,7 @@ ccl_device void integrator_intersect_closest(INTEGRATOR_STATE_ARGS)
       const int flags = kernel_tex_fetch(__shaders, shader).flags;
 
       if (!integrator_intersect_terminate<DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST>(
-              INTEGRATOR_STATE_PASS, &isect, flags)) {
+              INTEGRATOR_STATE_PASS, flags)) {
         integrator_intersect_shader_next_kernel<DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST>(
             INTEGRATOR_STATE_PASS, &isect, shader, flags);
         return;

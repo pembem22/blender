@@ -450,6 +450,7 @@ extern StructRNA RNA_NodeOutputFileSlotFile;
 extern StructRNA RNA_NodeOutputFileSlotLayer;
 extern StructRNA RNA_NodeSocket;
 extern StructRNA RNA_NodeSocketInterface;
+extern StructRNA RNA_NodeSocketStandard;
 extern StructRNA RNA_NodeTree;
 extern StructRNA RNA_NoiseGpencilModifier;
 extern StructRNA RNA_NoiseTexture;
@@ -1358,9 +1359,9 @@ int RNA_parameter_flag(PropertyRNA *prop);
 
 ParameterList *RNA_parameter_list_create(ParameterList *parms, PointerRNA *ptr, FunctionRNA *func);
 void RNA_parameter_list_free(ParameterList *parms);
-int RNA_parameter_list_size(ParameterList *parms);
-int RNA_parameter_list_arg_count(ParameterList *parms);
-int RNA_parameter_list_ret_count(ParameterList *parms);
+int RNA_parameter_list_size(const ParameterList *parms);
+int RNA_parameter_list_arg_count(const ParameterList *parms);
+int RNA_parameter_list_ret_count(const ParameterList *parms);
 
 void RNA_parameter_list_begin(ParameterList *parms, ParameterIterator *iter);
 void RNA_parameter_list_next(ParameterIterator *iter);

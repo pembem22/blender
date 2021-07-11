@@ -128,7 +128,7 @@ static void setup_app_userdef(BlendFileData *bfd)
 }
 
 /**
- * Context matching, handle no-ui case
+ * Context matching, handle no-UI case.
  *
  * \note this is called on Undo so any slow conversion functions here
  * should be avoided or check (mode != LOAD_UNDO).
@@ -272,7 +272,7 @@ static void setup_app_data(bContext *C,
 
     /* We need to tag this here because events may be handled immediately after.
      * only the current screen is important because we won't have to handle
-     * events from multiple screens at once.*/
+     * events from multiple screens at once. */
     if (curscreen) {
       BKE_screen_gizmo_tag_refresh(curscreen);
     }

@@ -17,6 +17,8 @@
 #include "blender_viewport.h"
 
 #include "blender_util.h"
+#include "render/pass.h"
+#include "util/util_logging.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -41,8 +43,8 @@ BlenderViewportParameters::BlenderViewportParameters(BL::SpaceView3D &b_v3d, boo
   BL::View3DShading shading = b_v3d.shading();
   PointerRNA cshading = RNA_pointer_get(&shading.ptr, "cycles");
 
-  /* We only copy the shading parameters if we are in look dev mode. otherwise
-   * defaults are being used. These defaults mimic normal render settings */
+  /* We only copy the shading parameters if we are in look-dev mode.
+   * Otherwise defaults are being used. These defaults mimic normal render settings. */
   if (shading.type() == BL::View3DShading::type_RENDERED) {
     use_scene_world = shading.use_scene_world_render();
     use_scene_lights = shading.use_scene_lights_render();
@@ -56,7 +58,22 @@ BlenderViewportParameters::BlenderViewportParameters(BL::SpaceView3D &b_v3d, boo
   }
 
   /* Film. */
-  display_pass = (PassType)get_enum(cshading, "render_pass", -1, -1);
+
+  /* Lookup display pass based on the enum identifier.
+   * This is because integer values of python enum are not aligned with the passes definition in
+   * the kernel. */
+
+  display_pass = PASS_COMBINED;
+
+  const string display_pass_identifier = get_enum_identifier(cshading, "render_pass");
+  if (!display_pass_identifier.empty()) {
+    const ustring pass_type_identifier(string_to_lower(display_pass_identifier));
+    const NodeEnum *pass_type_enum = Pass::get_type_enum();
+    if (pass_type_enum->exists(pass_type_identifier)) {
+      display_pass = static_cast<PassType>((*pass_type_enum)[pass_type_identifier]);
+    }
+  }
+
   if (use_developer_ui) {
     show_active_pixels = get_boolean(cshading, "show_active_pixels");
   }

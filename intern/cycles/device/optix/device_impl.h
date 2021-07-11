@@ -34,6 +34,7 @@ enum {
   PG_RGEN_INTERSECT_CLOSEST,
   PG_RGEN_INTERSECT_SHADOW,
   PG_RGEN_INTERSECT_SUBSURFACE,
+  PG_RGEN_INTERSECT_VOLUME_STACK,
   PG_RGEN_SHADE_SURFACE_RAYTRACE,
   PG_MISS,
   PG_HITD, /* Default hit group. */
@@ -45,6 +46,7 @@ enum {
 #  endif
   PG_CALL_SVM_AO,
   PG_CALL_SVM_BEVEL,
+  PG_CALL_AO_PASS,
   NUM_PROGRAM_GROUPS
 };
 
@@ -57,7 +59,7 @@ static const int NUM_HIT_PROGRAM_GROUPS = 5;
 static const int NUM_HIT_PROGRAM_GROUPS = 3;
 #  endif
 static const int CALLABLE_PROGRAM_GROUPS_BASE = PG_CALL_SVM_AO;
-static const int NUM_CALLABLE_PROGRAM_GROUPS = 2;
+static const int NUM_CALLABLE_PROGRAM_GROUPS = 3;
 
 /* List of OptiX pipelines. */
 enum { PIP_SHADE_RAYTRACE, PIP_INTERSECT, NUM_PIPELINES };
@@ -85,10 +87,11 @@ class OptiXDevice : public CUDADevice {
 
   class Denoiser {
    public:
-    explicit Denoiser(CUDADevice *device);
+    explicit Denoiser(OptiXDevice *device);
     ~Denoiser();
 
-    CUDADevice *device;
+    OptiXDevice *device;
+    OptiXDeviceQueue queue;
 
     OptixDenoiser optix_denoiser = nullptr;
 
@@ -104,7 +107,8 @@ class OptiXDevice : public CUDADevice {
     size_t scratch_offset = 0;
     size_t scratch_size = 0;
 
-    int input_passes = 0;
+    bool use_pass_albedo = false;
+    bool use_pass_normal = false;
   };
   Denoiser denoiser_;
 
@@ -144,30 +148,44 @@ class OptiXDevice : public CUDADevice {
   class DenoisePass;
 
   virtual void denoise_buffer(const DeviceDenoiseTask &task) override;
+  virtual DeviceQueue *get_denoise_queue() override;
+
+  /* Read guiding passes from the render buffers, preprocess them in a way which is expected by
+   * OptiX and store in the guiding passes memory within the given context.
+   *
+   * Pre=-processing of the guiding passes is to only hapopen once per context lifetime. DO not
+   * preprocess them for every pass which is being denoised. */
+  bool denoise_filter_guiding_preprocess(DenoiseContext &context);
+
+  /* Set fake albedo pixels in the albedo guiding pass storage.
+   * After this point only passes which do not need albedo for denoising can be processed. */
+  bool denoise_filter_guiding_set_fake_albedo(DenoiseContext &context);
 
   void denoise_pass(DenoiseContext &context, PassType pass_type);
 
-  /* Read pixels from the input noisy image and store scaled result in the given memory. */
-  void denoise_read_input_pixels(DenoiseContext &context, const DenoisePass &pass) const;
+  /* Read input color pass from the render buffer into the memory which corresponds to the noisy
+   * input within the given context. Pixels are scaled to the number of samples, but are not
+   * preprocessed yet. */
+  void denoise_color_read(DenoiseContext &context, const DenoisePass &pass);
 
-  /* Run corresponding conversion kernels, preparing data for the denoiser or copying data from the
+  /* Run corresponding filter kernels, preparing data for the denoiser or copying data from the
    * denoiser result to the render buffer. */
-  bool denoise_filter_convert_to_rgb(DenoiseContext &context, const DenoisePass &pass);
-  bool denoise_filter_convert_from_rgb(DenoiseContext &context, const DenoisePass &pass);
+  bool denoise_filter_color_preprocess(DenoiseContext &context, const DenoisePass &pass);
+  bool denoise_filter_color_postprocess(DenoiseContext &context, const DenoisePass &pass);
 
-  /* Make sure the OptiX denoiser is created and configured for the given task. */
-  bool denoise_ensure(const DeviceDenoiseTask &task);
+  /* Make sure the OptiX denoiser is created and configured. */
+  bool denoise_ensure(DenoiseContext &context);
 
   /* Create OptiX denoiser descriptor if needed.
    * Will do nothing if the current OptiX descriptor is usable for the given parameters.
    * If the OptiX denoiser descriptor did re-allocate here it is left unconfigured. */
-  bool denoise_create_if_needed(const DenoiseParams &params);
+  bool denoise_create_if_needed(DenoiseContext &context);
 
   /* Configure existing OptiX denoiser descriptor for the use for the given task. */
-  bool denoise_configure_if_needed(const DeviceDenoiseTask &task);
+  bool denoise_configure_if_needed(DenoiseContext &context);
 
-  /* Run configured denoiser on the given task. */
-  bool denoise_run(DenoiseContext &context);
+  /* Run configured denoiser. */
+  bool denoise_run(DenoiseContext &context, const DenoisePass &pass);
 };
 
 CCL_NAMESPACE_END

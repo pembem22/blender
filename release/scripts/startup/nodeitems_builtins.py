@@ -506,8 +506,17 @@ geometry_node_categories = [
         NodeItem("GeometryNodeCurveResample"),
         NodeItem("GeometryNodeMeshToCurve"),
         NodeItem("GeometryNodeCurveToPoints"),
+        NodeItem("GeometryNodeCurveEndpoints"),
         NodeItem("GeometryNodeCurveLength"),
         NodeItem("GeometryNodeCurveReverse"),
+    ]),
+    GeometryNodeCategory("GEO_PRIMITIVES_CURVE", "Curve Primitives", items=[
+        NodeItem("GeometryNodeCurvePrimitiveLine"),
+        NodeItem("GeometryNodeCurvePrimitiveCircle"),
+        NodeItem("GeometryNodeCurveStar"),
+        NodeItem("GeometryNodeCurveSpiral"),
+        NodeItem("GeometryNodeCurveQuadraticBezier"),
+        NodeItem("GeometryNodeCurvePrimitiveBezierSegment"),
     ]),
     GeometryNodeCategory("GEO_GEOMETRY", "Geometry", items=[
         NodeItem("GeometryNodeBoundBox"),
@@ -538,9 +547,9 @@ geometry_node_categories = [
         NodeItem("GeometryNodeTriangulate"),
         NodeItem("GeometryNodeEdgeSplit"),
         NodeItem("GeometryNodeSubdivisionSurface"),
-        NodeItem("GeometryNodeSubdivide"),
+        NodeItem("GeometryNodeMeshSubdivide"),
     ]),
-    GeometryNodeCategory("GEO_PRIMITIVES", "Mesh Primitives", items=[
+    GeometryNodeCategory("GEO_PRIMITIVES_MESH", "Mesh Primitives", items=[
         NodeItem("GeometryNodeMeshCircle"),
         NodeItem("GeometryNodeMeshCone"),
         NodeItem("GeometryNodeMeshCube"),
@@ -565,6 +574,7 @@ geometry_node_categories = [
         NodeItem("ShaderNodeMath"),
         NodeItem("FunctionNodeBooleanMath"),
         NodeItem("FunctionNodeFloatCompare"),
+        NodeItem("FunctionNodeFloatToInt"),
         NodeItem("GeometryNodeSwitch"),
     ]),
     GeometryNodeCategory("GEO_VECTOR", "Vector", items=[
@@ -573,6 +583,9 @@ geometry_node_categories = [
         NodeItem("ShaderNodeCombineXYZ"),
         NodeItem("ShaderNodeVectorMath"),
         NodeItem("ShaderNodeVectorRotate"),
+    ]),
+    GeometryNodeCategory("GEO_OUTPUT", "Output", items=[
+        NodeItem("GeometryNodeViewer"),
     ]),
     GeometryNodeCategory("GEO_VOLUME", "Volume", items=[
         NodeItem("GeometryNodePointsToVolume"),

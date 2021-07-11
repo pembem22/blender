@@ -227,7 +227,7 @@ ccl_device void subsurface_random_walk_coefficients(const SpectralColor albedo,
 
 ccl_device_forceinline float eval_phase_dwivedi(float v, float phase_log, float cos_theta)
 {
-  /* Eq. 9 from [2] using precomputed log((v + 1) / (v - 1))*/
+  /* Eq. 9 from [2] using precomputed log((v + 1) / (v - 1)) */
   return 1.0f / ((v - cos_theta) * phase_log);
 }
 
@@ -531,8 +531,8 @@ ccl_device_inline bool subsurface_random_walk(INTEGRATOR_STATE_ARGS)
   INTEGRATOR_STATE_WRITE(path, throughput) = throughput;
 
   const int shader = intersection_get_shader(kg, &ss_isect.hits[0]);
-  const int flags = kernel_tex_fetch(__shaders, shader).flags;
-  if (flags & SD_HAS_RAYTRACE) {
+  const int shader_flags = kernel_tex_fetch(__shaders, shader).flags;
+  if ((shader_flags & SD_HAS_RAYTRACE) || (kernel_data.film.pass_ao != PASS_UNUSED)) {
     INTEGRATOR_PATH_NEXT_SORTED(DEVICE_KERNEL_INTEGRATOR_INTERSECT_SUBSURFACE,
                                 DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE,
                                 shader);

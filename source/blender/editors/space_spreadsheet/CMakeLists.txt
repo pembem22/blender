@@ -27,6 +27,7 @@ set(INC
   ../../gpu
   ../../makesdna
   ../../makesrna
+  ../../nodes
   ../../windowmanager
   ../../../../intern/glew-mx
   ../../../../intern/guardedalloc
@@ -34,22 +35,26 @@ set(INC
 
 set(SRC
   space_spreadsheet.cc
-  spreadsheet_context.cc
   spreadsheet_column.cc
+  spreadsheet_context.cc
   spreadsheet_data_source.cc
   spreadsheet_data_source_geometry.cc
+  spreadsheet_dataset_draw.cc
+  spreadsheet_dataset_layout.cc
   spreadsheet_draw.cc
   spreadsheet_layout.cc
   spreadsheet_ops.cc
   spreadsheet_row_filter.cc
   spreadsheet_row_filter_ui.cc
 
-  spreadsheet_context.hh
   spreadsheet_cell_value.hh
   spreadsheet_column.hh
   spreadsheet_column_values.hh
+  spreadsheet_context.hh
   spreadsheet_data_source.hh
   spreadsheet_data_source_geometry.hh
+  spreadsheet_dataset_draw.hh
+  spreadsheet_dataset_layout.hh
   spreadsheet_draw.hh
   spreadsheet_intern.hh
   spreadsheet_layout.hh

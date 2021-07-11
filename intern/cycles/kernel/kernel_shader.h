@@ -283,7 +283,7 @@ ccl_device_inline void shader_setup_from_sample(const KernelGlobals *ccl_restric
   /* primitive */
   sd->object = object;
   sd->lamp = LAMP_NONE;
-  /* currently no access to bvh prim index for strand sd->prim*/
+  /* Currently no access to bvh prim index for strand sd->prim. */
   sd->prim = prim;
   sd->u = u;
   sd->v = v;
@@ -470,7 +470,7 @@ ccl_device_inline void shader_setup_from_volume(const KernelGlobals *ccl_restric
   sd->object = OBJECT_NONE; /* todo: fill this for texture coordinates */
   sd->lamp = LAMP_NONE;
   sd->prim = PRIM_NONE;
-  sd->type = PRIMITIVE_NONE;
+  sd->type = PRIMITIVE_VOLUME;
 
   sd->u = 0.0f;
   sd->v = 0.0f;
@@ -583,11 +583,7 @@ ccl_device_inline void shader_prepare_closures(INTEGRATOR_STATE_CONST_ARGS, Shad
 
 ccl_device_inline bool shader_bsdf_is_transmission(const ShaderData *sd, const float3 omega_in)
 {
-  /* For curves use the smooth normal, particularly for ribbons the geometric
-   * normal gives too much darkening otherwise. */
-  const float3 Ng = (sd->type & PRIMITIVE_ALL_CURVE) ? sd->N : sd->Ng;
-
-  return dot(Ng, omega_in) < 0.0f;
+  return dot(sd->N, omega_in) < 0.0f;
 }
 
 ccl_device_forceinline bool _shader_bsdf_exclude(ClosureType type, uint light_shader_flags)
@@ -910,6 +906,21 @@ ccl_device float3 shader_bsdf_average_normal(const KernelGlobals *kg, const Shad
     const ShaderClosure *sc = &sd->closure[i];
     if (CLOSURE_IS_BSDF_OR_BSSRDF(sc->type))
       N += sc->N * fabsf(average(sc->weight));
+  }
+
+  return (is_zero(N)) ? sd->N : normalize(N);
+}
+
+ccl_device float3 shader_bsdf_ao_normal(const KernelGlobals *kg, const ShaderData *sd)
+{
+  float3 N = zero_float3();
+
+  for (int i = 0; i < sd->num_closure; i++) {
+    const ShaderClosure *sc = &sd->closure[i];
+    if (CLOSURE_IS_BSDF_DIFFUSE(sc->type)) {
+      const DiffuseBsdf *bsdf = (const DiffuseBsdf *)sc;
+      N += bsdf->N * fabsf(average(sc->weight));
+    }
   }
 
   return (is_zero(N)) ? sd->N : normalize(N);

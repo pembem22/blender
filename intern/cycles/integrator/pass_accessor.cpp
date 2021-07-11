@@ -336,6 +336,8 @@ void PassAccessor::init_kernel_film_convert(KernelFilmConvert *kfilm_convert,
   kfilm_convert->show_active_pixels = pass_access_info_.show_active_pixels;
 
   kfilm_convert->num_components = destination.num_components;
+  kfilm_convert->pixel_stride = destination.pixel_stride ? destination.pixel_stride :
+                                                           destination.num_components;
 
   kfilm_convert->is_denoised = (mode == PassMode::DENOISED);
 }
@@ -354,7 +356,7 @@ bool PassAccessor::set_render_tile_pixels(RenderBuffers *render_buffers, const S
   const int num_components = source.num_components;
 
   float *out = buffer_data + pass_access_info_.offset;
-  const float *in = source.pixels;
+  const float *in = source.pixels + source.offset * num_components;
 
   for (int i = 0; i < size; i++, out += pass_stride, in += num_components) {
     memcpy(out, in, sizeof(float) * num_components);

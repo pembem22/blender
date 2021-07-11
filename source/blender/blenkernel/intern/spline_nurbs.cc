@@ -45,7 +45,7 @@ void NURBSpline::copy_data(Spline &dst) const
   nurbs.positions_ = positions_;
   nurbs.weights_ = weights_;
   nurbs.knots_ = knots_;
-  nurbs.knots_dirty_ = false;
+  nurbs.knots_dirty_ = knots_dirty_;
   nurbs.radii_ = radii_;
   nurbs.tilts_ = tilts_;
 }
@@ -346,7 +346,10 @@ Span<NURBSpline::BasisCache> NURBSpline::calculate_basis_cache() const
 
   const int size = this->size();
   const int eval_size = this->evaluated_points_size();
-  BLI_assert(this->evaluated_edges_size() > 0);
+  if (eval_size == 0) {
+    return {};
+  }
+
   basis_cache_.resize(eval_size);
 
   const int order = this->order();

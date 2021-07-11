@@ -81,7 +81,6 @@ set(SRC_HEADERS
   kernel_math.h
   kernel_montecarlo.h
   kernel_passes.h
-  kernel_path.h
   kernel_path_state.h
   kernel_profiling.h
   kernel_projection.h
@@ -235,6 +234,7 @@ set(SRC_INTEGRATOR_HEADERS
   integrator/integrator_intersect_closest.h
   integrator/integrator_intersect_shadow.h
   integrator/integrator_intersect_subsurface.h
+  integrator/integrator_intersect_volume_stack.h
   integrator/integrator_megakernel.h
   integrator/integrator_shade_background.h
   integrator/integrator_shade_light.h

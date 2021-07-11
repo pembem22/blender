@@ -116,7 +116,6 @@ CCL_NAMESPACE_BEGIN
 #define __PRINCIPLED__
 #define __SUBSURFACE__
 #define __VOLUME__
-#define __VOLUME_SCATTER__
 #define __CMJ__
 #define __SHADOW_RECORD_ALL__
 #define __BRANCHED_PATH__
@@ -127,7 +126,6 @@ CCL_NAMESPACE_BEGIN
 #  ifdef WITH_OSL
 #    define __OSL__
 #  endif
-#  define __VOLUME_DECOUPLED__
 #  define __VOLUME_RECORD_ALL__
 #endif /* __KERNEL_CPU__ */
 
@@ -150,7 +148,6 @@ CCL_NAMESPACE_BEGIN
 #endif
 #ifdef __NO_VOLUME__
 #  undef __VOLUME__
-#  undef __VOLUME_SCATTER__
 #endif
 #ifdef __NO_SUBSURFACE__
 #  undef __SUBSURFACE__
@@ -348,6 +345,7 @@ typedef enum ClosureLabel {
 #define PASS_NAME_JOIN(a, b) a##_##b
 #define PASSMASK(pass) (1 << ((PASS_NAME_JOIN(PASS, pass)) % 32))
 
+// NOTE: Keep in sync with `Pass::get_type_enum()`.
 typedef enum PassType {
   PASS_NONE = 0,
 
@@ -532,26 +530,23 @@ typedef enum PrimitiveType {
   PRIMITIVE_MOTION_CURVE_THICK = (1 << 3),
   PRIMITIVE_CURVE_RIBBON = (1 << 4),
   PRIMITIVE_MOTION_CURVE_RIBBON = (1 << 5),
-  /* Lamp primitive is not included below on purpose,
-   * since it is no real traceable primitive.
-   */
-  PRIMITIVE_LAMP = (1 << 6),
+  PRIMITIVE_VOLUME = (1 << 6),
+  PRIMITIVE_LAMP = (1 << 7),
 
   PRIMITIVE_ALL_TRIANGLE = (PRIMITIVE_TRIANGLE | PRIMITIVE_MOTION_TRIANGLE),
   PRIMITIVE_ALL_CURVE = (PRIMITIVE_CURVE_THICK | PRIMITIVE_MOTION_CURVE_THICK |
                          PRIMITIVE_CURVE_RIBBON | PRIMITIVE_MOTION_CURVE_RIBBON),
+  PRIMITIVE_ALL_VOLUME = (PRIMITIVE_VOLUME),
   PRIMITIVE_ALL_MOTION = (PRIMITIVE_MOTION_TRIANGLE | PRIMITIVE_MOTION_CURVE_THICK |
                           PRIMITIVE_MOTION_CURVE_RIBBON),
-  PRIMITIVE_ALL = (PRIMITIVE_ALL_TRIANGLE | PRIMITIVE_ALL_CURVE),
+  PRIMITIVE_ALL = (PRIMITIVE_ALL_TRIANGLE | PRIMITIVE_ALL_CURVE | PRIMITIVE_ALL_VOLUME |
+                   PRIMITIVE_LAMP),
 
-  /* Total number of different traceable primitives.
-   * NOTE: This is an actual value, not a bitflag.
-   */
-  PRIMITIVE_NUM_TOTAL = 7,
+  PRIMITIVE_NUM = 8,
 } PrimitiveType;
 
-#define PRIMITIVE_PACK_SEGMENT(type, segment) ((segment << PRIMITIVE_NUM_TOTAL) | (type))
-#define PRIMITIVE_UNPACK_SEGMENT(type) (type >> PRIMITIVE_NUM_TOTAL)
+#define PRIMITIVE_PACK_SEGMENT(type, segment) ((segment << PRIMITIVE_NUM) | (type))
+#define PRIMITIVE_UNPACK_SEGMENT(type) (type >> PRIMITIVE_NUM)
 
 typedef enum CurveShapeType {
   CURVE_RIBBON = 0,
@@ -1091,9 +1086,13 @@ typedef struct KernelFilmConvert {
   /* Number of components to write to. */
   int num_components;
 
+  /* Number of floats per pixel. When zero is the same as `num_components`.
+   * NOTE: Is ignored for half4 destination. */
+  int pixel_stride;
+
   int is_denoised;
 
-  int pad1, pad2;
+  int pad1;
 } KernelFilmConvert;
 static_assert_align(KernelFilmConvert, 16);
 
@@ -1278,7 +1277,8 @@ typedef struct KernelObject {
   float cryptomatte_object;
   float cryptomatte_asset;
 
-  float shadow_terminator_offset;
+  float shadow_terminator_shading_offset;
+  float shadow_terminator_geometry_offset;
   float pad1, pad2, pad3;
 } KernelObject;
 static_assert_align(KernelObject, 16);
@@ -1425,6 +1425,7 @@ typedef enum DeviceKernel {
   DEVICE_KERNEL_INTEGRATOR_INTERSECT_CLOSEST,
   DEVICE_KERNEL_INTEGRATOR_INTERSECT_SHADOW,
   DEVICE_KERNEL_INTEGRATOR_INTERSECT_SUBSURFACE,
+  DEVICE_KERNEL_INTEGRATOR_INTERSECT_VOLUME_STACK,
   DEVICE_KERNEL_INTEGRATOR_SHADE_BACKGROUND,
   DEVICE_KERNEL_INTEGRATOR_SHADE_LIGHT,
   DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE,
@@ -1467,8 +1468,10 @@ typedef enum DeviceKernel {
   DEVICE_KERNEL_ADAPTIVE_SAMPLING_CONVERGENCE_FILTER_X,
   DEVICE_KERNEL_ADAPTIVE_SAMPLING_CONVERGENCE_FILTER_Y,
 
-  DEVICE_KERNEL_FILTER_CONVERT_TO_RGB,
-  DEVICE_KERNEL_FILTER_CONVERT_FROM_RGB,
+  DEVICE_KERNEL_FILTER_GUIDING_PREPROCESS,
+  DEVICE_KERNEL_FILTER_GUIDING_SET_FAKE_ALBEDO,
+  DEVICE_KERNEL_FILTER_COLOR_PREPROCESS,
+  DEVICE_KERNEL_FILTER_COLOR_POSTPROCESS,
 
   DEVICE_KERNEL_PREFIX_SUM,
 

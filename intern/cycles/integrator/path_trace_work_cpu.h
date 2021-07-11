@@ -39,10 +39,7 @@ class CPUKernels;
  * queues on the render device which makes this work be only usable on CPU. */
 class PathTraceWorkCPU : public PathTraceWork {
  public:
-  PathTraceWorkCPU(Device *device,
-                   DeviceScene *device_scene,
-                   RenderBuffers *buffers,
-                   bool *cancel_requested_flag);
+  PathTraceWorkCPU(Device *device, DeviceScene *device_scene, bool *cancel_requested_flag);
 
   virtual void init_execution() override;
 
@@ -51,6 +48,10 @@ class PathTraceWorkCPU : public PathTraceWork {
   virtual void copy_to_gpu_display(GPUDisplay *gpu_display,
                                    PassMode pass_mode,
                                    int num_samples) override;
+
+  virtual bool copy_render_buffers_from_device() override;
+  virtual bool copy_render_buffers_to_device() override;
+  virtual bool zero_render_buffers() override;
 
   virtual int adaptive_sampling_converge_filter_count_active(float threshold, bool reset) override;
 
@@ -69,9 +70,6 @@ class PathTraceWorkCPU : public PathTraceWork {
    * accessing it, but some "localization" is required to decouple from kernel globals stored
    * on the device level. */
   vector<CPUKernelThreadGlobals> kernel_thread_globals_;
-
-  /* Render output buffers. */
-  RenderBuffers *render_buffers_;
 };
 
 CCL_NAMESPACE_END

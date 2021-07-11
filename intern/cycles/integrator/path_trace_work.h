@@ -39,17 +39,22 @@ class PathTraceWork {
    * viewport. */
   static unique_ptr<PathTraceWork> create(Device *device,
                                           DeviceScene *device_scene,
-                                          RenderBuffers *buffers,
                                           bool *cancel_requested_flag);
 
   virtual ~PathTraceWork();
 
-  /* Set effective parameters within the render buffers.
+  /* Access the render buffers.
    *
-   * TODO(sergey): Currently is used as a part of an update for resolution divider changes. Might
-   * need to become more generic once/if we want to support "re-slicing" of the full render buffer
-   * according to the device performance. */
-  void set_effective_buffer_params(const BufferParams &effective_buffer_params);
+   * Is only supposed to be used by the PathTrace to update buffer allocation and slicing to
+   * correspond to the big tile size and relative device performance. */
+  RenderBuffers *get_render_buffers();
+
+  /* Set effective parameters of the big tile and the work itself. */
+  void set_effective_buffer_params(const BufferParams &effective_big_tile_params,
+                                   const BufferParams &effective_buffer_params);
+
+  /* Check whether the big tile is being worked on by multiple path trace works. */
+  bool has_multiple_works() const;
 
   /* Initialize execution of kernels.
    * Will ensure that all device queues are initialized for execution.
@@ -71,6 +76,47 @@ class PathTraceWork {
                                    PassMode pass_mode,
                                    int num_samples) = 0;
 
+  /* Copy data from/to given render buffers.
+   * Will copy pixels from a corresponding place (from multi-device point of view) of the render
+   * buffers, and copy work's render buffers to the corresponding place of the destination. */
+
+  /* Notes:
+   * - Copies work's render buffer from the device.
+   * - Copies CPU-side buffer of the given buffer
+   * - Does not copy the buffer to its device. */
+  void copy_to_render_buffers(RenderBuffers *render_buffers);
+
+  /* Notes:
+   * - Does not copy given render buffers from the device.
+   * - Copies work's render buffer to its device. */
+  void copy_from_render_buffers(const RenderBuffers *render_buffers);
+
+  /* Special version of the `copy_from_render_buffers()` which only copies denosied passes from the
+   * given render buffers, leaving rest of the passes.
+   *
+   * Same notes about device copying aplies to this call as well. */
+  void copy_from_denoised_render_buffers(const RenderBuffers *render_buffers);
+
+  /* Copy render buffers to/from device using an appropriate device queue when needed so that
+   * things are executed in order with the `render_samples()`. */
+  virtual bool copy_render_buffers_from_device() = 0;
+  virtual bool copy_render_buffers_to_device() = 0;
+
+  /* Zero render buffers to/from device using an appropriate device queue when needed so that
+   * things are executed in order with the `render_samples()`. */
+  virtual bool zero_render_buffers() = 0;
+
+  /* Access pixels rendered by this work and copy them to the coresponding location in the
+   * destination.
+   *
+   * NOTE: Does not perform copy of buffers from the device. Use `copy_render_tile_from_device()`
+   * to update host-side data. */
+  bool get_render_tile_pixels(const PassAccessor &pass_accessor,
+                              const PassAccessor::Destination &destination);
+
+  /* Set pass data for baking. */
+  bool set_render_tile_pixels(PassAccessor &pass_accessor, const PassAccessor::Source &source);
+
   /* Perform convergence test on the render buffer, and filter the convergence mask.
    * Returns number of active pixels (the ones which did not converge yet). */
   virtual int adaptive_sampling_converge_filter_count_active(float threshold, bool reset) = 0;
@@ -91,10 +137,7 @@ class PathTraceWork {
   }
 
  protected:
-  PathTraceWork(Device *device,
-                DeviceScene *device_scene,
-                RenderBuffers *buffers,
-                bool *cancel_requested_flag);
+  PathTraceWork(Device *device, DeviceScene *device_scene, bool *cancel_requested_flag);
 
   virtual PassAccessor::PassAccessInfo get_display_pass_access_info(PassMode pass_mode) const;
 
@@ -105,12 +148,15 @@ class PathTraceWork {
   /* Device side scene storage, that may be used for integrator logic. */
   DeviceScene *device_scene_;
 
-  /* Render buffers where sampling is being accumulated into.
+  /* Render buffers where sampling is being accumulated into, allocated for a fraction of the big
+   * tile which is being rendered by this work.
    * It also defines possible subset of a big tile in the case of multi-device rendering. */
-  RenderBuffers *buffers_;
+  unique_ptr<RenderBuffers> buffers_;
 
-  /* Effective parameters of the render buffer.
-   * Might be different from buffers_->params when there is a resolution divider involved. */
+  /* Effective parameters of the big tile and render buffer.
+   * The latter might be different from buffers_->params when there is a resolution divider
+   * involved. */
+  BufferParams effective_big_tile_params_;
   BufferParams effective_buffer_params_;
 
   bool *cancel_requested_flag_ = nullptr;

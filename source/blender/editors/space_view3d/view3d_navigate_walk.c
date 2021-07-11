@@ -20,7 +20,7 @@
  * Interactive walk navigation modal operator
  * (similar to walking around in a first person game).
  *
- * \note Similar logic to `view3d_fly.c` changes here may apply there too.
+ * \note Similar logic to `view3d_navigate_fly.c` changes here may apply there too.
  */
 
 /* defines VIEW3D_OT_navigate - walk modal operator */
@@ -98,7 +98,7 @@ enum {
   WALK_MODAL_JUMP,
   WALK_MODAL_JUMP_STOP,
   WALK_MODAL_TELEPORT,
-  WALK_MODAL_TOGGLE,
+  WALK_MODAL_GRAVITY_TOGGLE,
   WALK_MODAL_ACCELERATE,
   WALK_MODAL_DECELERATE,
 };
@@ -164,7 +164,7 @@ void walk_modal_keymap(wmKeyConfig *keyconf)
       {WALK_MODAL_JUMP, "JUMP", 0, "Jump", "Jump when in walk mode"},
       {WALK_MODAL_JUMP_STOP, "JUMP_STOP", 0, "Jump (Off)", "Stop pushing jump"},
 
-      {WALK_MODAL_TOGGLE, "GRAVITY_TOGGLE", 0, "Toggle Gravity", "Toggle gravity effect"},
+      {WALK_MODAL_GRAVITY_TOGGLE, "GRAVITY_TOGGLE", 0, "Toggle Gravity", "Toggle gravity effect"},
 
       {0, NULL, 0, NULL, NULL},
   };
@@ -234,7 +234,7 @@ typedef struct WalkInfo {
   wmNDOFMotionData *ndof;
 #endif
 
-  /* walk state state */
+  /* Walk state. */
   /** The base speed without run/slow down modifications. */
   float base_speed;
   /** The speed the view is moving per redraw. */
@@ -694,7 +694,7 @@ static void walkEvent(bContext *C, WalkInfo *walk, const wmEvent *event)
         walk->is_cursor_first = false;
       }
       else {
-        /* note, its possible the system isn't giving us the warp event
+        /* NOTE: its possible the system isn't giving us the warp event
          * ideally we shouldn't have to worry about this, see: T45361 */
         wmWindow *win = CTX_wm_window(C);
         WM_cursor_warp(win,
@@ -708,8 +708,6 @@ static void walkEvent(bContext *C, WalkInfo *walk, const wmEvent *event)
       walk->is_cursor_absolute = true;
       copy_v2_v2_int(walk->prev_mval, event->mval);
       copy_v2_v2_int(walk->center_mval, event->mval);
-      /* Without this we can't turn 180d with the default speed of 1.0. */
-      walk->mouse_speed *= 4.0f;
     }
 #endif /* USE_TABLET_SUPPORT */
 
@@ -941,7 +939,7 @@ static void walkEvent(bContext *C, WalkInfo *walk, const wmEvent *event)
 #undef JUMP_TIME_MAX
 #undef JUMP_SPEED_MIN
 
-      case WALK_MODAL_TOGGLE:
+      case WALK_MODAL_GRAVITY_TOGGLE:
         if (walk->navigation_mode == WALK_MODE_GRAVITY) {
           walk_navigation_mode_set(walk, WALK_MODE_FREE);
         }
@@ -982,16 +980,13 @@ static float getVelocityZeroTime(const float gravity, const float velocity)
 
 static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
 {
-#define WALK_ROTATE_RELATIVE_FAC 2.2f           /* More is faster, relative to region size. */
-#define WALK_ROTATE_CONSTANT_FAC DEG2RAD(0.15f) /* More is faster, radians per-pixel. */
+#define WALK_ROTATE_TABLET_FAC 8.8f             /* Higher is faster, relative to region size. */
+#define WALK_ROTATE_CONSTANT_FAC DEG2RAD(0.15f) /* Higher is faster, radians per-pixel. */
 #define WALK_TOP_LIMIT DEG2RADF(85.0f)
 #define WALK_BOTTOM_LIMIT DEG2RADF(-80.0f)
 #define WALK_MOVE_SPEED base_speed
 #define WALK_BOOST_FACTOR ((void)0, walk->speed_factor)
 
-  /* walk mode - Ctrl+Shift+F
-   * a walk loop where the user can move move the view as if they are in a walk game
-   */
   RegionView3D *rv3d = walk->rv3d;
   ARegion *region = walk->region;
 
@@ -1067,7 +1062,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
 #ifdef USE_TABLET_SUPPORT
           if (walk->is_cursor_absolute) {
             y /= region->winy;
-            y *= WALK_ROTATE_RELATIVE_FAC;
+            y *= WALK_ROTATE_TABLET_FAC;
           }
           else
 #endif
@@ -1116,7 +1111,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
 #ifdef USE_TABLET_SUPPORT
           if (walk->is_cursor_absolute) {
             x /= region->winx;
-            x *= WALK_ROTATE_RELATIVE_FAC;
+            x *= WALK_ROTATE_TABLET_FAC;
           }
           else
 #endif
@@ -1336,7 +1331,7 @@ static int walkApply(bContext *C, WalkInfo *walk, bool is_confirm)
   }
 
   return OPERATOR_FINISHED;
-#undef WALK_ROTATE_RELATIVE_FAC
+#undef WALK_ROTATE_TABLET_FAC
 #undef WALK_TOP_LIMIT
 #undef WALK_BOTTOM_LIMIT
 #undef WALK_MOVE_SPEED
