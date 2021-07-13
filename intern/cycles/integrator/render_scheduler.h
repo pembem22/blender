@@ -70,6 +70,10 @@ class RenderScheduler {
  public:
   RenderScheduler(bool headless, bool background, int pixel_size);
 
+  /* Allows to disable work re-balancing works, allowing to schedule as much to a single device
+   * as possible. */
+  void set_need_schedule_rebalance(bool need_schedule_rebalance);
+
   bool is_background() const;
 
   void set_denoiser_params(const DenoiseParams &params);
@@ -136,6 +140,7 @@ class RenderScheduler {
   void report_adaptive_filter_time(const RenderWork &render_work, double time, bool is_cancelled);
   void report_denoise_time(const RenderWork &render_work, double time);
   void report_display_update_time(const RenderWork &render_work, double time);
+  void report_rebalance_time(const RenderWork &render_work, double time, bool balance_changed);
 
   /* Generate full multi-line report of the rendering process, including rendering parameters,
    * times, and so on. */
@@ -200,6 +205,9 @@ class RenderScheduler {
    * for the resolution divider calculation. */
   bool work_is_usable_for_first_render_estimation(const RenderWork &render_work);
 
+  /* Check whether timing report about the given work need to reset accumulated average time. */
+  bool work_report_reset_average(const RenderWork &render_work);
+
   void set_start_render_time_if_needed();
 
   /* CHeck whether render time limit has been reached (or exceeded), and if so store related
@@ -248,6 +256,12 @@ class RenderScheduler {
       return average_time_accumulator_ / num_average_times_;
     }
 
+    inline void reset_average()
+    {
+      average_time_accumulator_ = 0.0;
+      num_average_times_ = 0;
+    }
+
    protected:
     double total_wall_time_ = 0.0;
 
@@ -268,6 +282,17 @@ class RenderScheduler {
 
     /* Point in time at which last rebalance has been performed. */
     double last_rebalance_time = 0.0;
+
+    /* Number of rebalance works which has been requested to be performed.
+     * The path tracer might ignore the work if there is a single device rendering. */
+    int num_rebalance_requested = 0;
+
+    /* Number of rebalance works handled which did change balance across devices. */
+    int num_rebalance_changes = 0;
+
+    /* Denotes whether the latest performed rebalance work cause an actual rebalance of work across
+     * devices. */
+    bool last_rebalance_changed = false;
 
     /* Threshold for adaptive sampling which will be scheduled to work when not using progressive
      * noise floor. */
@@ -294,6 +319,13 @@ class RenderScheduler {
   TimeWithAverage adaptive_filter_time_;
   TimeWithAverage denoise_time_;
   TimeWithAverage display_update_time_;
+  TimeWithAverage rebalance_time_;
+
+  /* Whether to schedule device load rebalance works.
+   * Rebalancing requires some special treatment for update intervals and such, so if it's known
+   * that the rebalance will be ignored (due to single-device rendering i.e.) is better to fully
+   * ignore rebalancing logic. */
+  bool need_schedule_rebalance_works_ = false;
 
   /* Path tracing work will be scheduled for samples from within
    * [start_sample_, start_sample_ + num_samples_ - 1] range, inclusively. */

@@ -35,6 +35,11 @@ RenderScheduler::RenderScheduler(bool headless, bool background, int pixel_size)
   use_progressive_noise_floor_ = !background_;
 }
 
+void RenderScheduler::set_need_schedule_rebalance(bool need_schedule_rebalance)
+{
+  need_schedule_rebalance_works_ = need_schedule_rebalance;
+}
+
 bool RenderScheduler::is_background() const
 {
   return background_;
@@ -116,6 +121,9 @@ void RenderScheduler::reset(const BufferParams &buffer_params, int num_samples)
   state_.last_display_update_sample = -1;
 
   state_.last_rebalance_time = 0.0;
+  state_.num_rebalance_requested = 0;
+  state_.num_rebalance_changes = 0;
+  state_.last_rebalance_changed = false;
 
   /* TODO(sergey): Choose better initial value. */
   /* NOTE: The adaptive sampling settings might not be available here yet. */
@@ -135,6 +143,7 @@ void RenderScheduler::reset(const BufferParams &buffer_params, int num_samples)
   denoise_time_.reset();
   adaptive_filter_time_.reset();
   display_update_time_.reset();
+  rebalance_time_.reset();
 }
 
 bool RenderScheduler::render_work_reschedule_on_converge(RenderWork &render_work)
@@ -229,6 +238,13 @@ RenderWork RenderScheduler::get_render_work()
 
   render_work.init_render_buffers = (render_work.path_trace.start_sample == get_start_sample());
 
+  /* NOTE: Rebalance scheduler requires current number of samples to not be advanced forward. */
+  render_work.rebalance = work_need_rebalance();
+  if (render_work.rebalance) {
+    state_.last_rebalance_time = time_now;
+    ++state_.num_rebalance_requested;
+  }
+
   /* NOTE: Advance number of samples now, so that filter and denoising check can see that all the
    * samples are rendered. */
   state_.num_rendered_samples += render_work.path_trace.num_samples;
@@ -247,11 +263,6 @@ RenderWork RenderScheduler::get_render_work()
   if (render_work.update_display) {
     state_.last_display_update_time = time_now;
     state_.last_display_update_sample = state_.num_rendered_samples;
-  }
-
-  render_work.rebalance = work_need_rebalance();
-  if (render_work.rebalance) {
-    state_.last_rebalance_time = time_now;
   }
 
   return render_work;
@@ -287,6 +298,10 @@ void RenderScheduler::report_path_trace_time(const RenderWork &render_work,
                                                render_work.path_trace.num_samples;
   }
 
+  if (work_report_reset_average(render_work)) {
+    path_trace_time_.reset_average();
+  }
+
   path_trace_time_.add_average(final_time_approx, render_work.path_trace.num_samples);
 
   VLOG(4) << "Average path tracing time: " << path_trace_time_.get_average() << " seconds.";
@@ -304,6 +319,10 @@ void RenderScheduler::report_adaptive_filter_time(const RenderWork &render_work,
 
   const double final_time_approx = approximate_final_time(render_work, time);
 
+  if (work_report_reset_average(render_work)) {
+    adaptive_filter_time_.reset_average();
+  }
+
   adaptive_filter_time_.add_average(final_time_approx, render_work.path_trace.num_samples);
 
   VLOG(4) << "Average adaptive sampling filter  time: " << adaptive_filter_time_.get_average()
@@ -318,6 +337,10 @@ void RenderScheduler::report_denoise_time(const RenderWork &render_work, double 
 
   if (work_is_usable_for_first_render_estimation(render_work)) {
     first_render_time_.denoise_time = final_time_approx;
+  }
+
+  if (work_report_reset_average(render_work)) {
+    denoise_time_.reset_average();
   }
 
   denoise_time_.add_average(final_time_approx);
@@ -335,6 +358,10 @@ void RenderScheduler::report_display_update_time(const RenderWork &render_work, 
     first_render_time_.display_update_time = final_time_approx;
   }
 
+  if (work_report_reset_average(render_work)) {
+    display_update_time_.reset_average();
+  }
+
   display_update_time_.add_average(final_time_approx);
 
   VLOG(4) << "Average display update time: " << display_update_time_.get_average() << " seconds.";
@@ -343,6 +370,27 @@ void RenderScheduler::report_display_update_time(const RenderWork &render_work, 
    * did happen have more reliable point in time (without path tracing and denoising parts of the
    * render work). */
   state_.last_display_update_time = time_dt();
+}
+
+void RenderScheduler::report_rebalance_time(const RenderWork &render_work,
+                                            double time,
+                                            bool balance_changed)
+{
+  rebalance_time_.add_wall(time);
+
+  if (work_report_reset_average(render_work)) {
+    rebalance_time_.reset_average();
+  }
+
+  rebalance_time_.add_average(time);
+
+  if (balance_changed) {
+    ++state_.num_rebalance_changes;
+  }
+
+  state_.last_rebalance_changed = balance_changed;
+
+  VLOG(4) << "Average rebalance time: " << rebalance_time_.get_average() << " seconds.";
 }
 
 string RenderScheduler::full_report() const
@@ -394,6 +442,14 @@ string RenderScheduler::full_report() const
     result += "  Passes: " + passes + "\n";
   }
 
+  if (state_.num_rebalance_requested) {
+    result += "\nRebalancer:\n";
+    result += "  Number of requested rebalances: " + to_string(state_.num_rebalance_requested) +
+              "\n";
+    result += "  Number of performed rebalances: " + to_string(state_.num_rebalance_changes) +
+              "\n";
+  }
+
   result += "\nTime (in seconds):\n";
   result += string_printf("  %20s %20s %20s\n", "", "Wall", "Average");
   result += string_printf("  %20s %20f %20f\n",
@@ -417,6 +473,13 @@ string RenderScheduler::full_report() const
                           "Display Update",
                           display_update_time_.get_wall(),
                           display_update_time_.get_average());
+
+  if (state_.num_rebalance_requested) {
+    result += string_printf("  %20s %20f %20f\n",
+                            "Rebalance",
+                            rebalance_time_.get_wall(),
+                            rebalance_time_.get_average());
+  }
 
   const double total_time = path_trace_time_.get_wall() + adaptive_filter_time_.get_wall() +
                             denoise_time_.get_wall() + display_update_time_.get_wall();
@@ -714,6 +777,10 @@ bool RenderScheduler::work_need_rebalance()
    * work. */
   static const double kRebalanceIntervalInSeconds = 1;
 
+  if (!need_schedule_rebalance_works_) {
+    return false;
+  }
+
   if (state_.resolution_divider != pixel_size_) {
     /* Don't rebalance at a non-final resolution divider. Some reasons for this:
      *  - It will introduce unnecessary during navigation.
@@ -721,7 +788,7 @@ bool RenderScheduler::work_need_rebalance()
     return false;
   }
 
-  if (state_.num_rendered_samples == 1) {
+  if (state_.num_rendered_samples == 0) {
     return true;
   }
 
@@ -813,6 +880,16 @@ bool RenderScheduler::work_is_usable_for_first_render_estimation(const RenderWor
 {
   return render_work.resolution_divider == pixel_size_ &&
          render_work.path_trace.start_sample == start_sample_;
+}
+
+bool RenderScheduler::work_report_reset_average(const RenderWork &render_work)
+{
+  /* When rendering at a non-final resolution divider time average is not very useful because it
+   * will either bias average down (due to lower render times on the smaller images) or will give
+   * incorrect result when trying to estimate time which would have spent on the final resolution.
+   *
+   * So we only accumulate average for the latest resolution divider which was rendered. */
+  return render_work.resolution_divider != pixel_size_;
 }
 
 void RenderScheduler::set_start_render_time_if_needed()

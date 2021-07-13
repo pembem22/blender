@@ -66,6 +66,8 @@ PathTrace::PathTrace(Device *device, DeviceScene *device_scene, RenderScheduler 
 
   work_balance_infos_.resize(path_trace_works_.size());
   work_balance_do_initial(work_balance_infos_);
+
+  render_scheduler.set_need_schedule_rebalance(path_trace_works_.size() > 1);
 }
 
 void PathTrace::load_kernels()
@@ -529,18 +531,18 @@ void PathTrace::rebalance(const RenderWork &render_work)
 {
   static const int kLogLevel = 3;
 
-  scoped_timer timer;
-
-  const int num_works = path_trace_works_.size();
-
   if (!render_work.rebalance) {
     return;
   }
+
+  const int num_works = path_trace_works_.size();
 
   if (num_works == 1) {
     VLOG(kLogLevel) << "Ignoring rebalance work due to single device render.";
     return;
   }
+
+  const double start_time = time_dt();
 
   if (VLOG_IS_ON(kLogLevel)) {
     VLOG(kLogLevel) << "Perform rebalance work.";
@@ -556,13 +558,14 @@ void PathTrace::rebalance(const RenderWork &render_work)
   if (VLOG_IS_ON(kLogLevel)) {
     VLOG(kLogLevel) << "Calculated per-device weights for works:";
     for (int i = 0; i < num_works; ++i) {
-      LOG(INFO) << path_trace_works_[i]->get_device()->info.description << ": "
-                << work_balance_infos_[i].weight;
+      VLOG(kLogLevel) << path_trace_works_[i]->get_device()->info.description << ": "
+                      << work_balance_infos_[i].weight;
     }
   }
 
   if (!did_rebalance) {
     VLOG(kLogLevel) << "Balance in path trace works did not change.";
+    render_scheduler_.report_rebalance_time(render_work, time_dt() - start_time, false);
     return;
   }
 
@@ -576,7 +579,7 @@ void PathTrace::rebalance(const RenderWork &render_work)
 
   copy_from_render_buffers(big_tile_cpu_buffers.buffers.get());
 
-  VLOG(kLogLevel) << "Rebalance time (seconds): " << timer.get_time();
+  render_scheduler_.report_rebalance_time(render_work, time_dt() - start_time, true);
 }
 
 void PathTrace::cancel()
