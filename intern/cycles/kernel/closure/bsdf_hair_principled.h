@@ -236,7 +236,7 @@ ccl_device_inline void hair_attenuation(
     INTEGRATOR_STATE_CONST_ARGS, float f, SpectralColor T, SpectralColor *Ap, float *Ap_energy)
 {
   /* Primary specular (R). */
-  Ap[0] = make_float4(f, f, f, f);
+  Ap[0] = make_spectral_color(f);
 
   /* Transmission (TT). */
   SpectralColor col = sqr(1.0f - f) * T;
@@ -342,28 +342,28 @@ ccl_device SpectralColor bsdf_principled_hair_eval(INTEGRATOR_STATE_CONST_ARGS,
   Np = azimuthal_scattering(phi, 0, bsdf->s, gamma_o, gamma_t);
   F = Ap[0] * Mp * Np;
   F_energy = Ap_energy[0] * Mp * Np;
-  kernel_assert(is_finite(float4_to_float3(F)));
+  kernel_assert(is_finite(F) && is_finite(F_energy));
 
   /* Transmission (TT). */
   Mp = longitudinal_scattering(angles[2], angles[3], sin_theta_o, cos_theta_o, 0.25f * bsdf->v);
   Np = azimuthal_scattering(phi, 1, bsdf->s, gamma_o, gamma_t);
   F += Ap[1] * Mp * Np;
   F_energy += Ap_energy[1] * Mp * Np;
-  kernel_assert(is_finite(float4_to_float3(F)));
+  kernel_assert(is_finite(F) && is_finite(F_energy));
 
   /* Secondary specular (TRT). */
   Mp = longitudinal_scattering(angles[4], angles[5], sin_theta_o, cos_theta_o, 4.0f * bsdf->v);
   Np = azimuthal_scattering(phi, 2, bsdf->s, gamma_o, gamma_t);
   F += Ap[2] * Mp * Np;
   F_energy += Ap_energy[2] * Mp * Np;
-  kernel_assert(is_finite(float4_to_float3(F)));
+  kernel_assert(is_finite(F) && is_finite(F_energy));
 
   /* Residual component (TRRT+). */
   Mp = longitudinal_scattering(sin_theta_i, cos_theta_i, sin_theta_o, cos_theta_o, 4.0f * bsdf->v);
   Np = M_1_2PI_F;
   F += Ap[3] * Mp * Np;
   F_energy += Ap_energy[3] * Mp * Np;
-  kernel_assert(is_finite(float4_to_float3(F)));
+  kernel_assert(is_finite(F) && is_finite(F_energy));
 
   *pdf = F_energy;
   return F;
@@ -469,28 +469,28 @@ ccl_device int bsdf_principled_hair_sample(INTEGRATOR_STATE_CONST_ARGS,
   Np = azimuthal_scattering(phi, 0, bsdf->s, gamma_o, gamma_t);
   F = Ap[0] * Mp * Np;
   F_energy = Ap_energy[0] * Mp * Np;
-  kernel_assert(is_finite(float4_to_float3(F)));
+  kernel_assert(is_finite(F) && is_finite(F_energy));
 
   /* Transmission (TT). */
   Mp = longitudinal_scattering(angles[2], angles[3], sin_theta_o, cos_theta_o, 0.25f * bsdf->v);
   Np = azimuthal_scattering(phi, 1, bsdf->s, gamma_o, gamma_t);
   F += Ap[1] * Mp * Np;
   F_energy += Ap_energy[1] * Mp * Np;
-  kernel_assert(is_finite(float4_to_float3(F)));
+  kernel_assert(is_finite(F) && is_finite(F_energy));
 
   /* Secondary specular (TRT). */
   Mp = longitudinal_scattering(angles[4], angles[5], sin_theta_o, cos_theta_o, 4.0f * bsdf->v);
   Np = azimuthal_scattering(phi, 2, bsdf->s, gamma_o, gamma_t);
   F += Ap[2] * Mp * Np;
   F_energy += Ap_energy[2] * Mp * Np;
-  kernel_assert(is_finite(float4_to_float3(F)));
+  kernel_assert(is_finite(F) && is_finite(F_energy));
 
   /* Residual component (TRRT+). */
   Mp = longitudinal_scattering(sin_theta_i, cos_theta_i, sin_theta_o, cos_theta_o, 4.0f * bsdf->v);
   Np = M_1_2PI_F;
   F += Ap[3] * Mp * Np;
   F_energy += Ap_energy[3] * Mp * Np;
-  kernel_assert(is_finite(float4_to_float3(F)));
+  kernel_assert(is_finite(F) && is_finite(F_energy));
 
   *eval = F;
   *pdf = F_energy;
