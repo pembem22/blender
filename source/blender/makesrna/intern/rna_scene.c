@@ -6194,6 +6194,14 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
       "Create empty placeholder files while rendering frames (similar to Unix 'touch')");
   RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, NULL);
 
+  prop = RNA_def_property(srna, "use_spectral_rendering", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_boolean_sdna(prop, NULL, "mode", R_SPECTRAL_RENDERING);
+  RNA_def_property_boolean_default(prop, true);
+  RNA_def_property_ui_text(prop,
+                           "Spectral Rendering",
+                           "Calculate entire visible spectrum instead of only 3 color channels");
+  RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+
   prop = RNA_def_property(srna, "use_overwrite", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_negative_sdna(prop, NULL, "mode", R_NO_OVERWRITE);
   RNA_def_property_ui_text(prop, "Overwrite", "Overwrite existing files while rendering");

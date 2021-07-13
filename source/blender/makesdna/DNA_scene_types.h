@@ -1817,15 +1817,15 @@ typedef struct Scene {
 #define SCER_SHOW_SUBFRAME (1 << 3)
 
 /** #RenderData.mode */
-#define R_MODE_UNUSED_0 (1 << 0) /* dirty */
-#define R_MODE_UNUSED_1 (1 << 1) /* cleared */
-#define R_MODE_UNUSED_2 (1 << 2) /* cleared */
-#define R_MODE_UNUSED_3 (1 << 3) /* cleared */
-#define R_MODE_UNUSED_4 (1 << 4) /* cleared */
-#define R_MODE_UNUSED_5 (1 << 5) /* cleared */
-#define R_MODE_UNUSED_6 (1 << 6) /* cleared */
-#define R_MODE_UNUSED_7 (1 << 7) /* cleared */
-#define R_MODE_UNUSED_8 (1 << 8) /* cleared */
+#define R_MODE_UNUSED_0 (1 << 0)      /* dirty */
+#define R_SPECTRAL_RENDERING (1 << 1) /* cleared */
+#define R_MODE_UNUSED_2 (1 << 2)      /* cleared */
+#define R_MODE_UNUSED_3 (1 << 3)      /* cleared */
+#define R_MODE_UNUSED_4 (1 << 4)      /* cleared */
+#define R_MODE_UNUSED_5 (1 << 5)      /* cleared */
+#define R_MODE_UNUSED_6 (1 << 6)      /* cleared */
+#define R_MODE_UNUSED_7 (1 << 7)      /* cleared */
+#define R_MODE_UNUSED_8 (1 << 8)      /* cleared */
 #define R_BORDER (1 << 9)
 #define R_MODE_UNUSED_10 (1 << 10) /* cleared */
 #define R_CROP (1 << 11)
