@@ -96,9 +96,38 @@ class CPUKernels {
 
   /* Bake. */
 
-  CPUKernelFunction<void (*)(const KernelGlobals *, float *, int, int, int, int, int)> bake;
+  using BakeFunction =
+      CPUKernelFunction<void (*)(const KernelGlobals *, float *, int, int, int, int, int)>;
 
-  CPUKernels();
+  BakeFunction bake;
+
+  CPUKernels(IntegratorInitFunction integrator_init_from_camera,
+             IntegratorInitFunction integrator_init_from_bake,
+             IntegratorFunction integrator_intersect_closest,
+             IntegratorFunction integrator_intersect_shadow,
+             IntegratorFunction integrator_intersect_subsurface,
+             IntegratorFunction integrator_intersect_volume_stack,
+             IntegratorShadeFunction integrator_shade_background,
+             IntegratorShadeFunction integrator_shade_light,
+             IntegratorShadeFunction integrator_shade_shadow,
+             IntegratorShadeFunction integrator_shade_surface,
+             IntegratorShadeFunction integrator_shade_volume,
+             IntegratorShadeFunction integrator_megakernel,
+             ShaderEvalFunction shader_eval_displace,
+             ShaderEvalFunction shader_eval_background,
+             AdaptiveSamplingConvergenceCheckFunction adaptive_sampling_convergence_check,
+             AdaptiveSamplingFilterXFunction adaptive_sampling_filter_x,
+             AdaptiveSamplingFilterYFunction adaptive_sampling_filter_y,
+             BakeFunction bake);
+};
+
+class CPUKernelsRGB : public CPUKernels {
+ public:
+  CPUKernelsRGB();
+};
+class CPUKernelsSpectral : public CPUKernels {
+ public:
+  CPUKernelsSpectral();
 };
 
 CCL_NAMESPACE_END

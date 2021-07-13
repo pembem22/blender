@@ -1555,13 +1555,14 @@ void BlenderSync::sync_shaders(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3
   /* for auto refresh images */
   ImageManager *image_manager = scene->image_manager;
   const int frame = b_scene.frame_current();
-  const bool auto_refresh_update = image_manager->set_animation_frame_update(frame);
+  const bool update_all = image_manager->set_animation_frame_update(frame) ||
+                          scene->integrator->use_spectral_rendering_is_modified();
 
   shader_map.pre_sync();
 
-  sync_world(b_depsgraph, b_v3d, auto_refresh_update);
-  sync_lights(b_depsgraph, auto_refresh_update);
-  sync_materials(b_depsgraph, auto_refresh_update);
+  sync_world(b_depsgraph, b_v3d, update_all);
+  sync_lights(b_depsgraph, update_all);
+  sync_materials(b_depsgraph, update_all);
 }
 
 CCL_NAMESPACE_END

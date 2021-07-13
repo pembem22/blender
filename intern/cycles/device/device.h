@@ -163,6 +163,9 @@ class DeviceRequestedFeatures {
   /* Use path tracing kernels. */
   bool use_path_tracing;
 
+  /* Spectral rendering. */
+  bool use_spectral_rendering;
+
   DeviceRequestedFeatures()
   {
     /* TODO(sergey): Find more meaningful defaults. */
@@ -183,6 +186,7 @@ class DeviceRequestedFeatures {
     use_true_displacement = false;
     use_background_light = false;
     use_path_tracing = true;
+    use_spectral_rendering = false;
   }
 
   bool modified(const DeviceRequestedFeatures &requested_features)
@@ -202,7 +206,8 @@ class DeviceRequestedFeatures {
              use_principled == requested_features.use_principled &&
              use_denoising == requested_features.use_denoising &&
              use_true_displacement == requested_features.use_true_displacement &&
-             use_background_light == requested_features.use_background_light);
+             use_background_light == requested_features.use_background_light &&
+             use_spectral_rendering == requested_features.use_spectral_rendering);
   }
 
   /* Convert the requested features structure to a build options,
@@ -248,6 +253,9 @@ class DeviceRequestedFeatures {
     }
     if (!use_denoising) {
       build_options += " -D__NO_DENOISING__";
+    }
+    if (use_spectral_rendering) {
+      build_options += " -D__SPECTRAL_RENDERING__";
     }
     return build_options;
   }

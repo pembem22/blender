@@ -20,38 +20,85 @@
 
 CCL_NAMESPACE_BEGIN
 
+CPUKernels::CPUKernels(
+    IntegratorInitFunction integrator_init_from_camera,
+    IntegratorInitFunction integrator_init_from_bake,
+    IntegratorFunction integrator_intersect_closest,
+    IntegratorFunction integrator_intersect_shadow,
+    IntegratorFunction integrator_intersect_subsurface,
+    IntegratorFunction integrator_intersect_volume_stack,
+    IntegratorShadeFunction integrator_shade_background,
+    IntegratorShadeFunction integrator_shade_light,
+    IntegratorShadeFunction integrator_shade_shadow,
+    IntegratorShadeFunction integrator_shade_surface,
+    IntegratorShadeFunction integrator_shade_volume,
+    IntegratorShadeFunction integrator_megakernel,
+    ShaderEvalFunction shader_eval_displace,
+    ShaderEvalFunction shader_eval_background,
+    AdaptiveSamplingConvergenceCheckFunction adaptive_sampling_convergence_check,
+    AdaptiveSamplingFilterXFunction adaptive_sampling_filter_x,
+    AdaptiveSamplingFilterYFunction adaptive_sampling_filter_y,
+    BakeFunction bake)
+    : integrator_init_from_camera(integrator_init_from_camera),
+      integrator_init_from_bake(integrator_init_from_bake),
+      integrator_intersect_closest(integrator_intersect_closest),
+      integrator_intersect_shadow(integrator_intersect_shadow),
+      integrator_intersect_subsurface(integrator_intersect_subsurface),
+      integrator_intersect_volume_stack(integrator_intersect_volume_stack),
+      integrator_shade_background(integrator_shade_background),
+      integrator_shade_light(integrator_shade_light),
+      integrator_shade_shadow(integrator_shade_shadow),
+      integrator_shade_surface(integrator_shade_surface),
+      integrator_shade_volume(integrator_shade_volume),
+      integrator_megakernel(integrator_megakernel),
+      shader_eval_displace(shader_eval_displace),
+      shader_eval_background(shader_eval_background),
+      adaptive_sampling_convergence_check(adaptive_sampling_convergence_check),
+      adaptive_sampling_filter_x(adaptive_sampling_filter_x),
+      adaptive_sampling_filter_y(adaptive_sampling_filter_y),
+      bake(bake)
+{
+}
+
 #define KERNEL_FUNCTIONS(name) \
   KERNEL_NAME_EVAL(cpu, name), KERNEL_NAME_EVAL(cpu_sse2, name), \
       KERNEL_NAME_EVAL(cpu_sse3, name), KERNEL_NAME_EVAL(cpu_sse41, name), \
       KERNEL_NAME_EVAL(cpu_avx, name), KERNEL_NAME_EVAL(cpu_avx2, name)
 
-#define REGISTER_KERNEL(name) name(KERNEL_FUNCTIONS(name))
+#define REGISTER_KERNEL(name) \
+  { \
+    KERNEL_FUNCTIONS(name) \
+  }
 
-CPUKernels::CPUKernels()
-    : /* Integrator. */
-      REGISTER_KERNEL(integrator_init_from_camera),
-      REGISTER_KERNEL(integrator_init_from_bake),
-      REGISTER_KERNEL(integrator_intersect_closest),
-      REGISTER_KERNEL(integrator_intersect_shadow),
-      REGISTER_KERNEL(integrator_intersect_subsurface),
-      REGISTER_KERNEL(integrator_intersect_volume_stack),
-      REGISTER_KERNEL(integrator_shade_background),
-      REGISTER_KERNEL(integrator_shade_light),
-      REGISTER_KERNEL(integrator_shade_shadow),
-      REGISTER_KERNEL(integrator_shade_surface),
-      REGISTER_KERNEL(integrator_shade_volume),
-      REGISTER_KERNEL(integrator_megakernel),
-      /* Shader evaluation. */
-      REGISTER_KERNEL(shader_eval_displace),
-      REGISTER_KERNEL(shader_eval_background),
-      /* Adaptive campling. */
-      REGISTER_KERNEL(adaptive_sampling_convergence_check),
-      REGISTER_KERNEL(adaptive_sampling_filter_x),
-      REGISTER_KERNEL(adaptive_sampling_filter_y),
-      /* Bake. */
-      REGISTER_KERNEL(bake)
-{
-}
+#define REGISTER_KERNELS(kernels_name) \
+  kernels_name::kernels_name() \
+      : CPUKernels(/* Integrator. */ \
+                   REGISTER_KERNEL(integrator_init_from_camera), \
+                   REGISTER_KERNEL(integrator_init_from_bake), \
+                   REGISTER_KERNEL(integrator_intersect_closest), \
+                   REGISTER_KERNEL(integrator_intersect_shadow), \
+                   REGISTER_KERNEL(integrator_intersect_subsurface), \
+                   REGISTER_KERNEL(integrator_intersect_volume_stack), \
+                   REGISTER_KERNEL(integrator_shade_background), \
+                   REGISTER_KERNEL(integrator_shade_light), \
+                   REGISTER_KERNEL(integrator_shade_shadow), \
+                   REGISTER_KERNEL(integrator_shade_surface), \
+                   REGISTER_KERNEL(integrator_shade_volume), \
+                   REGISTER_KERNEL(integrator_megakernel), /* Shader evaluation. */ \
+                   REGISTER_KERNEL(shader_eval_displace), \
+                   REGISTER_KERNEL(shader_eval_background), /* Adaptive sampling. */ \
+                   REGISTER_KERNEL(adaptive_sampling_convergence_check), \
+                   REGISTER_KERNEL(adaptive_sampling_filter_x), \
+                   REGISTER_KERNEL(adaptive_sampling_filter_y), /* Bake. */ \
+                   REGISTER_KERNEL(bake)) \
+  { \
+  }
+
+REGISTER_KERNELS(CPUKernelsRGB);
+
+#define __SPECTRAL_RENDERING__
+
+REGISTER_KERNELS(CPUKernelsSpectral);
 
 #undef REGISTER_KERNEL
 #undef KERNEL_FUNCTIONS

@@ -119,7 +119,6 @@ CCL_NAMESPACE_BEGIN
 #define __CMJ__
 #define __SHADOW_RECORD_ALL__
 #define __BRANCHED_PATH__
-#define __SPECTRAL_RENDERING__
 
 /* Device specific features */
 #ifdef __KERNEL_CPU__
@@ -1182,8 +1181,7 @@ typedef struct KernelIntegrator {
 
   int has_shadow_catcher;
 
-  /* padding */
-  int pad1;
+  int use_spectral_rendering;
 } KernelIntegrator;
 static_assert_align(KernelIntegrator, 16);
 
@@ -1402,7 +1400,10 @@ typedef struct KernelShaderEvalInput {
   int object;
   int prim;
   float u, v;
+
+#ifdef __SPECTRAL_RENDERING__
   SpectralColor wavelengths;
+#endif
 } KernelShaderEvalInput;
 static_assert_align(KernelShaderEvalInput, 16);
 

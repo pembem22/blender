@@ -499,6 +499,20 @@ class CYCLES_RENDER_PT_motion_blur_curve(CyclesButtonsPanel, Panel):
         row.operator("render.shutter_curve_preset", icon='NOCURVE', text="").shape = 'MAX'
 
 
+class CYCLES_RENDER_PT_spectral_rendering(CyclesButtonsPanel, Panel):
+    bl_label = "Spectral Rendering"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header(self, context):
+        rd = context.scene.render
+        self.layout.prop(rd, "use_spectral_rendering", text="")
+
+    def draw(self, context):
+        layout = self.layout
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+
 class CYCLES_RENDER_PT_film(CyclesButtonsPanel, Panel):
     bl_label = "Film"
     bl_options = {'DEFAULT_CLOSED'}
@@ -2086,6 +2100,7 @@ classes = (
     CYCLES_VIEW3D_PT_shading_debug,
     CYCLES_RENDER_PT_motion_blur,
     CYCLES_RENDER_PT_motion_blur_curve,
+    CYCLES_RENDER_PT_spectral_rendering,
     CYCLES_RENDER_PT_film,
     CYCLES_RENDER_PT_film_pixel_filter,
     CYCLES_RENDER_PT_film_transparency,

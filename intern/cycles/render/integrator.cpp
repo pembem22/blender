@@ -100,6 +100,8 @@ NODE_DEFINE(Integrator)
                  "Use Normal  Pass for Denoiser Denoiser",
                  default_denoise_params.use_pass_normal);
 
+  SOCKET_BOOLEAN(use_spectral_rendering, "Use Spectral Rendering", false);
+
   return type;
 }
 
@@ -219,6 +221,8 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
   }
 
   kintegrator->has_shadow_catcher = scene->has_shadow_catcher();
+
+  kintegrator->use_spectral_rendering = use_spectral_rendering;
 
   dscene->sample_pattern_lut.clear_modified();
   clear_modified();

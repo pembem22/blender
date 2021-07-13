@@ -24,8 +24,14 @@
 
 CCL_NAMESPACE_BEGIN
 
-#define KERNEL_NAME_JOIN(x, y, z) x##_##y##_##z
-#define KERNEL_NAME_EVAL(arch, name) KERNEL_NAME_JOIN(kernel, arch, name)
+#define KERNEL_NAME_JOIN(x, y, z, w) x##_##y##_##z##_##w
+
+#ifdef __SPECTRAL_RENDERING__
+#  define KERNEL_NAME_EVAL(arch, name) KERNEL_NAME_JOIN(kernel, arch, name, spectral)
+#else
+#  define KERNEL_NAME_EVAL(arch, name) KERNEL_NAME_JOIN(kernel, arch, name, rgb)
+#endif
+
 #define KERNEL_FUNCTION_FULL_NAME(name) KERNEL_NAME_EVAL(KERNEL_ARCH, name)
 
 struct IntegratorState;

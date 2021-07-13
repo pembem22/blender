@@ -428,7 +428,8 @@ bool CUDADevice::load_kernels(const DeviceRequestedFeatures &requested_features)
     return false;
 
   /* get kernel */
-  const char *kernel_name = "kernel";
+  const char *kernel_name = requested_features.use_spectral_rendering ? "kernel_spectral" :
+                                                                        "kernel_rgb";
   string cubin = compile_kernel(requested_features, kernel_name);
   if (cubin.empty())
     return false;

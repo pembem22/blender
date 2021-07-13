@@ -31,6 +31,18 @@ set(SRC_DEVICE_CPU
   device/cpu/kernel_avx2.cpp
 )
 
+if(WITH_CYCLES_SPECTRAL_RENDERING)
+  set(SRC_DEVICE_CPU
+    ${SRC_DEVICE_CPU}
+    device/cpu/kernel_spectral.cpp
+    device/cpu/kernel_spectral_sse2.cpp
+    device/cpu/kernel_spectral_sse3.cpp
+    device/cpu/kernel_spectral_sse41.cpp
+    device/cpu/kernel_spectral_avx.cpp
+    device/cpu/kernel_spectral_avx2.cpp
+  )
+endif()
+
 set(SRC_DEVICE_CUDA
   device/cuda/kernel.cu
 )
@@ -343,13 +355,19 @@ if(WITH_CYCLES_CUDA_BINARIES)
   )
   set(cuda_cubins)
 
-  macro(CYCLES_CUDA_KERNEL_ADD arch prev_arch name flags sources experimental)
+  macro(CYCLES_CUDA_KERNEL_ADD arch prev_arch name flags sources experimental spectral)
     if(${arch} MATCHES "compute_.*")
       set(format "ptx")
     else()
       set(format "cubin")
     endif()
-    set(cuda_file ${name}_${arch}.${format})
+
+
+    if (${spectral})
+      set(cuda_file ${name}_spectral_${arch}.${format})
+      else()
+      set(cuda_file ${name}_rgb_${arch}.${format})
+    endif()
 
     set(kernel_sources ${sources})
     if(NOT ${prev_arch} STREQUAL "none")
@@ -375,6 +393,10 @@ if(WITH_CYCLES_CUDA_BINARIES)
     if(${experimental})
       set(cuda_flags ${cuda_flags} -D __KERNEL_EXPERIMENTAL__)
       set(name ${name}_experimental)
+    endif()
+
+    if(${spectral})
+      set(cuda_flags ${cuda_flags} -D __SPECTRAL_RENDERING__)
     endif()
 
     if(WITH_NANOVDB)
@@ -456,7 +478,11 @@ if(WITH_CYCLES_CUDA_BINARIES)
     endif()
     if(DEFINED cuda_nvcc_executable AND DEFINED cuda_toolkit_root_dir)
       # Compile regular kernel
-      CYCLES_CUDA_KERNEL_ADD(${arch} ${prev_arch} kernel "" "${cuda_sources}" FALSE)
+      CYCLES_CUDA_KERNEL_ADD(${arch} ${prev_arch} kernel "" "${cuda_sources}" FALSE FALSE)
+      
+      if(WITH_CYCLES_SPECTRAL_RENDERING)
+        CYCLES_CUDA_KERNEL_ADD(${arch} ${prev_arch} kernel "" "${cuda_sources}" FALSE TRUE)
+      endif()
 
       if(WITH_CYCLES_CUDA_BUILD_SERIAL)
         set(prev_arch ${arch})
@@ -608,6 +634,24 @@ endif()
 
 if(CXX_HAS_AVX2)
   set_source_files_properties(device/cpu/kernel_avx2.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_AVX2_KERNEL_FLAGS}")
+endif()
+
+if(WITH_CYCLES_SPECTRAL_RENDERING)
+  set_source_files_properties(device/cpu/kernel_spectral.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_KERNEL_FLAGS}")
+
+  if(CXX_HAS_SSE)
+    set_source_files_properties(device/cpu/kernel_spectral_sse2.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_SSE2_KERNEL_FLAGS}")
+    set_source_files_properties(device/cpu/kernel_spectral_sse3.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_SSE3_KERNEL_FLAGS}")
+    set_source_files_properties(device/cpu/kernel_spectral_sse41.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_SSE41_KERNEL_FLAGS}")
+  endif()
+
+  if(CXX_HAS_AVX)
+    set_source_files_properties(device/cpu/kernel_spectral_avx.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_AVX_KERNEL_FLAGS}")
+  endif()
+
+  if(CXX_HAS_AVX2)
+    set_source_files_properties(device/cpu/kernel_spectral_avx2.cpp PROPERTIES COMPILE_FLAGS "${CYCLES_AVX2_KERNEL_FLAGS}")
+  endif()
 endif()
 
 cycles_add_library(cycles_kernel "${LIB}"

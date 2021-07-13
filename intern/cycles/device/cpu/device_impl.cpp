@@ -66,7 +66,9 @@
 CCL_NAMESPACE_BEGIN
 
 CPUDevice::CPUDevice(const DeviceInfo &info_, Stats &stats_, Profiler &profiler_)
-    : Device(info_, stats_, profiler_), texture_info(this, "__texture_info", MEM_GLOBAL)
+    : Device(info_, stats_, profiler_),
+      texture_info(this, "__texture_info", MEM_GLOBAL),
+      kernels(CPUKernelsRGB())
 {
   /* Pick any kernel, all of them are supposed to have same level of microarchitecture
    * optimization. */
@@ -474,8 +476,14 @@ void *CPUDevice::get_cpu_osl_memory()
 #endif
 }
 
-bool CPUDevice::load_kernels(const DeviceRequestedFeatures & /*requested_features*/)
+bool CPUDevice::load_kernels(const DeviceRequestedFeatures &requested_features)
 {
+  if (requested_features.use_spectral_rendering) {
+    kernels = CPUKernelsSpectral();
+  }
+  else {
+    kernels = CPUKernelsRGB();
+  }
   return true;
 }
 

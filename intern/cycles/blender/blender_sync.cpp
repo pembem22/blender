@@ -335,7 +335,7 @@ void BlenderSync::sync_integrator(BL::ViewLayer &b_view_layer, bool background)
 
   integrator->set_light_sampling_threshold(get_float(cscene, "light_sampling_threshold"));
 
-  const bool use_adaptive_sampling = RNA_boolean_get(&cscene, "use_adaptive_sampling");
+  const bool use_adaptive_sampling = get_boolean(cscene, "use_adaptive_sampling");
 
   SamplingPattern sampling_pattern = (SamplingPattern)get_enum(
       cscene, "sampling_pattern", SAMPLING_NUM_PATTERNS, SAMPLING_PATTERN_SOBOL);
@@ -378,6 +378,8 @@ void BlenderSync::sync_integrator(BL::ViewLayer &b_view_layer, bool background)
     integrator->set_use_denoise_pass_albedo(denoise_params.use_pass_albedo);
     integrator->set_use_denoise_pass_normal(denoise_params.use_pass_normal);
   }
+
+  integrator->set_use_spectral_rendering(get_boolean(cscene, "use_spectral_rendering"));
 
   /* UPDATE_NONE as we don't want to tag the integrator as modified (this was done by the
    * set calls above), but we need to make sure that the dependent things are tagged. */
