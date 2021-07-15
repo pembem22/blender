@@ -40,10 +40,8 @@ enum {
   PG_HITD, /* Default hit group. */
   PG_HITS, /* __SHADOW_RECORD_ALL__ hit group. */
   PG_HITL, /* __BVH_LOCAL__ hit group (only used for triangles). */
-#  if OPTIX_ABI_VERSION >= 36
   PG_HITD_MOTION,
   PG_HITS_MOTION,
-#  endif
   PG_CALL_SVM_AO,
   PG_CALL_SVM_BEVEL,
   PG_CALL_AO_PASS,
@@ -53,11 +51,7 @@ enum {
 static const int MISS_PROGRAM_GROUP_OFFSET = PG_MISS;
 static const int NUM_MIS_PROGRAM_GROUPS = 1;
 static const int HIT_PROGAM_GROUP_OFFSET = PG_HITD;
-#  if OPTIX_ABI_VERSION >= 36
 static const int NUM_HIT_PROGRAM_GROUPS = 5;
-#  else
-static const int NUM_HIT_PROGRAM_GROUPS = 3;
-#  endif
 static const int CALLABLE_PROGRAM_GROUPS_BASE = PG_CALL_SVM_AO;
 static const int NUM_CALLABLE_PROGRAM_GROUPS = 3;
 
@@ -119,10 +113,9 @@ class OptiXDevice : public CUDADevice {
  private:
   BVHLayoutMask get_bvh_layout_mask() const override;
 
-  string compile_kernel_get_common_cflags(
-      const DeviceRequestedFeatures &requested_features) override;
+  string compile_kernel_get_common_cflags(const uint kernel_features) override;
 
-  bool load_kernels(const DeviceRequestedFeatures &requested_features) override;
+  bool load_kernels(const uint kernel_features) override;
 
   bool build_optix_bvh(BVHOptiX *bvh,
                        OptixBuildOperation operation,

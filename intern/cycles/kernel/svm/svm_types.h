@@ -30,48 +30,6 @@ CCL_NAMESPACE_BEGIN
 
 /* Nodes */
 
-/* Known frequencies of used nodes, used for selective nodes compilation
- * in the kernel. Currently only affects split OpenCL kernel.
- *
- * Keep as defines so it's easy to check which nodes are to be compiled
- * from preprocessor.
- *
- * Lower the number of group more often the node is used.
- */
-#define NODE_GROUP_LEVEL_0 0
-#define NODE_GROUP_LEVEL_1 1
-#define NODE_GROUP_LEVEL_2 2
-#define NODE_GROUP_LEVEL_3 3
-#define NODE_GROUP_LEVEL_4 4
-#define NODE_GROUP_LEVEL_MAX NODE_GROUP_LEVEL_4
-
-enum SvmNodeFeatureFlag : unsigned int {
-  NODE_FEATURE_BSDF = (1U << 0U),
-  NODE_FEATURE_EMISSION = (1U << 1U),
-  NODE_FEATURE_VOLUME = (1U << 2U),
-  NODE_FEATURE_HAIR = (1U << 3U),
-  NODE_FEATURE_BUMP = (1U << 4U),
-  NODE_FEATURE_BUMP_STATE = (1U << 5U),
-  NODE_FEATURE_VORONOI_EXTRA = (1U << 6U),
-  NODE_FEATURE_RAYTRACE = (1U << 7U),
-  NODE_FEATURE_ALL = (~0U),
-};
-
-#define NODE_FEATURE_MASK_SURFACE_LIGHT (NODE_FEATURE_EMISSION | NODE_FEATURE_VORONOI_EXTRA)
-#define NODE_FEATURE_MASK_SURFACE_SHADOW \
-  (NODE_FEATURE_BSDF | NODE_FEATURE_EMISSION | NODE_FEATURE_VOLUME | NODE_FEATURE_HAIR | \
-   NODE_FEATURE_BUMP | NODE_FEATURE_BUMP_STATE | NODE_FEATURE_VORONOI_EXTRA)
-#define NODE_FEATURE_MASK_SURFACE (NODE_FEATURE_MASK_SURFACE_SHADOW | NODE_FEATURE_RAYTRACE)
-#define NODE_FEATURE_MASK_VOLUME \
-  (NODE_FEATURE_EMISSION | NODE_FEATURE_VOLUME | NODE_FEATURE_VORONOI_EXTRA)
-#define NODE_FEATURE_MASK_DISPLACEMENT \
-  (NODE_FEATURE_VORONOI_EXTRA | NODE_FEATURE_BUMP | NODE_FEATURE_BUMP_STATE)
-#define NODE_FEATURE_MASK_BUMP NODE_FEATURE_MASK_DISPLACEMENT
-
-#define NODES_GROUP(group) ((group) <= __NODES_MAX_GROUP__)
-#define NODES_FEATURE(feature) \
-  (((node_feature_mask & __NODES_FEATURES__) & (NODE_FEATURE_##feature)) != 0U)
-
 typedef enum ShaderNodeType {
   NODE_END = 0,
   NODE_SHADER_JUMP,

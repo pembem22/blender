@@ -46,7 +46,7 @@ ccl_device_inline SpectralColor integrate_transparent_surface_shadow(INTEGRATOR_
 
   /* Evaluate shader. */
   if (!(shadow_sd->flag & SD_HAS_ONLY_VOLUME)) {
-    shader_eval_surface<NODE_FEATURE_MASK_SURFACE_SHADOW>(
+    shader_eval_surface<KERNEL_FEATURE_NODE_MASK_SURFACE_SHADOW>(
         INTEGRATOR_STATE_PASS, shadow_sd, NULL, PATH_RAY_SHADOW);
   }
 
@@ -101,7 +101,7 @@ ccl_device_inline bool integrate_transparent_shadow(INTEGRATOR_STATE_ARGS, const
   const int num_recorded_hits = min(num_hits, INTEGRATOR_SHADOW_ISECT_SIZE);
 
   for (int hit = 0; hit < num_recorded_hits + 1; hit++) {
-
+    /* Volume shaders. */
     if (hit < num_recorded_hits || !shadow_intersections_has_remaining(num_hits)) {
 #  ifdef __VOLUME__
       if (!integrator_state_shadow_volume_stack_is_empty(INTEGRATOR_STATE_PASS)) {

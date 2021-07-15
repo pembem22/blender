@@ -26,14 +26,6 @@
 #  pragma GCC diagnostic ignored "-Wuninitialized"
 #endif
 
-/* Selective nodes compilation. */
-#ifndef __NODES_MAX_GROUP__
-#  define __NODES_MAX_GROUP__ NODE_GROUP_LEVEL_MAX
-#endif
-#ifndef __NODES_FEATURES__
-#  define __NODES_FEATURES__ NODE_FEATURE_ALL
-#endif
-
 #include "util/util_half.h"
 #include "util/util_math.h"
 #include "util/util_simd.h"
@@ -76,32 +68,6 @@ template<typename T> struct texture {
     kernel_assert(index >= 0 && index < width);
     return data[index];
   }
-#if defined(__KERNEL_AVX__) || defined(__KERNEL_AVX2__)
-  /* Reads 256 bytes but indexes in blocks of 128 bytes to maintain
-   * compatibility with existing indices and data structures.
-   */
-  ccl_always_inline avxf fetch_avxf(const int index) const
-  {
-    kernel_assert(index >= 0 && (index + 1) < width);
-    ssef *ssef_data = (ssef *)data;
-    ssef *ssef_node_data = &ssef_data[index];
-    return _mm256_loadu_ps((float *)ssef_node_data);
-  }
-#endif
-
-#ifdef __KERNEL_SSE2__
-  ccl_always_inline ssef fetch_ssef(int index) const
-  {
-    kernel_assert(index >= 0 && index < width);
-    return ((ssef *)data)[index];
-  }
-
-  ccl_always_inline ssei fetch_ssei(int index) const
-  {
-    kernel_assert(index >= 0 && index < width);
-    return ((ssei *)data)[index];
-  }
-#endif
 
   T *data;
   int width;

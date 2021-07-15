@@ -48,7 +48,6 @@ class CPUKernelThreadGlobals;
 enum DeviceType {
   DEVICE_NONE = 0,
   DEVICE_CPU,
-  DEVICE_OPENCL,
   DEVICE_CUDA,
   DEVICE_MULTI,
   DEVICE_OPTIX,
@@ -57,7 +56,6 @@ enum DeviceType {
 
 enum DeviceTypeMask {
   DEVICE_MASK_CPU = (1 << DEVICE_CPU),
-  DEVICE_MASK_OPENCL = (1 << DEVICE_OPENCL),
   DEVICE_MASK_CUDA = (1 << DEVICE_CUDA),
   DEVICE_MASK_OPTIX = (1 << DEVICE_OPTIX),
   DEVICE_MASK_ALL = ~0
@@ -105,163 +103,6 @@ class DeviceInfo {
     return id == info.id;
   }
 };
-
-class DeviceRequestedFeatures {
- public:
-  /* Use experimental feature set. */
-  bool experimental;
-
-  /* Selective nodes compilation. */
-
-  /* Identifier of a node group up to which all the nodes needs to be
-   * compiled in. Nodes from higher group indices will be ignores.
-   */
-  int max_nodes_group;
-
-  /* Features bitfield indicating which features from the requested group
-   * will be compiled in. Nodes which corresponds to features which are not
-   * in this bitfield will be ignored even if they're in the requested group.
-   */
-  int nodes_features;
-
-  /* BVH/sampling kernel features. */
-  bool use_hair;
-  bool use_hair_thick;
-  bool use_object_motion;
-  bool use_camera_motion;
-
-  /* Denotes whether baking functionality is needed. */
-  bool use_baking;
-
-  /* Use subsurface scattering materials. */
-  bool use_subsurface;
-
-  /* Use volume materials. */
-  bool use_volume;
-
-  /* Use OpenSubdiv patch evaluation */
-  bool use_patch_evaluation;
-
-  /* Use Transparent shadows */
-  bool use_transparent;
-
-  /* Use shadow catcher. */
-  bool use_shadow_catcher;
-
-  /* Per-uber shader usage flags. */
-  bool use_principled;
-
-  /* Denoising features. */
-  bool use_denoising;
-
-  /* Use true displacement */
-  bool use_true_displacement;
-
-  /* Use background lights */
-  bool use_background_light;
-
-  /* Use path tracing kernels. */
-  bool use_path_tracing;
-
-  /* Spectral rendering. */
-  bool use_spectral_rendering;
-
-  DeviceRequestedFeatures()
-  {
-    /* TODO(sergey): Find more meaningful defaults. */
-    max_nodes_group = 0;
-    nodes_features = 0;
-    use_hair = false;
-    use_hair_thick = false;
-    use_object_motion = false;
-    use_camera_motion = false;
-    use_baking = false;
-    use_subsurface = false;
-    use_volume = false;
-    use_patch_evaluation = false;
-    use_transparent = false;
-    use_shadow_catcher = false;
-    use_principled = false;
-    use_denoising = false;
-    use_true_displacement = false;
-    use_background_light = false;
-    use_path_tracing = true;
-    use_spectral_rendering = false;
-  }
-
-  bool modified(const DeviceRequestedFeatures &requested_features)
-  {
-    return !(max_nodes_group == requested_features.max_nodes_group &&
-             nodes_features == requested_features.nodes_features &&
-             use_hair == requested_features.use_hair &&
-             use_hair_thick == requested_features.use_hair_thick &&
-             use_object_motion == requested_features.use_object_motion &&
-             use_camera_motion == requested_features.use_camera_motion &&
-             use_baking == requested_features.use_baking &&
-             use_subsurface == requested_features.use_subsurface &&
-             use_volume == requested_features.use_volume &&
-             use_patch_evaluation == requested_features.use_patch_evaluation &&
-             use_transparent == requested_features.use_transparent &&
-             use_shadow_catcher == requested_features.use_shadow_catcher &&
-             use_principled == requested_features.use_principled &&
-             use_denoising == requested_features.use_denoising &&
-             use_true_displacement == requested_features.use_true_displacement &&
-             use_background_light == requested_features.use_background_light &&
-             use_spectral_rendering == requested_features.use_spectral_rendering);
-  }
-
-  /* Convert the requested features structure to a build options,
-   * which could then be passed to compilers.
-   */
-  string get_build_options() const
-  {
-    string build_options = "";
-    if (experimental) {
-      build_options += "-D__KERNEL_EXPERIMENTAL__ ";
-    }
-    build_options += "-D__NODES_MAX_GROUP__=" + string_printf("%d", max_nodes_group);
-    build_options += " -D__NODES_FEATURES__=" + string_printf("%d", nodes_features);
-    if (!use_hair) {
-      build_options += " -D__NO_HAIR__";
-    }
-    if (!use_object_motion) {
-      build_options += " -D__NO_OBJECT_MOTION__";
-    }
-    if (!use_camera_motion) {
-      build_options += " -D__NO_CAMERA_MOTION__";
-    }
-    if (!use_baking) {
-      build_options += " -D__NO_BAKING__";
-    }
-    if (!use_volume) {
-      build_options += " -D__NO_VOLUME__";
-    }
-    if (!use_subsurface) {
-      build_options += " -D__NO_SUBSURFACE__";
-    }
-    if (!use_patch_evaluation) {
-      build_options += " -D__NO_PATCH_EVAL__";
-    }
-    if (!use_transparent && !use_volume) {
-      build_options += " -D__NO_TRANSPARENT__";
-    }
-    if (!use_shadow_catcher) {
-      build_options += " -D__NO_SHADOW_CATCHER__";
-    }
-    if (!use_principled) {
-      build_options += " -D__NO_PRINCIPLED__";
-    }
-    if (!use_denoising) {
-      build_options += " -D__NO_DENOISING__";
-    }
-    if (use_spectral_rendering) {
-      build_options += " -D__SPECTRAL_RENDERING__";
-    }
-    return build_options;
-  }
-};
-
-std::ostream &operator<<(std::ostream &os, const DeviceRequestedFeatures &requested_features);
 
 /* Device */
 
@@ -320,7 +161,7 @@ class Device {
   virtual void const_copy_to(const char *name, void *host, size_t size) = 0;
 
   /* load/compile kernels, must be called before adding tasks */
-  virtual bool load_kernels(const DeviceRequestedFeatures & /*requested_features*/)
+  virtual bool load_kernels(uint /*kernel_features*/)
   {
     return true;
   }
@@ -439,7 +280,6 @@ class Device {
   static thread_mutex device_mutex;
   static vector<DeviceInfo> cuda_devices;
   static vector<DeviceInfo> optix_devices;
-  static vector<DeviceInfo> opencl_devices;
   static vector<DeviceInfo> cpu_devices;
   static uint devices_initialized_mask;
 };

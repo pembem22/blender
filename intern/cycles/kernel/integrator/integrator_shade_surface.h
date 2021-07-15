@@ -177,16 +177,23 @@ ccl_device_forceinline void integrate_surface_direct_light(INTEGRATOR_STATE_ARGS
   uint32_t shadow_flag = INTEGRATOR_STATE(path, flag);
   shadow_flag |= (is_light) ? PATH_RAY_SHADOW_FOR_LIGHT : 0;
   shadow_flag |= (is_transmission) ? PATH_RAY_TRANSMISSION_PASS : PATH_RAY_REFLECT_PASS;
-  const SpectralColor diffuse_glossy_ratio = (bounce == 0) ?
-                                                 bsdf_eval_diffuse_glossy_ratio(&bsdf_eval) :
-                                                 INTEGRATOR_STATE(path, diffuse_glossy_ratio);
   const SpectralColor throughput = INTEGRATOR_STATE(path, throughput) * bsdf_eval_sum(&bsdf_eval);
+
+  if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_PASSES) {
+    const SpectralColor diffuse_glossy_ratio = (bounce == 0) ?
+                                                   bsdf_eval_diffuse_glossy_ratio(&bsdf_eval) :
+                                                   INTEGRATOR_STATE(path, diffuse_glossy_ratio);
+    INTEGRATOR_STATE_WRITE(shadow_path, diffuse_glossy_ratio) = diffuse_glossy_ratio;
+  }
 
   INTEGRATOR_STATE_WRITE(shadow_path, flag) = shadow_flag;
   INTEGRATOR_STATE_WRITE(shadow_path, bounce) = bounce;
   INTEGRATOR_STATE_WRITE(shadow_path, transparent_bounce) = transparent_bounce;
-  INTEGRATOR_STATE_WRITE(shadow_path, diffuse_glossy_ratio) = diffuse_glossy_ratio;
   INTEGRATOR_STATE_WRITE(shadow_path, throughput) = throughput;
+
+  if (kernel_data.kernel_features & KERNEL_FEATURE_SHADOW_PASS) {
+    INTEGRATOR_STATE_WRITE(shadow_path, unshadowed_throughput) = throughput;
+  }
 
   /* Branch off shadow kernel. */
   INTEGRATOR_SHADOW_PATH_INIT(DEVICE_KERNEL_INTEGRATOR_INTERSECT_SHADOW);
@@ -251,9 +258,12 @@ ccl_device_forceinline int integrate_surface_bsdf_bssrdf_bounce(INTEGRATOR_STATE
   SpectralColor throughput = INTEGRATOR_STATE(path, throughput);
   throughput *= bsdf_eval_sum(&bsdf_eval) / bsdf_pdf;
   INTEGRATOR_STATE_WRITE(path, throughput) = throughput;
-  if (INTEGRATOR_STATE(path, bounce) == 0) {
-    INTEGRATOR_STATE_WRITE(path,
-                           diffuse_glossy_ratio) = bsdf_eval_diffuse_glossy_ratio(&bsdf_eval);
+
+  if (kernel_data.kernel_features & KERNEL_FEATURE_LIGHT_PASSES) {
+    if (INTEGRATOR_STATE(path, bounce) == 0) {
+      INTEGRATOR_STATE_WRITE(path,
+                             diffuse_glossy_ratio) = bsdf_eval_diffuse_glossy_ratio(&bsdf_eval);
+    }
   }
 
   /* Update path state */
@@ -426,7 +436,7 @@ ccl_device bool integrate_surface(INTEGRATOR_STATE_ARGS,
 
 #if defined(__AO__) && defined(__SHADER_RAYTRACE__)
     /* Ambient occlusion pass. */
-    if (node_feature_mask & NODE_FEATURE_RAYTRACE) {
+    if (node_feature_mask & KERNEL_FEATURE_NODE_RAYTRACE) {
       if ((kernel_data.film.pass_ao != PASS_UNUSED) &&
           (INTEGRATOR_STATE(path, flag) & PATH_RAY_CAMERA)) {
         integrate_surface_ao_pass(INTEGRATOR_STATE_PASS, &sd, &rng_state, render_buffer);
@@ -451,7 +461,7 @@ ccl_device bool integrate_surface(INTEGRATOR_STATE_ARGS,
   return continue_path_label != 0;
 }
 
-template<uint node_feature_mask = NODE_FEATURE_MASK_SURFACE & ~NODE_FEATURE_RAYTRACE,
+template<uint node_feature_mask = KERNEL_FEATURE_NODE_MASK_SURFACE & ~KERNEL_FEATURE_NODE_RAYTRACE,
          int current_kernel = DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE>
 ccl_device_forceinline void integrator_shade_surface(INTEGRATOR_STATE_ARGS,
                                                      ccl_global float *ccl_restrict render_buffer)
@@ -473,7 +483,7 @@ ccl_device_forceinline void integrator_shade_surface(INTEGRATOR_STATE_ARGS,
 ccl_device_forceinline void integrator_shade_surface_raytrace(
     INTEGRATOR_STATE_ARGS, ccl_global float *ccl_restrict render_buffer)
 {
-  integrator_shade_surface<NODE_FEATURE_MASK_SURFACE,
+  integrator_shade_surface<KERNEL_FEATURE_NODE_MASK_SURFACE,
                            DEVICE_KERNEL_INTEGRATOR_SHADE_SURFACE_RAYTRACE>(INTEGRATOR_STATE_PASS,
                                                                             render_buffer);
 }
