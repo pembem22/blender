@@ -699,6 +699,7 @@ void OSLCompiler::add(ShaderNode *node, const char *name, bool isfilepath)
       const SocketType &socket = input->socket_type;
       switch (input->type()) {
         case SocketType::COLOR:
+        case SocketType::SPECTRAL:
           parameter_color(param_name.c_str(), node->get_float3(socket));
           break;
         case SocketType::POINT:
@@ -818,7 +819,8 @@ void OSLCompiler::parameter(ShaderNode *node, const char *name)
       ss->Parameter(uname, TypeDesc::TypeInt, &value);
       break;
     }
-    case SocketType::COLOR: {
+    case SocketType::COLOR:
+    case SocketType::SPECTRAL: {
       float3 value = node->get_float3(socket);
       ss->Parameter(uname, TypeDesc::TypeColor, &value);
       break;

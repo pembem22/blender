@@ -379,7 +379,7 @@ if(WITH_CYCLES_CUDA_BINARIES)
     endif()
 
     if(${spectral})
-      set(cuda_flags ${cuda_flags} -D __SPECTRAL_RENDERING__)
+      set(cuda_flags ${cuda_flags} -D WITH_SPECTRAL_RENDERING)
     endif()
 
     if(WITH_NANOVDB)

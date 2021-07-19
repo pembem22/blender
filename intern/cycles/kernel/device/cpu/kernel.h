@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#pragma once
+// #pragma once
 
 /* CPU Kernel Interface */
 
@@ -24,15 +24,19 @@
 
 CCL_NAMESPACE_BEGIN
 
-#define KERNEL_NAME_JOIN(x, y, z, w) x##_##y##_##z##_##w
-
-#ifdef __SPECTRAL_RENDERING__
-#  define KERNEL_NAME_EVAL(arch, name) KERNEL_NAME_JOIN(kernel, arch, name, spectral)
-#else
-#  define KERNEL_NAME_EVAL(arch, name) KERNEL_NAME_JOIN(kernel, arch, name, rgb)
+#ifndef KERNEL_TYPE
+#  ifdef __SPECTRAL_RENDERING__
+#    define KERNEL_TYPE spectral
+#  else
+#    define KERNEL_TYPE rgb
+#  endif
 #endif
 
-#define KERNEL_FUNCTION_FULL_NAME(name) KERNEL_NAME_EVAL(KERNEL_ARCH, name)
+#define KERNEL_NAME_JOIN_3(x, y, z) x##_##y##_##z
+#define KERNEL_NAME_JOIN_4(x, y, z, w) x##_##y##_##z##_##w
+#define KERNEL_NAME_EVAL_TYPELESS(arch, name) KERNEL_NAME_JOIN_3(kernel, arch, name)
+#define KERNEL_NAME_EVAL(arch, name, type) KERNEL_NAME_JOIN_4(kernel, arch, name, type)
+#define KERNEL_FUNCTION_FULL_NAME(name) KERNEL_NAME_EVAL(KERNEL_ARCH, name, KERNEL_TYPE)
 
 struct IntegratorState;
 struct KernelGlobals;

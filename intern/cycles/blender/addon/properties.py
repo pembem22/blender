@@ -487,6 +487,11 @@ class CyclesRenderSettings(bpy.types.PropertyGroup):
         min=0.0, max=1.0,
         default=0.1,
     )
+    use_spectral_rendering: BoolProperty(
+      name="Spectral Rendering",
+      description="Use spectral rendering",
+      default=False
+    )
 
     # Really annoyingly, we have to keep it around for a few releases,
     # otherwise forward compatibility breaks in really bad manner: CRASH!

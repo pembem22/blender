@@ -235,7 +235,7 @@ if(WITH_CYCLES_PTEX)
 endif()
 
 if(WITH_CYCLES_OSL)
-  # add_definitions(-DWITH_OSL)
+  add_definitions(-DWITH_OSL)
   # osl 1.9.x
   add_definitions(-DOSL_STATIC_BUILD)
   # pre 1.9
@@ -293,10 +293,6 @@ if(WITH_OPENIMAGEDENOISE)
     SYSTEM
     ${OPENIMAGEDENOISE_INCLUDE_DIRS}
   )
-endif()
-
-if(WITH_CYCLES_SPECTRAL_RENDERING)
-  add_definitions(-DWITH_SPECTRAL_RENDERING)
 endif()
 
 if(WITH_CYCLES_STANDALONE)

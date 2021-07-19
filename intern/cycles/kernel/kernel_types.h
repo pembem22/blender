@@ -100,9 +100,13 @@ CCL_NAMESPACE_BEGIN
 #define __SHADOW_RECORD_ALL__
 #define __BRANCHED_PATH__
 
+#ifdef WITH_SPECTRAL_RENDERING
+#  define __SPECTRAL_RENDERING__
+#endif
+
 /* Device specific features */
 #ifdef __KERNEL_CPU__
-#  ifdef WITH_OSL
+#  if defined(WITH_OSL) && !defined(WITH_SPECTRAL_RENDERING)
 #    define __OSL__
 #  endif
 #  define __VOLUME_RECORD_ALL__
@@ -146,6 +150,9 @@ CCL_NAMESPACE_BEGIN
 #  endif
 #  if !(__KERNEL_FEATURES & KERNEL_FEATURE_DENOISING)
 #    undef __DENOISING_FEATURES__
+#  endif
+#  if !(__KERNEL_FEATURES & KERNEL_FEATURE_SPECTRAL_RENDERING)
+#    undef __SPECTRAL_RENDERING__
 #  endif
 #endif
 
@@ -1357,10 +1364,6 @@ typedef struct KernelShaderEvalInput {
   int object;
   int prim;
   float u, v;
-
-#ifdef __SPECTRAL_RENDERING__
-  SpectralColor wavelengths;
-#endif
 } KernelShaderEvalInput;
 static_assert_align(KernelShaderEvalInput, 16);
 

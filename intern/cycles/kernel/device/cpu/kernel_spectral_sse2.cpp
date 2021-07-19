@@ -20,7 +20,7 @@
 
 #include "util/util_optimization.h"
 
-#define __SPECTRAL_RENDERING__
+#define WITH_SPECTRAL_RENDERING
 
 #ifndef WITH_CYCLES_OPTIMIZED_KERNEL_SSE2
 #  define KERNEL_STUB

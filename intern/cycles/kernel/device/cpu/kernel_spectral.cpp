@@ -56,41 +56,8 @@
 /* do nothing */
 #endif
 
-#define __SPECTRAL_RENDERING__
+#define WITH_SPECTRAL_RENDERING
 
 #include "kernel/device/cpu/kernel.h"
 #define KERNEL_ARCH cpu
 #include "kernel/device/cpu/kernel_arch_impl.h"
-
-CCL_NAMESPACE_BEGIN
-
-/* Memory Copy */
-
-void kernel_const_copy(KernelGlobals *kg, const char *name, void *host, size_t)
-{
-  if (strcmp(name, "__data") == 0) {
-    kg->__data = *(KernelData *)host;
-  }
-  else {
-    assert(0);
-  }
-}
-
-void kernel_global_memory_copy(KernelGlobals *kg, const char *name, void *mem, size_t size)
-{
-  if (0) {
-  }
-
-#define KERNEL_TEX(type, tname) \
-  else if (strcmp(name, #tname) == 0) \
-  { \
-    kg->tname.data = (type *)mem; \
-    kg->tname.width = size; \
-  }
-#include "kernel/kernel_textures.h"
-  else {
-    assert(0);
-  }
-}
-
-CCL_NAMESPACE_END

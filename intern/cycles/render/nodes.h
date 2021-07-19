@@ -1551,10 +1551,6 @@ class VectorDisplacementNode : public ShaderNode {
 class RGBToSpectrumNode : public ShaderNode {
  public:
   SHADER_NODE_CLASS(RGBToSpectrumNode)
-  virtual int get_group()
-  {
-    return NODE_GROUP_LEVEL_0;
-  }
 
   NODE_SOCKET_API(float3, color)
 };

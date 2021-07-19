@@ -498,8 +498,8 @@ class CYCLES_RENDER_PT_spectral_rendering(CyclesButtonsPanel, Panel):
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw_header(self, context):
-        rd = context.scene.render
-        self.layout.prop(rd, "use_spectral_rendering", text="")
+        cscene = context.scene.cycles
+        self.layout.prop(cscene, "use_spectral_rendering", text="")
 
     def draw(self, context):
         layout = self.layout
@@ -2018,6 +2018,8 @@ def draw_device(self, context):
         from . import engine
         if engine.with_osl() and use_cpu(context):
             col.prop(cscene, "shading_system")
+            if cscene.shading_system and cscene.use_spectral_rendering:
+                col.label(text="OSL does not support spectral rendering and will be disabled.", icon='ERROR')
 
 
 def draw_pause(self, context):

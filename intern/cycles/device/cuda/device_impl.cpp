@@ -241,6 +241,10 @@ string CUDADevice::compile_kernel_get_common_cflags(const uint kernel_features)
     cflags += string(" ") + string(extra_cflags);
   }
 
+  if (kernel_features & KERNEL_FEATURE_SPECTRAL_RENDERING) {
+    cflags += " -DWITH_SPECTRAL_RENDERING";
+  }
+
 #  ifdef WITH_NANOVDB
   cflags += " -DWITH_NANOVDB";
 #  endif
@@ -427,8 +431,9 @@ bool CUDADevice::load_kernels(const uint kernel_features)
     return false;
 
   /* get kernel */
-  const char *kernel_name = requested_features.use_spectral_rendering ? "kernel_spectral" :
-                                                                        "kernel_rgb";
+  const char *kernel_name = (kernel_features & KERNEL_FEATURE_SPECTRAL_RENDERING) ?
+                                "kernel_spectral" :
+                                "kernel_rgb";
   string cubin = compile_kernel(kernel_features, kernel_name);
   if (cubin.empty())
     return false;

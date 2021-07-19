@@ -348,11 +348,9 @@ ccl_device void svm_eval_nodes(INTEGRATOR_STATE_CONST_ARGS,
           offset = svm_node_vector_displacement(kg, sd, stack, node, offset);
         }
         break;
-#ifdef __SPECTRAL_RENDERING__
       case NODE_RGB_TO_SPECTRUM:
         svm_node_rgb_to_spectrum(INTEGRATOR_STATE_PASS, sd, stack, node.y, node.z);
         break;
-#endif
       case NODE_TEX_IMAGE:
         offset = svm_node_tex_image(kg, sd, stack, node, offset);
         break;

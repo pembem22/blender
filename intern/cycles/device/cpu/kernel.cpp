@@ -16,7 +16,8 @@
 
 #include "device/cpu/kernel.h"
 
-#include "kernel/device/cpu/kernel.h"
+#include "kernel/device/cpu/kernel_rgb.h"
+#include "kernel/device/cpu/kernel_spectral.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -61,13 +62,24 @@ CPUKernels::CPUKernels(
 }
 
 #define KERNEL_FUNCTIONS(name) \
-  KERNEL_NAME_EVAL(cpu, name), KERNEL_NAME_EVAL(cpu_sse2, name), \
-      KERNEL_NAME_EVAL(cpu_sse3, name), KERNEL_NAME_EVAL(cpu_sse41, name), \
-      KERNEL_NAME_EVAL(cpu_avx, name), KERNEL_NAME_EVAL(cpu_avx2, name)
+  KERNEL_NAME_EVAL(cpu, name, KERNEL_TYPE), KERNEL_NAME_EVAL(cpu_sse2, name, KERNEL_TYPE), \
+      KERNEL_NAME_EVAL(cpu_sse3, name, KERNEL_TYPE), \
+      KERNEL_NAME_EVAL(cpu_sse41, name, KERNEL_TYPE), \
+      KERNEL_NAME_EVAL(cpu_avx, name, KERNEL_TYPE), KERNEL_NAME_EVAL(cpu_avx2, name, KERNEL_TYPE)
 
 #define REGISTER_KERNEL(name) \
   { \
     KERNEL_FUNCTIONS(name) \
+  }
+
+#define KERNEL_FUNCTIONS_TYPELESS(name) \
+  KERNEL_NAME_EVAL_TYPELESS(cpu, name), KERNEL_NAME_EVAL_TYPELESS(cpu_sse2, name), \
+      KERNEL_NAME_EVAL_TYPELESS(cpu_sse3, name), KERNEL_NAME_EVAL_TYPELESS(cpu_sse41, name), \
+      KERNEL_NAME_EVAL_TYPELESS(cpu_avx, name), KERNEL_NAME_EVAL_TYPELESS(cpu_avx2, name)
+
+#define REGISTER_KERNEL_TYPELESS(name) \
+  { \
+    KERNEL_FUNCTIONS_TYPELESS(name) \
   }
 
 #define REGISTER_KERNELS(kernels_name) \
@@ -94,11 +106,13 @@ CPUKernels::CPUKernels(
   { \
   }
 
+#define KERNEL_TYPE rgb
 REGISTER_KERNELS(CPUKernelsRGB);
+#undef KERNEL_TYPE
 
-#define __SPECTRAL_RENDERING__
-
+#define KERNEL_TYPE spectral
 REGISTER_KERNELS(CPUKernelsSpectral);
+#undef KERNEL_TYPE
 
 #undef REGISTER_KERNEL
 #undef KERNEL_FUNCTIONS

@@ -476,14 +476,14 @@ void *CPUDevice::get_cpu_osl_memory()
 #endif
 }
 
-bool CPUDevice::load_kernels(const uint /*kernel_features*/)
+bool CPUDevice::load_kernels(const uint kernel_features)
 {
-  // if (requested_features.use_spectral_rendering) {
-  //   kernels = CPUKernelsSpectral();
-  // }
-  // else {
-  //   kernels = CPUKernelsRGB();
-  // }
+  if (kernel_features & KERNEL_FEATURE_SPECTRAL_RENDERING) {
+    kernels = CPUKernelsSpectral();
+  }
+  else {
+    kernels = CPUKernelsRGB();
+  }
   return true;
 }
 

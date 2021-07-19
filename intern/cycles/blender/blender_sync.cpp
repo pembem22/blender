@@ -749,10 +749,10 @@ SceneParams BlenderSync::get_scene_params(BL::Scene &b_scene, bool background)
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
   const bool shadingsystem = RNA_boolean_get(&cscene, "shading_system");
 
-  if (shadingsystem == 0)
-    params.shadingsystem = SHADINGSYSTEM_SVM;
-  else if (shadingsystem == 1)
+  if (shadingsystem == 1 && !get_boolean(cscene, "use_spectral_rendering"))
     params.shadingsystem = SHADINGSYSTEM_OSL;
+  else if (shadingsystem == 0)
+    params.shadingsystem = SHADINGSYSTEM_SVM;
 
   if (background || DebugFlags().viewport_static_bvh)
     params.bvh_type = BVH_TYPE_STATIC;
@@ -847,10 +847,10 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine &b_engine,
   /* shading system - scene level needs full refresh */
   const bool shadingsystem = RNA_boolean_get(&cscene, "shading_system");
 
-  if (shadingsystem == 0)
-    params.shadingsystem = SHADINGSYSTEM_SVM;
-  else if (shadingsystem == 1)
+  if (shadingsystem == 1 && !get_boolean(cscene, "use_spectral_rendering"))
     params.shadingsystem = SHADINGSYSTEM_OSL;
+  else if (shadingsystem == 0)
+    params.shadingsystem = SHADINGSYSTEM_SVM;
 
   /* Time limit. */
   if (background) {
