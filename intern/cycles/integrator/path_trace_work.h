@@ -56,6 +56,9 @@ class PathTraceWork {
   /* Check whether the big tile is being worked on by multiple path trace works. */
   bool has_multiple_works() const;
 
+  /* Allocate working memory for execution. Must be called before init_execution(). */
+  virtual void alloc_work_memory(){};
+
   /* Initialize execution of kernels.
    * Will ensure that all device queues are initialized for execution.
    *
@@ -120,6 +123,9 @@ class PathTraceWork {
   /* Perform convergence test on the render buffer, and filter the convergence mask.
    * Returns number of active pixels (the ones which did not converge yet). */
   virtual int adaptive_sampling_converge_filter_count_active(float threshold, bool reset) = 0;
+
+  /* Run cryptomatte pass post-processing kernels. */
+  virtual void cryptomatte_postproces() = 0;
 
   /* Cheap-ish request to see whether rendering is requested and is to be stopped as soon as
    * possible, without waiting for any samples to be finished. */

@@ -252,6 +252,22 @@ ccl_device bool kernel_accum_shadow_catcher_transparent(INTEGRATOR_STATE_CONST_A
   return false;
 }
 
+ccl_device void kernel_accum_shadow_catcher_transparent_only(INTEGRATOR_STATE_CONST_ARGS,
+                                                             const float transparent,
+                                                             ccl_global float *ccl_restrict buffer)
+{
+  if (!kernel_data.integrator.has_shadow_catcher) {
+    return;
+  }
+
+  kernel_assert(kernel_data.film.pass_shadow_catcher_matte != PASS_UNUSED);
+
+  /* Matte pass. */
+  if (kernel_shadow_catcher_is_matte_path(INTEGRATOR_STATE_PASS)) {
+    kernel_write_pass_float(buffer + kernel_data.film.pass_shadow_catcher_matte + 3, transparent);
+  }
+}
+
 #endif /* __SHADOW_CATCHER__ */
 
 /* --------------------------------------------------------------------
@@ -460,11 +476,14 @@ ccl_device_inline void kernel_accum_transparent(INTEGRATOR_STATE_CONST_ARGS,
                                                 const float transparent,
                                                 ccl_global float *ccl_restrict render_buffer)
 {
+  ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,
+                                                              render_buffer);
+
   if (kernel_data.film.light_pass_flag & PASSMASK(COMBINED)) {
-    ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,
-                                                                render_buffer);
     kernel_write_pass_float(buffer + kernel_data.film.pass_combined + 3, transparent);
   }
+
+  kernel_accum_shadow_catcher_transparent_only(INTEGRATOR_STATE_PASS, transparent, buffer);
 }
 
 /* Write background contribution to render buffer.
@@ -473,6 +492,7 @@ ccl_device_inline void kernel_accum_transparent(INTEGRATOR_STATE_CONST_ARGS,
 ccl_device_inline void kernel_accum_background(INTEGRATOR_STATE_CONST_ARGS,
                                                const SpectralColor L,
                                                const float transparent,
+                                               const bool is_transparent_background_ray,
                                                ccl_global float *ccl_restrict render_buffer)
 {
   SpectralColor contribution = INTEGRATOR_STATE(path, throughput) * L;
@@ -481,7 +501,13 @@ ccl_device_inline void kernel_accum_background(INTEGRATOR_STATE_CONST_ARGS,
   ccl_global float *buffer = kernel_accum_pixel_render_buffer(INTEGRATOR_STATE_PASS,
                                                               render_buffer);
 
-  kernel_accum_combined_transparent_pass(INTEGRATOR_STATE_PASS, contribution, transparent, buffer);
+  if (is_transparent_background_ray) {
+    kernel_accum_transparent(INTEGRATOR_STATE_PASS, transparent, render_buffer);
+  }
+  else {
+    kernel_accum_combined_transparent_pass(
+        INTEGRATOR_STATE_PASS, contribution, transparent, buffer);
+  }
   kernel_accum_emission_or_background_pass(
       INTEGRATOR_STATE_PASS, contribution, buffer, kernel_data.film.pass_background);
 }

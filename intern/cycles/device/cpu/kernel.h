@@ -94,6 +94,13 @@ class CPUKernels {
   AdaptiveSamplingFilterXFunction adaptive_sampling_filter_x;
   AdaptiveSamplingFilterYFunction adaptive_sampling_filter_y;
 
+  /* Cryptomatte. */
+
+  using CryptomattePostprocessFunction = CPUKernelFunction<void (*)(
+      const KernelGlobals *kg, ccl_global float *render_buffer, int pixel_index)>;
+
+  CryptomattePostprocessFunction cryptomatte_postprocess;
+
   /* Bake. */
 
   using BakeFunction =
@@ -118,6 +125,7 @@ class CPUKernels {
              AdaptiveSamplingConvergenceCheckFunction adaptive_sampling_convergence_check,
              AdaptiveSamplingFilterXFunction adaptive_sampling_filter_x,
              AdaptiveSamplingFilterYFunction adaptive_sampling_filter_y,
+             CryptomattePostprocessFunction cryptomatte_postprocess,
              BakeFunction bake);
 };
 

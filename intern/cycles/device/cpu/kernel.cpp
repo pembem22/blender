@@ -39,6 +39,7 @@ CPUKernels::CPUKernels(
     AdaptiveSamplingConvergenceCheckFunction adaptive_sampling_convergence_check,
     AdaptiveSamplingFilterXFunction adaptive_sampling_filter_x,
     AdaptiveSamplingFilterYFunction adaptive_sampling_filter_y,
+    CryptomattePostprocessFunction cryptomatte_postprocess,
     BakeFunction bake)
     : integrator_init_from_camera(integrator_init_from_camera),
       integrator_init_from_bake(integrator_init_from_bake),
@@ -57,6 +58,7 @@ CPUKernels::CPUKernels(
       adaptive_sampling_convergence_check(adaptive_sampling_convergence_check),
       adaptive_sampling_filter_x(adaptive_sampling_filter_x),
       adaptive_sampling_filter_y(adaptive_sampling_filter_y),
+      cryptomatte_postprocess(cryptomatte_postprocess),
       bake(bake)
 {
 }
@@ -102,6 +104,7 @@ CPUKernels::CPUKernels(
                    REGISTER_KERNEL(adaptive_sampling_convergence_check), \
                    REGISTER_KERNEL(adaptive_sampling_filter_x), \
                    REGISTER_KERNEL(adaptive_sampling_filter_y), /* Bake. */ \
+                   REGISTER_KERNEL(cryptomatte_postprocess),    /* Cryptomatte. */ \
                    REGISTER_KERNEL(bake)) \
   { \
   }

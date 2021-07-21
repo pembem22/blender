@@ -144,9 +144,15 @@ ccl_device_forceinline void integrate_surface_direct_light(INTEGRATOR_STATE_ARGS
   const bool is_transmission = shader_bsdf_is_transmission(sd, ls.D);
 
   BsdfEval bsdf_eval ccl_optional_struct_init;
-  shader_bsdf_eval(
-      INTEGRATOR_STATE_PASS, sd, ls.D, is_transmission, &bsdf_eval, ls.pdf, ls.shader);
+
+  const float bsdf_pdf = shader_bsdf_eval(
+      INTEGRATOR_STATE_PASS, sd, ls.D, is_transmission, &bsdf_eval, ls.shader);
   bsdf_eval_mul(&bsdf_eval, light_eval / ls.pdf);
+
+  if (ls.shader & SHADER_USE_MIS) {
+    const float mis_weight = power_heuristic(ls.pdf, bsdf_pdf);
+    bsdf_eval_mul(&bsdf_eval, mis_weight);
+  }
 
   /* Path termination. */
   const float terminate = path_state_rng_light_termination(kg, rng_state);
@@ -267,7 +273,10 @@ ccl_device_forceinline int integrate_surface_bsdf_bssrdf_bounce(INTEGRATOR_STATE
   }
 
   /* Update path state */
-  if (!(label & LABEL_TRANSPARENT)) {
+  if (label & LABEL_TRANSPARENT) {
+    INTEGRATOR_STATE_WRITE(path, mis_ray_t) += sd->ray_length;
+  }
+  else {
     INTEGRATOR_STATE_WRITE(path, mis_ray_pdf) = bsdf_pdf;
     INTEGRATOR_STATE_WRITE(path, mis_ray_t) = 0.0f;
     INTEGRATOR_STATE_WRITE(path, min_ray_pdf) = fminf(bsdf_pdf,
@@ -295,6 +304,8 @@ ccl_device_forceinline bool integrate_surface_volume_only_bounce(INTEGRATOR_STAT
 #  ifdef __RAY_DIFFERENTIALS__
   INTEGRATOR_STATE_WRITE(ray, dP) = differential_make_compact(sd->dP);
 #  endif
+
+  INTEGRATOR_STATE_WRITE(path, mis_ray_t) += sd->ray_length;
 
   return LABEL_TRANSMIT | LABEL_TRANSPARENT;
 }
